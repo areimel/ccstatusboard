@@ -39,7 +39,8 @@ const responseSchema = z.looseObject({
   seven_day: bucketSchema,
   seven_day_sonnet: bucketSchema,
   seven_day_opus: bucketSchema,
-  limits: z.array(limitSchema).nullable().optional().catch(undefined),
+  // One malformed element must not discard the rest: bad entries become null and are filtered out.
+  limits: z.array(limitSchema.nullable().catch(null)).nullable().optional().catch(undefined),
   extra_usage: z
     .looseObject({
       is_enabled: z.boolean().nullable().optional().catch(undefined),
@@ -107,7 +108,7 @@ export function parseUsageResponse(json: unknown): Omit<LimitsState, 'status' | 
   const parsed = responseSchema.safeParse(json);
   if (!parsed.success) return { perModelWeekly: [] };
   const r = parsed.data;
-  const limits = r.limits ?? [];
+  const limits = (r.limits ?? []).filter((l): l is ApiLimit => l !== null);
   const byKind = (kind: string) => limits.find((l) => l.kind === kind);
 
   const out: Omit<LimitsState, 'status' | 'fetchedAt'> = { perModelWeekly: [] };
@@ -221,7 +222,8 @@ export class UsagePoller {
     if (res.status === 429) {
       const ra = Number.parseInt(res.headers.get('retry-after') ?? '', 10);
       this.emitFailure('rate limited');
-      return (Number.isFinite(ra) && ra >= 0 ? ra : DEFAULT_RETRY_AFTER_S) * 1000;
+      // Floor at the minimum interval so `Retry-After: 0` can't cause a hot loop.
+      return Math.max(MIN_INTERVAL_S, Number.isFinite(ra) && ra >= 0 ? ra : DEFAULT_RETRY_AFTER_S) * 1000;
     }
     if (!res.ok) return this.fail(`HTTP ${res.status}`);
 
