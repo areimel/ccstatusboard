@@ -187,3 +187,19 @@ describe('parser robustness', () => {
     expect(parseTranscriptRecord(raw, ctx)).toEqual([]);
   });
 });
+
+describe('subagent files (forceSidechain) never touch parent session metadata', () => {
+  const ts = '2026-10-11T14:00:00Z';
+  const records: Array<[string, Record<string, unknown>]> = [
+    ['cost-state', { type: 'cost-state', timestamp: ts, totalCostUSD: 1.23 }],
+    ['ai-title', { type: 'ai-title', timestamp: ts, aiTitle: 'Subagent title' }],
+    ['agent-name', { type: 'agent-name', timestamp: ts, agentName: 'Explore' }],
+    ['permission-mode', { type: 'permission-mode', timestamp: ts, permissionMode: 'plan' }],
+  ];
+  for (const [kind, raw] of records) {
+    it(`drops ${kind} records from subagent files but keeps them in the main transcript`, () => {
+      expect(parseTranscriptRecord(raw, { sessionId: 's', forceSidechain: true })).toEqual([]);
+      expect(parseTranscriptRecord(raw, { sessionId: 's' })).toHaveLength(1);
+    });
+  }
+});

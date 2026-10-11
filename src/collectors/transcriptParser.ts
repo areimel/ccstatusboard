@@ -1,6 +1,7 @@
 // Turns raw Claude Code transcript records into typed TranscriptEvents.
 // Formats are undocumented internals (Claude Code 2.1.x): validate everything, never throw.
 import type { TokenCounts, TranscriptEvent } from '../domain/types.js';
+import { dedupKey } from '../domain/dedup.js';
 
 export interface ParseContext {
   sessionId: string;
@@ -74,7 +75,7 @@ function usageEvent(
       kind: 'usage',
       contextTokens: input + cacheCreation + cacheRead,
       record: {
-        key: requestId ? `${id}:${requestId}` : id,
+        key: dedupKey(id, requestId),
         sessionId: ctx.sessionId,
         timestamp,
         model,
@@ -85,10 +86,15 @@ function usageEvent(
   ];
 }
 
+const SESSION_META_TYPES = new Set(['cost-state', 'ai-title', 'agent-name', 'permission-mode']);
+
 export function parseTranscriptRecord(raw: unknown, ctx: ParseContext): TranscriptEvent[] {
   if (!isObj(raw)) return [];
   const isSidechain = ctx.forceSidechain === true || raw.isSidechain === true;
   const timestamp = parseTs(raw.timestamp);
+  // Session-level metadata in a subagent file describes the subagent, not the parent session.
+  if (ctx.forceSidechain === true && typeof raw.type === 'string' && SESSION_META_TYPES.has(raw.type))
+    return [];
 
   switch (raw.type) {
     case 'assistant':
