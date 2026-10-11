@@ -3,7 +3,6 @@ import { totalsForWindow } from '../domain/aggregate.js';
 import { contextPercent, contextWindowFor, currentContextTokens } from '../domain/context.js';
 import type {
   DisplayStatus,
-  ModelTotals,
   PriceLookup,
   RegistryEntry,
   SessionView,
@@ -11,7 +10,7 @@ import type {
   TranscriptEvent,
   UsageRecord,
 } from '../domain/types.js';
-import { sanitizeOptional, sanitizeText } from './sanitize.js';
+import { sanitizeKeys, sanitizeOptional, sanitizeText } from './sanitize.js';
 
 const ALL_TIME: TimeWindow = { start: 0, end: Number.MAX_SAFE_INTEGER };
 
@@ -102,11 +101,15 @@ export function displayStatus(s: SessionState): { status: DisplayStatus; rawStat
   return { status: 'idle', rawStatus: raw };
 }
 
+/** First non-empty sanitized candidate: registry name → ai-title → agent-name → cwd basename → id prefix. */
 export function displayName(s: SessionState): string {
   const cwd = s.registry?.cwd ?? s.meta.cwd;
-  return (
-    s.registry?.name || s.aiTitle || s.agentName || (cwd ? basename(cwd) : '') || s.sessionId.slice(0, 8)
-  );
+  const candidates = [s.registry?.name, s.aiTitle, s.agentName, cwd ? basename(cwd) : undefined];
+  for (const c of candidates) {
+    const clean = c === undefined ? '' : sanitizeText(c).trim();
+    if (clean) return clean;
+  }
+  return sanitizeText(s.sessionId).slice(0, 8);
 }
 
 export function lastActivityOf(s: SessionState): number {
@@ -116,12 +119,6 @@ export function lastActivityOf(s: SessionState): number {
 
 export function sessionVersion(s: SessionState): string | undefined {
   return s.registry?.version ?? s.meta.version;
-}
-
-function sanitizeKeys(byModel: Record<string, ModelTotals>): Record<string, ModelTotals> {
-  const out: Record<string, ModelTotals> = {};
-  for (const [model, totals] of Object.entries(byModel)) out[sanitizeText(model)] = totals;
-  return out;
 }
 
 /** Builds the UI view. Every disk-sourced string is sanitized here so the UI never sees control chars. */
@@ -134,7 +131,7 @@ export function buildSessionView(s: SessionState, lookup: PriceLookup | null): S
     contextTokens === undefined ? undefined : contextWindowFor(model, model ? lookup?.(model) : undefined);
   const { status, rawStatus } = displayStatus(s);
   return {
-    sessionId: sanitizeText(s.sessionId),
+    sessionId: s.sessionId, // identity key, kept raw; never rendered directly
     pid: s.registry?.pid,
     live: s.live,
     status,
@@ -142,7 +139,7 @@ export function buildSessionView(s: SessionState, lookup: PriceLookup | null): S
     waitingFor: status === 'waiting' ? sanitizeOptional(s.registry?.waitingFor) : undefined,
     activeAgents: s.live ? s.agents.activeCount : 0,
     agentNames: s.live ? s.agents.names.map(sanitizeText) : [],
-    name: sanitizeText(displayName(s)),
+    name: displayName(s),
     cwd: sanitizeOptional(s.registry?.cwd ?? s.meta.cwd),
     gitBranch: sanitizeOptional(s.meta.gitBranch),
     model: sanitizeOptional(model),

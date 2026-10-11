@@ -1,3 +1,6 @@
+import { sumCost } from '../domain/cost.js';
+import { addTokens, type ModelTotals, type WindowTotals } from '../domain/types.js';
+
 // Strings from disk/network are rendered raw by the UI; strip control characters
 // so a crafted session file cannot inject ANSI/OSC escape sequences into the terminal.
 
@@ -18,4 +21,21 @@ export function sanitizeText(s: string): string {
 
 export function sanitizeOptional(s: string | undefined): string | undefined {
   return s === undefined ? undefined : sanitizeText(s);
+}
+
+/** Sanitizes model-name keys; keys that collide after sanitizing are merged (tokens added, costs via sumCost). */
+export function sanitizeKeys(byModel: Record<string, ModelTotals>): Record<string, ModelTotals> {
+  const out: Record<string, ModelTotals> = {};
+  for (const [model, totals] of Object.entries(byModel)) {
+    const key = sanitizeText(model);
+    const prev = out[key];
+    out[key] = prev
+      ? { costUSD: sumCost(prev.costUSD, totals.costUSD), tokens: addTokens(prev.tokens, totals.tokens) }
+      : totals;
+  }
+  return out;
+}
+
+export function sanitizeWindowTotals(w: WindowTotals): WindowTotals {
+  return { ...w, byModel: sanitizeKeys(w.byModel) };
 }

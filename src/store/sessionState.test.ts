@@ -72,6 +72,17 @@ describe('displayName', () => {
     s.registry = { pid: 1, sessionId: 'abcdef123456', cwd: '/work/proj', name: 'my-session' };
     expect(displayName(s)).toBe('my-session');
   });
+
+  it('sanitizes each candidate and skips ones that are empty after sanitizing', () => {
+    const s = createSessionState('ab\x1bcdefghij');
+    expect(displayName(s)).toBe('abcdefgh');
+    applySessionEvent(s, { kind: 'meta', timestamp: 1, isSidechain: false, cwd: '/work/pr\x1boj' }, false);
+    applySessionEvent(s, { kind: 'title', timestamp: 0, title: ' \x1b\x07 ', source: 'ai-title' }, false);
+    s.registry = { pid: 1, sessionId: 's', cwd: '/work/pr\x1boj', name: '\x1b\x07' };
+    expect(displayName(s)).toBe('proj');
+    applySessionEvent(s, { kind: 'title', timestamp: 0, title: 'agent\x9b-y', source: 'agent-name' }, false);
+    expect(displayName(s)).toBe('agent-y');
+  });
 });
 
 describe('applySessionEvent + buildSessionView', () => {

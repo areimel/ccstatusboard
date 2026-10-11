@@ -21,7 +21,7 @@ import {
   todayWindow,
   weekWindowFromLimit,
 } from '../domain/windows.js';
-import { sanitizeOptional, sanitizeText } from './sanitize.js';
+import { sanitizeOptional, sanitizeText, sanitizeWindowTotals } from './sanitize.js';
 import {
   applySessionEvent,
   buildSessionView,
@@ -45,7 +45,8 @@ export class Store {
   private readonly sessions = new Map<string, SessionState>();
   private readonly dedup = new DedupSet();
   private readonly records: UsageRecord[] = [];
-  private sortedTs: number[] | null = null;
+  /** Usage timestamps, kept sorted ascending as records arrive. */
+  private readonly sortedTs: number[] = [];
   private limits: LimitsState = { status: 'loading', perModelWeekly: [] };
   private lookup: PriceLookup | null = null;
   private pricingStatus: PricingStatus = 'loading';
@@ -55,6 +56,7 @@ export class Store {
   private snapshot: Snapshot;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
+  private stopped = false;
 
   constructor(private readonly opts: StoreOptions) {
     this.claudeDirFound = opts.claudeDirFound;
@@ -69,7 +71,7 @@ export class Store {
         isNew = this.dedup.add(e.record.key);
         if (isNew) {
           this.records.push(e.record);
-          this.sortedTs = null;
+          insertSorted(this.sortedTs, e.record.timestamp);
         }
       }
       applySessionEvent(s, e, isNew);
@@ -127,11 +129,13 @@ export class Store {
   };
 
   start(): void {
+    this.stopped = false;
     if (this.ticker) return;
     this.ticker = setInterval(() => this.flush(), this.opts.refreshMs);
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.ticker) clearInterval(this.ticker);
     if (this.pending) clearTimeout(this.pending);
     this.ticker = null;
@@ -144,7 +148,13 @@ export class Store {
       this.pending = null;
     }
     this.snapshot = this.compute();
-    for (const fn of this.listeners) fn();
+    for (const fn of this.listeners) {
+      try {
+        fn();
+      } catch {
+        // One misbehaving subscriber must not starve the others.
+      }
+    }
   }
 
   private session(sessionId: string): SessionState {
@@ -157,22 +167,17 @@ export class Store {
   }
 
   private markDirty(): void {
-    if (this.pending) return;
+    if (this.pending || this.stopped) return;
     this.pending = setTimeout(() => {
       this.pending = null;
       this.flush();
     }, this.opts.refreshMs);
   }
 
-  private timestamps(): number[] {
-    if (!this.sortedTs) this.sortedTs = this.records.map((r) => r.timestamp).sort((a, b) => a - b);
-    return this.sortedTs;
-  }
-
   private blockWindow(now: number): TimeWindow {
     const resetsAt = this.limits.block?.resetsAt;
     if (resetsAt !== undefined) return blockWindowFromLimit(resetsAt, now);
-    return deriveCurrentBlock(this.timestamps(), now) ?? { start: now, end: now };
+    return deriveCurrentBlock(this.sortedTs, now) ?? { start: now, end: now };
   }
 
   private weekWindow(now: number): TimeWindow {
@@ -201,10 +206,10 @@ export class Store {
       claudeDir: this.opts.claudeDir,
       limits: this.limits,
       costs: {
-        block: totalsForWindow(this.records, this.blockWindow(now), lookup),
-        today: totalsForWindow(this.records, todayWindow(now), lookup),
-        week: totalsForWindow(this.records, this.weekWindow(now), lookup),
-        month: totalsForWindow(this.records, monthWindow(now), lookup),
+        block: sanitizeWindowTotals(totalsForWindow(this.records, this.blockWindow(now), lookup)),
+        today: sanitizeWindowTotals(totalsForWindow(this.records, todayWindow(now), lookup)),
+        week: sanitizeWindowTotals(totalsForWindow(this.records, this.weekWindow(now), lookup)),
+        month: sanitizeWindowTotals(totalsForWindow(this.records, monthWindow(now), lookup)),
         burnRatePerHour: burnRatePerHour(this.records, now, lookup),
         hourlySparkline: hourlySparkline(this.records, now, lookup),
       },
@@ -236,4 +241,21 @@ function sanitizeLimits(l: LimitsState): LimitsState {
     ...(l.extra ? { extra: { ...l.extra, currency: sanitizeOptional(l.extra.currency) } } : {}),
     ...(l.error !== undefined ? { error: sanitizeText(l.error) } : {}),
   };
+}
+
+/** Inserts `v` into ascending `arr`: O(1) append for in-order data, binary search otherwise. */
+function insertSorted(arr: number[], v: number): void {
+  const last = arr[arr.length - 1];
+  if (last === undefined || v >= last) {
+    arr.push(v);
+    return;
+  }
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((arr[mid] ?? 0) <= v) lo = mid + 1;
+    else hi = mid;
+  }
+  arr.splice(lo, 0, v);
 }
