@@ -11,6 +11,7 @@ import { HistoryScanner } from '../collectors/historyScanner.js';
 import { SessionRegistry } from '../collectors/sessionRegistry.js';
 import { scanSubagents } from '../collectors/subagents.js';
 import { UsagePoller } from '../collectors/usageApi.js';
+import type { CredentialsResult } from '../collectors/credentials.js';
 
 export interface Runtime {
   store: Store;
@@ -25,6 +26,8 @@ export interface RuntimeOptions {
   version: string;
   now?: () => number;
   fetch?: typeof fetch;
+  /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
+  readCredentials?: (claudeDir: string) => Promise<CredentialsResult>;
 }
 
 const AGENT_SCAN_MS = 5_000;
@@ -151,7 +154,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     intervalSeconds: config.usagePollSeconds,
     version,
     enabled: config.usageApi,
-    deps: { ...fetchDep, now },
+    deps: { ...fetchDep, now, ...(opts.readCredentials ? { readCredentials: opts.readCredentials } : {}) },
     // An in-flight poll may resolve after stop(); drop it.
     onUpdate: (l: LimitsState) => {
       if (!stopped) store.setLimits(l);

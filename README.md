@@ -91,19 +91,19 @@ ccstatusboard [options]
 
 ## Where the data comes from
 
-| Data                           | Source                                                                                   |
-| ------------------------------ | ---------------------------------------------------------------------------------------- |
-| Running sessions and status    | `~/.claude/sessions/<pid>.json`, checked against the live process table                  |
-| Tokens, model, branch, context | Session transcripts in `~/.claude/projects/**/*.jsonl` (tailed incrementally)            |
-| Today / week / month totals    | A startup scan of transcripts from the last 35 days, cached in `~/.cache/ccstatusboard/` |
-| 5h / weekly limits             | Anthropic's OAuth usage endpoint (as used by Claude Code's `/usage`), polled every 60 s  |
-| Prices                         | [LiteLLM's pricing table](https://github.com/BerriAI/litellm), cached for 24 h           |
+| Data                           | Source                                                                                               |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Running sessions and status    | `~/.claude/sessions/<pid>.json`, checked against the live process table                              |
+| Tokens, model, branch, context | Session transcripts in `~/.claude/projects/**/*.jsonl` (tailed incrementally)                        |
+| Today / week / month totals    | A startup scan of transcripts from the last 35 days, cached in ccstatusboard's cache dir (see below) |
+| 5h / weekly limits             | Anthropic's OAuth usage endpoint (as used by Claude Code's `/usage`), polled every 60 s              |
+| Prices                         | [LiteLLM's pricing table](https://github.com/BerriAI/litellm), cached for 24 h                       |
 
 Costs are **estimates** based on API list prices. On a Pro/Max subscription you are not billed these amounts.
 
 ## Privacy and safety
 
-- **Read-only.** ccstatusboard never writes inside `~/.claude`. Its only writes are its own caches in `~/.cache/ccstatusboard/` (or `$XDG_CACHE_HOME/ccstatusboard/`).
+- **Read-only.** ccstatusboard never writes inside `~/.claude`. Its only writes are its own caches in `$XDG_CACHE_HOME/ccstatusboard/` if `XDG_CACHE_HOME` is set, otherwise `~/.cache/ccstatusboard/` on Linux and `~/Library/Caches/ccstatusboard/` on macOS.
 - It reads your Claude Code OAuth access token (from `~/.claude/.credentials.json`, or on macOS the Keychain entry `Claude Code-credentials`) **only** to call Anthropic's usage endpoint. It never refreshes, stores or sends the token anywhere else. Use `--no-usage-api` to turn this off.
 - It never opens the per-session `*.key` files.
 - The only network requests are to `api.anthropic.com` (usage) and `raw.githubusercontent.com` (LiteLLM prices).

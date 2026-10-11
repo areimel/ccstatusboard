@@ -1,7 +1,8 @@
 // End-to-end: temp CLAUDE_CONFIG_DIR + fake network → real collectors → Store snapshot (spec §9).
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appendFile, rm } from 'node:fs/promises';
-import { createRuntime, type Runtime } from '../../src/app/runtime.js';
+import { createRuntime, type Runtime, type RuntimeOptions } from '../../src/app/runtime.js';
+import { readCredentials } from '../../src/collectors/credentials.js';
 import { DEFAULT_CONFIG } from '../../src/config/schema.js';
 import type { Config } from '../../src/domain/types.js';
 import { assistantLine, costStateLine } from '../helpers/transcript.js';
@@ -39,6 +40,7 @@ async function boot(
     config?: Partial<Config>;
     credentials?: boolean;
     createClaudeDir?: boolean;
+    readCredentials?: RuntimeOptions['readCredentials'];
   } = {},
 ) {
   fx = await makeClaudeDir(sessions, { credentials: o.credentials, createClaudeDir: o.createClaudeDir });
@@ -48,6 +50,7 @@ async function boot(
     cacheDir: fx.cacheDir,
     version: '0.1.0-test',
     fetch: o.fetch ?? makeFakeFetch({ usage: usageFixture(Date.now()), pricing: PRICING_FIXTURE }),
+    ...(o.readCredentials ? { readCredentials: o.readCredentials } : {}),
   });
   await rt.start();
   return { fx, store: rt.store };
@@ -141,8 +144,21 @@ describe('runtime integration', () => {
   });
 
   it('missing credentials → limits no-credentials', async () => {
-    const { store } = await boot([], { credentials: false });
+    // Pin the platform so this never reaches the developer's real macOS Keychain.
+    const exec = vi.fn(async () => {
+      throw new Error('keychain must not be queried');
+    });
+    const seen: string[] = [];
+    const { store, fx: f } = await boot([], {
+      credentials: false,
+      readCredentials: (dir) => {
+        seen.push(dir);
+        return readCredentials(dir, { platform: 'linux', exec });
+      },
+    });
     await waitFor(() => store.getSnapshot().limits.status === 'no-credentials');
+    expect(seen).toContain(f.claudeDir);
+    expect(exec).not.toHaveBeenCalled();
   });
 
   it('missing Claude dir → claudeDirFound false and no sessions', async () => {
