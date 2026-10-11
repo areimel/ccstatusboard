@@ -1,0 +1,70 @@
+{
+  "name": "ccstatusboard",
+  "version": "0.1.0",
+  "description": "htop-style terminal dashboard for all your Claude Code sessions, usage limits and costs",
+  "type": "module",
+  "bin": {
+    "ccstatusboard": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "license": "MIT",
+  "author": "Alec Reimel",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "tui",
+    "ink",
+    "dashboard",
+    "statusline"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@inkjs/ui": "2.0.0",
+    "@mishieck/ink-titled-box": "0.4.2",
+    "@pppp606/ink-chart": "0.2.8",
+    "ink": "7.1.1",
+    "ink-gradient": "4.0.1",
+    "react": "19.2.8",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22",
+    "@types/react": "19.2.18",
+    "eslint": "^10.12.0",
+    "ink-testing-library": "^4.0.0",
+    "prettier": "^3.9.10",
+    "tsup": "^8.5.1",
+    "tsx": "^4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "@mishieck/ink-titled-box": {
+      "ink": "$ink",
+      "react": "$react",
+      "typescript": "$typescript"
+    }
+  }
+}
