@@ -256,3 +256,26 @@ describe('App height budget', () => {
     await vi.waitFor(() => expect(lastFrame()).toContain('No sessions match'));
   });
 });
+
+describe('App height with long warnings', () => {
+  for (const size of [
+    { columns: 60, rows: 16 },
+    { columns: 80, rows: 24 },
+  ]) {
+    it(`stays within ${size.columns}x${size.rows}`, async () => {
+      const warnings = Array.from(
+        { length: 4 },
+        (_, i) => `runtime warning number ${i} with a very long explanation text`,
+      );
+      const snap = makeSnapshot({
+        sessions: Array.from({ length: 30 }, (_, i) => makeSession({ sessionId: `s${i}`, name: `sess${i}` })),
+        pricingStatus: 'stale',
+        unknownModels: ['claude-mystery-model-1', 'claude-mystery-model-2'],
+        warnings,
+      });
+      const { lastFrame } = renderApp(snap, size);
+      await vi.waitFor(() => expect(stripAnsi(lastFrame()!)).toContain('Sessions'));
+      expect(stripAnsi(lastFrame()!).split('\n').length).toBeLessThanOrEqual(size.rows);
+    });
+  }
+});

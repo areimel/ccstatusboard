@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render } from 'ink-testing-library';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render } from 'ink-testing-library';
 import { UsagePanel, usagePanelRows } from './UsagePanel.js';
 import { makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { emptyWindowTotals, type Snapshot } from '../domain/types.js';
 import { stripAnsi } from '../../test/helpers/ansi.js';
+
+afterEach(cleanup);
 
 // TitledBox renders its title only on the second render, so wait for it.
 async function frame(snap: Snapshot = makeSnapshot()): Promise<string> {

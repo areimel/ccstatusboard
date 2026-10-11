@@ -32,7 +32,7 @@ export function Header({ snapshot }: { snapshot: Snapshot }): JSX.Element {
         <Text color={theme.text}>{formatClock(snapshot.now)}</Text>
       </Text>
       {warnings.length > 0 ? (
-        <Text color={theme.warn} wrap="wrap">
+        <Text color={theme.warn} wrap="truncate-end">
           {warnings.join('  ')}
         </Text>
       ) : null}
