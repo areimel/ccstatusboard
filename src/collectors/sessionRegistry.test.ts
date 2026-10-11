@@ -175,23 +175,6 @@ describe('SessionRegistry.scanOnce', () => {
     await reg.scanOnce();
     expect(upserts.map((e) => e.sessionId)).toEqual(['ok']);
   });
-
-  it('treats a missing sessions dir as empty, and ends previously live sessions', async () => {
-    let missing = false;
-    const deps: RegistryDeps = {
-      readdir: async () => {
-        if (missing) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-        return ['1.json'];
-      },
-      readFile: async () => entry(1, 's1'),
-      isAlive: () => true,
-    };
-    const { reg, ended } = makeRegistry(deps);
-    await reg.scanOnce();
-    missing = true;
-    await expect(reg.scanOnce()).resolves.toBeUndefined();
-    expect(ended).toEqual([['s1', 1]]);
-  });
 });
 
 describe('SessionRegistry callback safety', () => {

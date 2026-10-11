@@ -50,11 +50,11 @@ describe('SessionRegistry resilience', () => {
     expect(t.upserts).toHaveLength(2);
   });
 
-  it('ENOENT on readdir still ends previously live sessions', async () => {
+  it('a missing sessions dir (ENOENT) is empty and ends previously live sessions', async () => {
     const t = setup({ '100.json': entry(100, 'a') }, new Set([100]));
     await t.reg.scanOnce();
     t.failReaddir('ENOENT');
-    await t.reg.scanOnce();
+    await expect(t.reg.scanOnce()).resolves.toBeUndefined();
     expect(t.ended).toEqual([['a', 100]]);
   });
 
