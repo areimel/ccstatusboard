@@ -61,6 +61,7 @@ export class SessionRegistry {
   private rescan = false;
   private timer: ReturnType<typeof setInterval> | null = null;
   private watcher: FSWatcher | null = null;
+  private stopped = false;
 
   constructor(opts: {
     claudeDir: string;
@@ -90,7 +91,7 @@ export class SessionRegistry {
       do {
         this.rescan = false;
         await this.doScan();
-      } while (this.rescan);
+      } while (this.rescan && !this.stopped);
     })().finally(() => {
       this.scanning = null;
     });
@@ -117,20 +118,38 @@ export class SessionRegistry {
       const e = parseRegistryEntry(raw);
       if (!e) continue;
       if (!this.alive(e.pid, e.procStart)) continue;
+      if (this.stopped) return;
       seen.set(e.sessionId, e.pid);
-      this.onUpsert(e);
+      try {
+        this.onUpsert(e);
+      } catch {
+        // A consumer error must never kill the scan.
+      }
     }
-    for (const [sessionId, pid] of this.live) {
-      if (!seen.has(sessionId)) this.onEnded(sessionId, pid);
-    }
+    if (this.stopped) return;
+    const prev = this.live;
     this.live = seen;
+    for (const [sessionId, pid] of prev) {
+      if (this.stopped) return;
+      if (seen.has(sessionId)) continue;
+      try {
+        this.onEnded(sessionId, pid);
+      } catch {
+        // swallow
+      }
+    }
   }
 
   start(): void {
-    void this.scanOnce();
-    this.timer = setInterval(() => void this.scanOnce(), this.pollMs);
+    if (this.timer) return;
+    this.stopped = false;
+    const kick = (): void => {
+      this.scanOnce().catch(() => {});
+    };
+    kick();
+    this.timer = setInterval(kick, this.pollMs);
     try {
-      const w = this.watchFn(this.dir, () => void this.scanOnce());
+      const w = this.watchFn(this.dir, kick);
       w.on?.('error', () => {
         w.close();
         if (this.watcher === w) this.watcher = null;
@@ -143,6 +162,7 @@ export class SessionRegistry {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.watcher?.close();

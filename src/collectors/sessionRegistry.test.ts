@@ -194,6 +194,77 @@ describe('SessionRegistry.scanOnce', () => {
   });
 });
 
+describe('SessionRegistry callback safety', () => {
+  it('a throwing onUpsert does not reject scanOnce', async () => {
+    const { deps } = fakeFs({ '1.json': entry(1, 's1'), '2.json': entry(2, 's2') }, new Set([1, 2]));
+    const seen: string[] = [];
+    const reg = new SessionRegistry({
+      claudeDir: CLAUDE,
+      deps,
+      onUpsert: (e) => {
+        seen.push(e.sessionId);
+        throw new Error('boom');
+      },
+      onEnded: () => {},
+    });
+    await expect(reg.scanOnce()).resolves.toBeUndefined();
+    expect(seen).toEqual(['s1', 's2']);
+  });
+
+  it('a throwing onEnded still fires exactly once per session', async () => {
+    const alive = new Set([1, 2]);
+    const { deps } = fakeFs({ '1.json': entry(1, 's1'), '2.json': entry(2, 's2') }, alive);
+    const ended: string[] = [];
+    const reg = new SessionRegistry({
+      claudeDir: CLAUDE,
+      deps,
+      onUpsert: () => {},
+      onEnded: (sid) => {
+        ended.push(sid);
+        throw new Error('boom');
+      },
+    });
+    await reg.scanOnce();
+    alive.clear();
+    await expect(reg.scanOnce()).resolves.toBeUndefined();
+    await reg.scanOnce();
+    await reg.scanOnce();
+    expect(ended.sort()).toEqual(['s1', 's2']);
+  });
+
+  it('fires no callbacks after stop() during an in-flight scan', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const deps: RegistryDeps = {
+      readdir: async () => ['1.json'],
+      readFile: async () => {
+        await gate;
+        return entry(1, 's1');
+      },
+      isAlive: () => true,
+    };
+    const { reg, upserts, ended } = makeRegistry(deps);
+    const p = reg.scanOnce();
+    reg.stop();
+    release();
+    await p;
+    expect(upserts).toEqual([]);
+    expect(ended).toEqual([]);
+  });
+
+  it('start() is idempotent', async () => {
+    vi.useFakeTimers();
+    const { deps } = fakeFs({}, new Set());
+    const watch = vi.fn(() => ({ close: vi.fn(), on: vi.fn() }));
+    deps.watch = watch as unknown as RegistryDeps['watch'];
+    const { reg } = makeRegistry(deps);
+    reg.start();
+    reg.start();
+    expect(watch).toHaveBeenCalledTimes(1);
+    reg.stop();
+  });
+});
+
 describe('SessionRegistry.start/stop', () => {
   it('scans immediately, then every pollMs, and stops cleanly', async () => {
     vi.useFakeTimers();
