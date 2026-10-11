@@ -203,7 +203,7 @@ export class Store {
     return {
       now,
       claudeDirFound: this.claudeDirFound,
-      claudeDir: this.opts.claudeDir,
+      claudeDir: sanitizeText(this.opts.claudeDir),
       limits: this.limits,
       costs: {
         block: sanitizeWindowTotals(totalsForWindow(this.records, this.blockWindow(now), lookup)),

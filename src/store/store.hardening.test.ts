@@ -18,6 +18,12 @@ describe('Store sanitization', () => {
     expect(snap.limits.perModelWeekly[0]?.label).toBe('opus');
   });
 
+  it('strips control characters from claudeDir (it comes from flags/env/config)', () => {
+    const store = makeStore({ claudeDirFound: false, claudeDir: '/tmp/evil\x1b[2J\x07dir' });
+    store.flush();
+    expect(store.getSnapshot().claudeDir).toBe('/tmp/evil[2Jdir');
+  });
+
   it('sanitizes byModel keys in every window total, merging collisions', () => {
     const store = makeStore();
     store.setPricing(lookup, 'ok');
