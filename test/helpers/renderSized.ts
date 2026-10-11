@@ -2,13 +2,14 @@
 // ink-testing-library's stdout is fixed at 100 columns, so layout-height tests use this instead.
 import { EventEmitter } from 'node:events';
 import type { ReactElement } from 'react';
-import { render } from 'ink';
+import { render, type Instance } from 'ink';
 import { stripAnsi } from './ansi.js';
 
 export interface SizedRender {
   /** Last non-empty frame, ANSI-stripped, without the trailing newline. */
   lastFrame: () => string;
   unmount: () => void;
+  instance: Instance;
 }
 
 export function renderSized(el: ReactElement, size: { columns: number; rows: number }): SizedRender {
@@ -40,5 +41,6 @@ export function renderSized(el: ReactElement, size: { columns: number; rows: num
   return {
     lastFrame: () => stripAnsi(frames.filter((f) => f.trim() !== '').at(-1) ?? '').replace(/\n$/, ''),
     unmount: () => instance.unmount(),
+    instance,
   };
 }

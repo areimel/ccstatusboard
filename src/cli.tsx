@@ -5,6 +5,7 @@ import { ConfigError, loadConfig, parseCliArgs } from './config/load.js';
 import type { Config } from './domain/types.js';
 import { cacheDir, resolveClaudeDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
+import { superviseInk } from './app/supervise.js';
 import { App } from './ui/App.js';
 
 // dist/cli.js (bundled) and src/cli.tsx are both one level below package.json.
@@ -116,6 +117,8 @@ async function main(argv: string[]): Promise<number | undefined> {
   ink.instance = render(<App store={runtime.store} config={config} onQuit={() => shutdown(0)} />, {
     exitOnCtrlC: false,
   });
+  // A render error unmounts Ink and only rejects waitUntilExit(): restore the terminal and exit 1.
+  superviseInk(ink.instance, { onExit: () => shutdown(0), onCrash: crash });
   await runtime.start(); // render first so the loading state is visible immediately
   return undefined; // keep running until quit
 }
