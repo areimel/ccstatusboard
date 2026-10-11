@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { UsagePanel } from './UsagePanel.js';
+import { UsagePanel, usagePanelRows } from './UsagePanel.js';
 import { makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { emptyWindowTotals, type Snapshot } from '../domain/types.js';
 import { stripAnsi } from '../../test/helpers/ansi.js';
@@ -77,4 +77,32 @@ describe('UsagePanel', () => {
     expect(out).toMatch(/block\s+—/);
     expect(out).toContain('burn —');
   });
+});
+
+describe('usagePanelRows', () => {
+  const variants: Record<string, Snapshot> = {
+    default: makeSnapshot(),
+    scanning: makeSnapshot({ scan: { done: false, filesDone: 1, filesTotal: 5 } }),
+    many: makeSnapshot({
+      limits: {
+        status: 'stale',
+        fetchedAt: NOW - 60_000,
+        block: { label: '5h', percent: 10 },
+        weekly: { label: 'Week', percent: 20 },
+        perModelWeekly: [
+          { label: 'Opus', percent: 1 },
+          { label: 'Sonnet', percent: 2 },
+          { label: 'Haiku', percent: 3 },
+        ],
+        extra: { enabled: true, percent: 5, usedAmount: 1, limitAmount: 10, currency: 'USD' },
+      },
+    }),
+    noCreds: makeSnapshot({ limits: { status: 'no-credentials', perModelWeekly: [] } }),
+  };
+  for (const [name, snap] of Object.entries(variants)) {
+    it(`equals the rendered line count (${name})`, async () => {
+      const out = await frame(snap);
+      expect(usagePanelRows(snap)).toBe(out.split('\n').length);
+    });
+  }
 });

@@ -46,9 +46,25 @@ function meterRows(limits: LimitsState, now: number): MeterRow[] {
   return rows;
 }
 
+const hasLimitValues = (limits: LimitsState): boolean =>
+  limits.block !== undefined || limits.weekly !== undefined;
+const isLimitsStale = (limits: LimitsState): boolean =>
+  limits.status === 'stale' || limits.status === 'error' || limits.status === 'expired';
+
+/** Exact rendered height of <UsagePanel>: 2 border rows + the taller of its two columns. */
+export function usagePanelRows(snapshot: Snapshot): number {
+  const { limits, scan } = snapshot;
+  const limitLines = hasLimitValues(limits)
+    ? meterRows(limits, snapshot.now).length + (isLimitsStale(limits) ? 1 : 0)
+    : 1;
+  const left = limitLines + 1; // + burn/sparkline row
+  const right = 4 + (scan.done ? 0 : 1); // cost rows + optional spinner
+  return 2 + Math.max(left, right);
+}
+
 function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: number; leftWidth: number }) {
   const theme = useTheme();
-  const hasValues = limits.block !== undefined || limits.weekly !== undefined;
+  const hasValues = hasLimitValues(limits);
   const message = STATUS_MESSAGE[limits.status];
   if (!hasValues) {
     return (
@@ -63,7 +79,7 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
   const rows = meterRows(limits, now);
   const labelWidth = Math.max(...rows.map((r) => r.label.length));
   const meterWidth = Math.max(10, Math.min(60, leftWidth - labelWidth - 1 - SUFFIX_WIDTH - 1));
-  const isStale = limits.status === 'stale' || limits.status === 'error' || limits.status === 'expired';
+  const isStale = isLimitsStale(limits);
   return (
     <Box flexDirection="column">
       {rows.map((r) => (

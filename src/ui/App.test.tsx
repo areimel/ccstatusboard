@@ -5,6 +5,7 @@ import { App, initialUiState, uiReducer, type UiState } from './App.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import type { Snapshot } from '../domain/types.js';
+import { stripAnsi } from '../../test/helpers/ansi.js';
 
 afterEach(cleanup);
 
@@ -214,5 +215,44 @@ describe('App list shrink and layout budget', () => {
     await vi.waitFor(() => expect(lastFrame()).toContain('Sessions'));
     expect(lastFrame()).toContain('pricing stale');
     expect(lastFrame()!.split('\n').length).toBeLessThanOrEqual(size.rows);
+  });
+});
+
+describe('App height budget', () => {
+  const heavy = (): Snapshot =>
+    makeSnapshot({
+      sessions: Array.from({ length: 40 }, (_, i) =>
+        makeSession({ sessionId: `s${i}`, name: `sess${i}`, lastActivity: NOW - i * 1_000 }),
+      ),
+      scan: { done: false, filesDone: 3, filesTotal: 10 },
+      pricingStatus: 'stale',
+      warnings: ['something odd'],
+      limits: {
+        status: 'stale',
+        fetchedAt: NOW - 600_000,
+        block: { label: '5h', percent: 58, resetsAt: NOW + 3_600_000 },
+        weekly: { label: 'Week', percent: 31, resetsAt: NOW + 86_400_000 },
+        perModelWeekly: [
+          { label: 'Opus', percent: 22 },
+          { label: 'Sonnet', percent: 12 },
+        ],
+      },
+    });
+
+  for (const rows of [16, 20, 24, 28, 40]) {
+    it(`renders at most ${rows} lines at 120x${rows}`, async () => {
+      const { lastFrame } = renderApp(heavy(), { columns: 120, rows });
+      await vi.waitFor(() => expect(stripAnsi(lastFrame()!)).toContain('Sessions'));
+      const lines = stripAnsi(lastFrame()!).split('\n').length;
+      expect(lines).toBeLessThanOrEqual(rows);
+    });
+  }
+
+  it('shows "No sessions match" when the search matches nothing', async () => {
+    const { lastFrame, stdin } = renderApp(twoSessions());
+    stdin.write('/');
+    await delay();
+    stdin.write('z');
+    await vi.waitFor(() => expect(lastFrame()).toContain('No sessions match'));
   });
 });

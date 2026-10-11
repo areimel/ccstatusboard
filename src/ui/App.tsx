@@ -7,7 +7,7 @@ import { ThemeProvider } from '@inkjs/ui';
 import { THEMES, ThemeContext, inkUiTheme } from './theme.js';
 import { Panel } from './Panel.js';
 import { Header, headerWarnings } from './Header.js';
-import { UsagePanel } from './UsagePanel.js';
+import { UsagePanel, usagePanelRows } from './UsagePanel.js';
 import { Footer } from './Footer.js';
 import { SessionTable, filterSessions, sortSessions } from './SessionTable.js';
 import { DetailPane } from './DetailPane.js';
@@ -16,9 +16,10 @@ import { HelpOverlay } from './HelpOverlay.js';
 export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 export const DETAIL_MIN_ROWS = 24;
-// header 1 (+1 when warnings) + usage panel 6 + table borders 2 + table header 1 + footer 1
-const CHROME_ROWS = 11;
-const DETAIL_ROWS = 5;
+const TABLE_CHROME_ROWS = 3;
+const FOOTER_ROWS = 1;
+const SPARE_ROWS = 1;
+const DETAIL_ROWS = 6;
 const SORT_ORDER: SortKey[] = ['status', 'activity', 'cost', 'ctx', 'name'];
 
 export interface UiState {
@@ -170,9 +171,12 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
     return <Text>Terminal too small</Text>;
   }
 
-  const detailShown = ui.showDetail && rows >= DETAIL_MIN_ROWS;
   const headerRows = 1 + (headerWarnings(snapshot).length > 0 ? 1 : 0);
-  const maxRows = Math.max(1, rows - (CHROME_ROWS - 1 + headerRows) - (detailShown ? DETAIL_ROWS : 0));
+  // header + usage panel + table borders (2) + table header (1) + footer (1) + 1 spare row,
+  // so the frame stays strictly shorter than the terminal (Ink full-clears at exact height).
+  const fixedRows = headerRows + usagePanelRows(snapshot) + TABLE_CHROME_ROWS + FOOTER_ROWS + SPARE_ROWS;
+  const detailShown = ui.showDetail && rows >= DETAIL_MIN_ROWS && rows - fixedRows - DETAIL_ROWS >= 1;
+  const maxRows = Math.max(1, rows - fixedRows - (detailShown ? DETAIL_ROWS : 0));
 
   let body: React.JSX.Element;
   if (ui.mode === 'help') {
@@ -183,10 +187,14 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
         <Text>Claude Code data not found at {snapshot.claudeDir}</Text>
       </Panel>
     );
-  } else if (snapshot.sessions.length === 0) {
+  } else if (snapshot.sessions.length === 0 || visible.length === 0) {
     body = (
       <Panel title="Sessions" width={columns}>
-        <Text>No Claude Code sessions in the last {config.endedWindowHours}h</Text>
+        <Text>
+          {snapshot.sessions.length === 0
+            ? `No Claude Code sessions in the last ${config.endedWindowHours}h`
+            : 'No sessions match'}
+        </Text>
       </Panel>
     );
   } else {
