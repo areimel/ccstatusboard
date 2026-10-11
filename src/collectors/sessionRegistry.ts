@@ -55,8 +55,8 @@ export class SessionRegistry {
   private readonly watchFn: typeof fsWatch;
   private readonly onUpsert: (e: RegistryEntry) => void;
   private readonly onEnded: (sessionId: string, pid: number) => void;
-  /** sessionId → pid for sessions live as of the last scan. */
-  private live = new Map<string, number>();
+  /** sessionId → entry for sessions live as of the last scan. */
+  private live = new Map<string, RegistryEntry>();
   private scanning: Promise<void> | null = null;
   private rescan = false;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -102,24 +102,35 @@ export class SessionRegistry {
     let names: string[];
     try {
       names = await this.readdir(this.dir);
-    } catch {
+    } catch (err) {
+      // A missing dir means no sessions; any other error is transient, so keep the last view.
+      if ((err as NodeJS.ErrnoException | null)?.code !== 'ENOENT') return;
       names = [];
     }
-    const seen = new Map<string, number>();
+    const seen = new Map<string, RegistryEntry>();
     for (const name of names) {
       // Only `<pid>.json`. Never touch `<pid>.<hash>.key` secrets or anything else.
       if (!name.endsWith('.json')) continue;
+      let text: string;
+      try {
+        text = await this.readFile(join(this.dir, name));
+      } catch {
+        continue;
+      }
       let raw: unknown;
       try {
-        raw = JSON.parse(await this.readFile(join(this.dir, name)));
+        raw = JSON.parse(text);
       } catch {
+        // Caught mid-write: carry the previous entry for this pid so the row doesn't flicker to ended.
+        const prev = this.previousEntryFor(name);
+        if (prev && this.alive(prev.pid, prev.procStart)) seen.set(prev.sessionId, prev);
         continue;
       }
       const e = parseRegistryEntry(raw);
       if (!e) continue;
       if (!this.alive(e.pid, e.procStart)) continue;
       if (this.stopped) return;
-      seen.set(e.sessionId, e.pid);
+      seen.set(e.sessionId, e);
       try {
         this.onUpsert(e);
       } catch {
@@ -129,15 +140,23 @@ export class SessionRegistry {
     if (this.stopped) return;
     const prev = this.live;
     this.live = seen;
-    for (const [sessionId, pid] of prev) {
+    for (const [sessionId, e] of prev) {
       if (this.stopped) return;
       if (seen.has(sessionId)) continue;
       try {
-        this.onEnded(sessionId, pid);
+        this.onEnded(sessionId, e.pid);
       } catch {
         // swallow
       }
     }
+  }
+
+  /** The entry that was live last scan for registry file `<pid>.json`, if any. */
+  private previousEntryFor(fileName: string): RegistryEntry | undefined {
+    const pid = Number(fileName.slice(0, -'.json'.length));
+    if (!Number.isInteger(pid)) return undefined;
+    for (const e of this.live.values()) if (e.pid === pid) return e;
+    return undefined;
   }
 
   start(): void {
