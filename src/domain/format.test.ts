@@ -8,6 +8,8 @@ import {
   formatUSD,
   shortModel,
   truncate,
+  truncateDisplay,
+  displayWidth,
 } from './format.js';
 
 const NOW = new Date(2026, 9, 11, 14, 32, 7).getTime(); // Sunday, local time
@@ -102,5 +104,23 @@ describe('formatClock / truncate', () => {
     expect(truncate('ccstatusboard', 20)).toBe('ccstatusboard');
     expect(truncate('ccstatusboard', 6)).toBe('ccsta…');
     expect(truncate('abc', 0)).toBe('');
+  });
+});
+
+describe('displayWidth / truncateDisplay', () => {
+  it('counts East Asian wide characters and emoji as 2 columns, combining marks as 0', () => {
+    expect(displayWidth('abc')).toBe(3);
+    expect(displayWidth('日本語')).toBe(6);
+    expect(displayWidth('ｱ全角Ａ')).toBe(7); // halfwidth katakana is 1, fullwidth Latin is 2
+    expect(displayWidth('ok 🚀')).toBe(5);
+    expect(displayWidth('é')).toBe(1);
+    expect(displayWidth('한국')).toBe(4);
+  });
+  it('truncates to a display width with an ellipsis', () => {
+    expect(truncateDisplay('ccstatusboard', 20)).toBe('ccstatusboard');
+    expect(truncateDisplay('ccstatusboard', 6)).toBe('ccsta…');
+    expect(truncateDisplay('日本語のセッション', 7)).toBe('日本語…');
+    expect(displayWidth(truncateDisplay('日本語のセッション', 8))).toBeLessThanOrEqual(8);
+    expect(truncateDisplay('abc', 0)).toBe('');
   });
 });

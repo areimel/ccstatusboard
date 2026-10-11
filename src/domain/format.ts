@@ -70,3 +70,53 @@ export function truncate(s: string, width: number): string {
   if (s.length <= width) return s;
   return `${s.slice(0, width - 1)}…`;
 }
+
+// East Asian Wide/Fullwidth blocks (approximation of `string-width`, no dependency).
+const WIDE_RANGES: Array<[number, number]> = [
+  [0x1100, 0x115f],
+  [0x2e80, 0x303e],
+  [0x3041, 0x33ff],
+  [0x3400, 0x4dbf],
+  [0x4e00, 0x9fff],
+  [0xa000, 0xa4cf],
+  [0xa960, 0xa97f],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe10, 0xfe19],
+  [0xfe30, 0xfe6f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x20000, 0x3fffd],
+];
+const ZERO_WIDTH = /^[\p{Mn}\p{Me}\p{Cf}]$/u; // combining marks, ZWSP/ZWJ, variation selectors
+const EMOJI = /^\p{Emoji_Presentation}$/u;
+
+function charWidth(ch: string): number {
+  const cp = ch.codePointAt(0) ?? 0;
+  if (cp < 0x20 || (cp >= 0x7f && cp < 0xa0) || ZERO_WIDTH.test(ch)) return 0;
+  if (EMOJI.test(ch)) return 2;
+  for (const [lo, hi] of WIDE_RANGES) if (cp >= lo && cp <= hi) return 2;
+  return 1;
+}
+
+/** Terminal column width: East Asian wide characters and emoji count 2, combining marks 0. */
+export function displayWidth(s: string): number {
+  let w = 0;
+  for (const ch of s) w += charWidth(ch);
+  return w;
+}
+
+/** Like `truncate`, but measured in terminal columns. */
+export function truncateDisplay(s: string, width: number): string {
+  if (width <= 0) return '';
+  if (displayWidth(s) <= width) return s;
+  let out = '';
+  let w = 0;
+  for (const ch of s) {
+    const cw = charWidth(ch);
+    if (w + cw > width - 1) break;
+    out += ch;
+    w += cw;
+  }
+  return `${out}…`;
+}

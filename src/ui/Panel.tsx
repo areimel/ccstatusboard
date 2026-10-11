@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import { TitledBox } from '@mishieck/ink-titled-box';
+import { displayWidth, truncateDisplay } from '../domain/format.js';
 import { useTheme } from './theme.js';
 
 /**
@@ -22,8 +23,7 @@ export interface PanelProps {
 export function FallbackPanel({ title, children, width, flexGrow }: PanelProps): JSX.Element {
   const theme = useTheme();
   const head = '╭─ ';
-  const titleText = `${title} `;
-  const fill = typeof width === 'number' ? Math.max(0, width - head.length - titleText.length - 1) : 2;
+  const fill = typeof width === 'number' ? Math.max(0, width - head.length - displayWidth(title) - 2) : 2;
   const close = typeof width === 'number' ? '╮' : '';
   return (
     <Box flexDirection="column" width={width} flexGrow={flexGrow}>
@@ -51,13 +51,22 @@ export function FallbackPanel({ title, children, width, flexGrow }: PanelProps):
   );
 }
 
+/** Room for the title in a `width`-column border: corners, padding and some border either side. */
+const TITLE_CHROME = 6;
+
 export function Panel(props: PanelProps): JSX.Element {
   const theme = useTheme();
-  if (!USE_TITLED_BOX) return <FallbackPanel {...props} />;
+  // TitledBox drops a title that doesn't fit, so truncate it first (by terminal columns).
+  const title =
+    typeof props.width === 'number' ? truncateDisplay(props.title, props.width - TITLE_CHROME) : props.title;
+  // TitledBox measures titles by .length, so wide (CJK/emoji) titles would overflow its top edge:
+  // draw those with the column-aware fallback border instead.
+  if (!USE_TITLED_BOX || displayWidth(title) !== title.length)
+    return <FallbackPanel {...props} title={title} />;
   return (
     <TitledBox
       borderStyle="round"
-      titles={[props.title]}
+      titles={[title]}
       borderColor={theme.border}
       flexDirection="column"
       paddingX={1}
