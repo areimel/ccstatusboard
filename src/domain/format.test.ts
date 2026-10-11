@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import {
+  formatAgo,
+  formatClock,
+  formatDuration,
+  formatResetsAt,
+  formatTokens,
+  formatUSD,
+  shortModel,
+  truncate,
+} from './format.js';
+
+const NOW = new Date(2026, 9, 11, 14, 32, 7).getTime(); // Sunday, local time
+
+describe('formatUSD', () => {
+  it('formats null/NaN as em dash', () => {
+    expect(formatUSD(null)).toBe('—');
+    expect(formatUSD(Number.NaN)).toBe('—');
+  });
+  it('uses two decimals below 1000 and grouped integers above', () => {
+    expect(formatUSD(4.2)).toBe('$4.20');
+    expect(formatUSD(96.1)).toBe('$96.10');
+    expect(formatUSD(412.75)).toBe('$412.75');
+    expect(formatUSD(1234.5)).toBe('$1,235');
+  });
+  it('prefixes ≈ when approximate', () => {
+    expect(formatUSD(4.2, true)).toBe('≈$4.20');
+  });
+});
+
+describe('formatTokens', () => {
+  it.each([
+    [950, '950'],
+    [1000, '1k'],
+    [12_300, '12.3k'],
+    [48_100, '48.1k'],
+    [120_000, '120k'],
+    [210_000, '210k'],
+    [999_700, '1M'],
+    [3_100_000, '3.1M'],
+  ])('%d → %s', (n, out) => {
+    expect(formatTokens(n)).toBe(out);
+  });
+});
+
+describe('formatDuration', () => {
+  it.each([
+    [-5, '0s'],
+    [45_000, '45s'],
+    [12 * 60_000, '12m'],
+    [134 * 60_000, '2h14m'],
+    [5 * 3_600_000, '5h'],
+    [(3 * 24 + 4) * 3_600_000, '3d4h'],
+    [2 * 86_400_000, '2d'],
+  ])('%d → %s', (ms, out) => {
+    expect(formatDuration(ms)).toBe(out);
+  });
+});
+
+describe('formatAgo', () => {
+  it('buckets by age', () => {
+    expect(formatAgo(NOW - 3_000, NOW)).toBe('now');
+    expect(formatAgo(NOW - 30_000, NOW)).toBe('30s');
+    expect(formatAgo(NOW - 18 * 60_000, NOW)).toBe('18m');
+    expect(formatAgo(NOW - 3 * 3_600_000, NOW)).toBe('3h ago');
+  });
+});
+
+describe('formatResetsAt', () => {
+  it('shows a countdown under 24h', () => {
+    expect(formatResetsAt(NOW + 134 * 60_000, NOW)).toBe('resets 2h14m');
+  });
+  it('shows weekday + local time at or beyond 24h', () => {
+    const thu9 = new Date(2026, 9, 15, 9, 0, 0).getTime();
+    expect(formatResetsAt(thu9, NOW)).toBe('resets Thu 09:00');
+  });
+  it('shows "resets now" when already past', () => {
+    expect(formatResetsAt(NOW - 1, NOW)).toBe('resets now');
+  });
+});
+
+describe('shortModel', () => {
+  it.each([
+    ['claude-opus-5-5', 'opus-5.5'],
+    ['claude-sonnet-5-5[1m]', 'sonnet-5.5'],
+    ['claude-haiku-5-5-20261001', 'haiku-5.5'],
+    ['claude-fable-5-1', 'fable-5.1'],
+    ['<synthetic>', '<synthetic>'],
+  ])('%s → %s', (m, out) => {
+    expect(shortModel(m)).toBe(out);
+  });
+  it('undefined → em dash', () => {
+    expect(shortModel(undefined)).toBe('—');
+  });
+});
+
+describe('formatClock / truncate', () => {
+  it('formats local HH:MM:SS', () => {
+    expect(formatClock(NOW)).toBe('14:32:07');
+  });
+  it('truncates with ellipsis', () => {
+    expect(truncate('ccstatusboard', 20)).toBe('ccstatusboard');
+    expect(truncate('ccstatusboard', 6)).toBe('ccsta…');
+    expect(truncate('abc', 0)).toBe('');
+  });
+});
