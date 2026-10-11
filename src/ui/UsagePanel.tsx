@@ -68,7 +68,7 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
   const message = STATUS_MESSAGE[limits.status];
   if (!hasValues) {
     return (
-      <Text>
+      <Text wrap="truncate-end">
         <Text color={theme.accent} bold>
           5h / Week{' '}
         </Text>
@@ -93,7 +93,7 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
         />
       ))}
       {isStale ? (
-        <Text color={theme.dim}>
+        <Text color={theme.dim} wrap="truncate-end">
           stale {limits.fetchedAt === undefined ? '?' : formatDuration(now - limits.fetchedAt)}
           {limits.status === 'expired' ? ` · ${STATUS_MESSAGE.expired}` : ''}
         </Text>
@@ -114,7 +114,7 @@ function CostColumn({ snapshot }: { snapshot: Snapshot }) {
   return (
     <Box flexDirection="column" width={RIGHT_WIDTH}>
       {rows.map(([label, v]) => (
-        <Text key={label}>
+        <Text key={label} wrap="truncate-end">
           <Text color={theme.dim}>{label.padEnd(7)}</Text>
           <Text color={theme.text} bold>
             {formatUSD(v)}

@@ -219,7 +219,8 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
   return (
     <ThemeContext.Provider value={THEMES[config.theme]}>
       <ThemeProvider theme={inkUiTheme(THEMES[config.theme])}>
-        <Box flexDirection="column" width={columns}>
+        {/* Backstop: never draw taller than the budget even if a child miscounts its rows. */}
+        <Box flexDirection="column" width={columns} maxHeight={rows - SPARE_ROWS} overflow="hidden">
           <Header snapshot={snapshot} />
           {ui.mode !== 'help' && <UsagePanel snapshot={snapshot} width={columns} />}
           {body}

@@ -5,7 +5,6 @@ import { App, initialUiState, uiReducer, type UiState } from './App.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import type { Snapshot } from '../domain/types.js';
-import { stripAnsi } from '../../test/helpers/ansi.js';
 
 afterEach(cleanup);
 
@@ -218,36 +217,7 @@ describe('App list shrink and layout budget', () => {
   });
 });
 
-describe('App height budget', () => {
-  const heavy = (): Snapshot =>
-    makeSnapshot({
-      sessions: Array.from({ length: 40 }, (_, i) =>
-        makeSession({ sessionId: `s${i}`, name: `sess${i}`, lastActivity: NOW - i * 1_000 }),
-      ),
-      scan: { done: false, filesDone: 3, filesTotal: 10 },
-      pricingStatus: 'stale',
-      warnings: ['something odd'],
-      limits: {
-        status: 'stale',
-        fetchedAt: NOW - 600_000,
-        block: { label: '5h', percent: 58, resetsAt: NOW + 3_600_000 },
-        weekly: { label: 'Week', percent: 31, resetsAt: NOW + 86_400_000 },
-        perModelWeekly: [
-          { label: 'Opus', percent: 22 },
-          { label: 'Sonnet', percent: 12 },
-        ],
-      },
-    });
-
-  for (const rows of [16, 20, 24, 28, 40]) {
-    it(`renders at most ${rows} lines at 120x${rows}`, async () => {
-      const { lastFrame } = renderApp(heavy(), { columns: 120, rows });
-      await vi.waitFor(() => expect(stripAnsi(lastFrame()!)).toContain('Sessions'));
-      const lines = stripAnsi(lastFrame()!).split('\n').length;
-      expect(lines).toBeLessThanOrEqual(rows);
-    });
-  }
-
+describe('App search empty state', () => {
   it('shows "No sessions match" when the search matches nothing', async () => {
     const { lastFrame, stdin } = renderApp(twoSessions());
     stdin.write('/');
@@ -255,27 +225,4 @@ describe('App height budget', () => {
     stdin.write('z');
     await vi.waitFor(() => expect(lastFrame()).toContain('No sessions match'));
   });
-});
-
-describe('App height with long warnings', () => {
-  for (const size of [
-    { columns: 60, rows: 16 },
-    { columns: 80, rows: 24 },
-  ]) {
-    it(`stays within ${size.columns}x${size.rows}`, async () => {
-      const warnings = Array.from(
-        { length: 4 },
-        (_, i) => `runtime warning number ${i} with a very long explanation text`,
-      );
-      const snap = makeSnapshot({
-        sessions: Array.from({ length: 30 }, (_, i) => makeSession({ sessionId: `s${i}`, name: `sess${i}` })),
-        pricingStatus: 'stale',
-        unknownModels: ['claude-mystery-model-1', 'claude-mystery-model-2'],
-        warnings,
-      });
-      const { lastFrame } = renderApp(snap, size);
-      await vi.waitFor(() => expect(stripAnsi(lastFrame()!)).toContain('Sessions'));
-      expect(stripAnsi(lastFrame()!).split('\n').length).toBeLessThanOrEqual(size.rows);
-    });
-  }
 });

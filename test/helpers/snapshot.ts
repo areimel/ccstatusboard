@@ -55,3 +55,53 @@ export function makeSnapshot(over: Partial<Snapshot> = {}): Snapshot {
     ...over,
   };
 }
+
+const modelCost = (costUSD: number) => ({ costUSD, tokens: { ...ZERO_TOKENS } });
+
+/** Worst-case layout fixture: 6 priced models, 7 agents, long text, expired limits with stale values. */
+export function makeOverflowSnapshot(): Snapshot {
+  const selected = makeSession({
+    sessionId: 'big',
+    name: 'ccstatusboard-design-spec-with-a-long-name',
+    cwd: '/home/someone/code_projects/personal-projects/a-really-long-project-directory-name',
+    status: 'waiting',
+    waitingFor: 'permission to run a long shell command',
+    permissionMode: 'acceptEdits',
+    version: '2.1.296',
+    lastActivity: NOW,
+    costUSD: 27.07,
+    costApprox: true,
+    activeAgents: 7,
+    agentNames: [...Array<string>(5).fill('general-purpose'), 'Explore', 'Plan'],
+    tokens: {
+      input: 1_234_000,
+      output: 356_000,
+      cacheWrite5m: 2_300_000,
+      cacheWrite1h: 0,
+      cacheRead: 45_600_000,
+    },
+    byModel: {
+      'claude-opus-4-6': modelCost(5),
+      'claude-sonnet-4-5': modelCost(2),
+      'claude-haiku-4-5': modelCost(1),
+      'claude-fable-5': modelCost(3),
+      'claude-opus-5-5': modelCost(4),
+      'claude-sonnet-5-5': modelCost(1.5),
+    },
+  });
+  return makeSnapshot({
+    sessions: [
+      selected,
+      ...Array.from({ length: 34 }, (_, i) =>
+        makeSession({ sessionId: `s${i}`, name: `sess${i}`, lastActivity: NOW - (i + 1) * 1_000 }),
+      ),
+    ],
+    limits: {
+      status: 'expired',
+      fetchedAt: NOW - 600_000,
+      block: { label: '5h', percent: 26, resetsAt: NOW + 3_000_000 },
+      weekly: { label: 'Week', percent: 4, resetsAt: NOW + 300_000_000 },
+      perModelWeekly: [{ label: 'Fable', percent: 0, resetsAt: NOW + 300_000_000 }],
+    },
+  });
+}
