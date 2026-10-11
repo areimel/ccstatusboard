@@ -113,3 +113,20 @@ describe('App height with long warnings (sized stdout)', () => {
     });
   }
 });
+
+describe('App help overlay at minimum width', () => {
+  it('draws the help panel within 60 columns', async () => {
+    const size = { columns: 60, rows: 24 };
+    const r = renderSized(
+      <App store={fakeStore(makeSnapshot())} config={DEFAULT_CONFIG} onQuit={vi.fn()} size={size} />,
+      size,
+    );
+    mounted.push(r);
+    await vi.waitFor(() => expect(r.lastFrame()).toContain('Sessions'));
+    r.write('?');
+    await vi.waitFor(() => expect(r.lastFrame()).toContain('Move selection'));
+    const lines = r.lastFrame().split('\n');
+    for (const l of lines) expect(l.length).toBeLessThanOrEqual(60);
+    expect(lines.find((l) => l.includes('Help'))).toMatch(/^╭.*╮$/);
+  });
+});

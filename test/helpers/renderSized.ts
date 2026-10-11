@@ -10,6 +10,8 @@ export interface SizedRender {
   lastFrame: () => string;
   unmount: () => void;
   instance: Instance;
+  /** Feed keystrokes to the app, like ink-testing-library's stdin.write. */
+  write: (data: string) => void;
 }
 
 export function renderSized(el: ReactElement, size: { columns: number; rows: number }): SizedRender {
@@ -23,11 +25,12 @@ export function renderSized(el: ReactElement, size: { columns: number; rows: num
       return true;
     },
   });
+  const pending: string[] = [];
   const stdin = Object.assign(new EventEmitter(), {
     isTTY: true,
     setRawMode: () => {},
     setEncoding: () => {},
-    read: () => null,
+    read: () => pending.shift() ?? null,
     ref: () => {},
     unref: () => {},
   });
@@ -42,5 +45,9 @@ export function renderSized(el: ReactElement, size: { columns: number; rows: num
     lastFrame: () => stripAnsi(frames.filter((f) => f.trim() !== '').at(-1) ?? '').replace(/\n$/, ''),
     unmount: () => instance.unmount(),
     instance,
+    write: (data: string) => {
+      pending.push(data);
+      stdin.emit('readable');
+    },
   };
 }

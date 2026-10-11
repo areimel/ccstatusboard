@@ -180,7 +180,7 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
 
   let body: React.JSX.Element;
   if (ui.mode === 'help') {
-    body = <HelpOverlay />;
+    body = <HelpOverlay width={Math.min(64, columns)} />;
   } else if (!snapshot.claudeDirFound) {
     body = (
       <Panel title="Sessions" width={columns}>

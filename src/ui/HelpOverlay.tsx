@@ -16,10 +16,11 @@ const KEYS: Array<[string, string]> = [
 
 const LEGEND = ['● waiting', '◐ busy', '○ idle', '· ended'];
 
-export function HelpOverlay(): JSX.Element {
+/** `width` defaults to 64; App passes `Math.min(64, columns)` so the border fits narrow terminals. */
+export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
   const theme = useTheme();
   return (
-    <Panel title="Help" width={64}>
+    <Panel title="Help" width={width}>
       {KEYS.map(([key, label]) => (
         <Box key={key}>
           <Box width={14}>

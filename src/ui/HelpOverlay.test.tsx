@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { HelpOverlay } from './HelpOverlay.js';
 import { stripAnsi } from '../../test/helpers/ansi.js';
+import { renderSized } from '../../test/helpers/renderSized.js';
 
 describe('HelpOverlay', () => {
   it('lists every key binding and the status legend', async () => {
@@ -21,5 +22,20 @@ describe('HelpOverlay', () => {
       expect(out).toContain(s);
     }
     for (const g of ['● waiting', '◐ busy', '○ idle', '· ended']) expect(out).toContain(g);
+  });
+});
+
+describe('HelpOverlay width', () => {
+  it('fits a 60-column terminal when given width 60', async () => {
+    const r = renderSized(<HelpOverlay width={60} />, { columns: 60, rows: 24 });
+    try {
+      await vi.waitFor(() => expect(r.lastFrame()).toContain('Help'));
+      const lines = r.lastFrame().split('\n');
+      for (const l of lines) expect(l.length).toBeLessThanOrEqual(60);
+      expect(lines[0]).toMatch(/^╭.*╮$/);
+      expect(lines.at(-1)).toMatch(/^╰─+╯$/);
+    } finally {
+      r.unmount();
+    }
   });
 });
