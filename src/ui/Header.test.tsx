@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { render } from 'ink-testing-library';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render } from 'ink-testing-library';
 import { Header } from './Header.js';
 import { makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { formatClock } from '../domain/format.js';
 import { stripAnsi } from '../../test/helpers/ansi.js';
+
+afterEach(cleanup);
 
 describe('Header', () => {
   it('shows app name, live/ended counts and the clock', () => {
