@@ -1,4 +1,4 @@
-import { appendFile, mkdir, mkdtemp, open, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, open, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -151,5 +151,34 @@ describe('HistoryScanner', () => {
     await scanner.run();
     expect(emitted).toEqual([]);
     expect(progress.at(-1)).toEqual({ done: true, filesDone: 0, filesTotal: 0 });
+  });
+
+  it('rescans from byte 0 when a file is rewritten smaller', async () => {
+    await writeFile(
+      mainFile,
+      jsonl(assistantLine({ id: 'msg_1', ts: TS, usage: { output_tokens: 5 } })) + '{"partial',
+    );
+    await makeScanner().scanner.run();
+    await writeFile(mainFile, jsonl(assistantLine({ id: 'msg_new', ts: TS, usage: { output_tokens: 1 } })));
+    const again = makeScanner();
+    await again.scanner.run();
+    const call = again.readRange.mock.calls.find((c) => c[0] === mainFile)!;
+    expect(call[1]).toBe(0);
+    expect(usageKeys(again.emitted.find((e) => e.file === mainFile)!.events)).toEqual(['msg_new']);
+  });
+
+  it('drops malformed cache entries and rescans those files', async () => {
+    await makeScanner().scanner.run();
+    const cacheFile = join(cacheDir, 'scan-cache.json');
+    const cache = JSON.parse(await readFile(cacheFile, 'utf8'));
+    cache.files[mainFile] = { mtimeMs: 'x', size: 1, offset: 0 };
+    await writeFile(cacheFile, JSON.stringify(cache));
+    const again = makeScanner();
+    await again.scanner.run();
+    expect(again.readRange.mock.calls.map((c) => c[0])).toEqual([mainFile]);
+    expect(usageKeys(again.emitted.find((e) => e.file === mainFile)!.events)).toEqual([
+      'msg_1:r1',
+      'msg_1:r1',
+    ]);
   });
 });

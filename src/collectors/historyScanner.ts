@@ -62,6 +62,17 @@ export function compactEvents(events: TranscriptEvent[]): TranscriptEvent[] {
   });
 }
 
+function isValidEntry(e: unknown): e is ScanCacheEntry {
+  if (typeof e !== 'object' || e === null) return false;
+  const c = e as Partial<ScanCacheEntry>;
+  return (
+    Number.isFinite(c.mtimeMs) &&
+    Number.isFinite(c.size) &&
+    Number.isFinite(c.offset) &&
+    Array.isArray(c.events)
+  );
+}
+
 export class HistoryScanner {
   private readonly opts: HistoryScannerOptions;
   private readonly d: Required<HistoryScannerDeps>;
@@ -140,7 +151,7 @@ export class HistoryScanner {
   private async scanFile(file: string, prev: ScanCacheEntry | undefined): Promise<ScanCacheEntry> {
     const st = await this.d.stat(file);
     if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) return prev;
-    const resume = prev !== undefined && st.size >= prev.offset;
+    const resume = prev !== undefined && st.size >= prev.size && prev.offset <= st.size;
     const start = resume ? prev.offset : 0;
     const { sessionId, isSubagent } = sessionIdFromTranscriptPath(file);
     const buf = start < st.size ? await this.d.readRange(file, start, st.size) : Buffer.alloc(0);
@@ -175,7 +186,12 @@ export class HistoryScanner {
     try {
       const parsed = JSON.parse(await this.d.readFile(this.cacheFile)) as Partial<ScanCacheFile>;
       if (parsed.version !== CACHE_VERSION || parsed.claudeDir !== this.opts.claudeDir) return {};
-      return typeof parsed.files === 'object' && parsed.files !== null ? parsed.files : {};
+      if (typeof parsed.files !== 'object' || parsed.files === null) return {};
+      const valid: Record<string, ScanCacheEntry> = {};
+      for (const [file, entry] of Object.entries(parsed.files)) {
+        if (isValidEntry(entry)) valid[file] = entry;
+      }
+      return valid;
     } catch {
       return {};
     }
