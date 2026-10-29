@@ -23,7 +23,7 @@ export class ConfigError extends Error {
   }
 }
 
-function isEnoent(e: unknown): boolean {
+export function isEnoent(e: unknown): boolean {
   return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'ENOENT';
 }
 
@@ -62,6 +62,10 @@ function flagOverrides(flags: CliFlags): Record<string, unknown> {
   return o;
 }
 
+export function resolveConfigPath(flags: CliFlags, env?: NodeJS.ProcessEnv, home?: string): string {
+  return flags.config ?? join(configDir(env, home), 'config.json');
+}
+
 export async function loadConfig(opts: {
   flags: CliFlags;
   env?: NodeJS.ProcessEnv;
@@ -70,7 +74,7 @@ export async function loadConfig(opts: {
 }): Promise<Config> {
   const readFile = opts.readFile ?? ((p: string) => fsReadFile(p, 'utf8'));
   const explicit = opts.flags.config !== undefined;
-  const path = opts.flags.config ?? join(configDir(opts.env, opts.home), 'config.json');
+  const path = resolveConfigPath(opts.flags, opts.env, opts.home);
   const fileValues = await readConfigFile(path, explicit, readFile);
   const result = configSchema.safeParse({ ...fileValues, ...flagOverrides(opts.flags) });
   if (!result.success) {

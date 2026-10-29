@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig, parseCliArgs } from './load.js';
+import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './load.js';
 import { DEFAULT_CONFIG } from './schema.js';
 
 function enoent(): Error {
@@ -129,5 +129,13 @@ describe('parseCliArgs', () => {
 
   it('throws ConfigError on unknown flags', () => {
     expect(() => parseCliArgs(['--bogus'])).toThrow(ConfigError);
+  });
+});
+
+describe('resolveConfigPath', () => {
+  it('prefers --config, else XDG/home default', () => {
+    expect(resolveConfigPath({ config: '/x/c.json' }, {}, home)).toBe('/x/c.json');
+    expect(resolveConfigPath({}, {}, home)).toBe(defaultPath);
+    expect(resolveConfigPath({}, { XDG_CONFIG_HOME: '/xdg' }, home)).toBe('/xdg/ccstatusboard/config.json');
   });
 });
