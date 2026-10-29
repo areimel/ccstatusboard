@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { createThemeSaver, type SaverFs } from './save.js';
 
 const path = '/cfg/ccstatusboard/config.json';
+const tmp = `${path}.${process.pid}.tmp`;
 
-function memFs(initial: Record<string, string> = {}, opts: { gate?: Promise<void> } = {}) {
+function memFs(
+  initial: Record<string, string> = {},
+  opts: { gate?: Promise<void>; links?: Record<string, string> } = {},
+) {
   const files = { ...initial };
   const log: string[] = [];
   const fs = {
@@ -25,6 +29,11 @@ function memFs(initial: Record<string, string> = {}, opts: { gate?: Promise<void
       delete files[a];
     }),
     mkdir: vi.fn(async () => undefined),
+    realpath: vi.fn(async (p: string) => opts.links?.[p] ?? p),
+    rm: vi.fn(async (p: string) => {
+      log.push(`rm:${p}`);
+      delete files[p];
+    }),
   };
   return fs satisfies SaverFs & Record<string, unknown>;
 }
@@ -86,8 +95,8 @@ describe('createThemeSaver', () => {
     const save = createThemeSaver({ path, fs });
     save('mono');
     await save.flush();
-    expect(fs.log).toEqual([`write:${path}.tmp`, `rename:${path}.tmp->${path}`]);
-    expect(fs.files[`${path}.tmp`]).toBeUndefined();
+    expect(fs.log).toEqual([`write:${tmp}`, `rename:${tmp}->${path}`]);
+    expect(fs.files[tmp]).toBeUndefined();
   });
 
   it('swallows write errors and keeps working', async () => {
@@ -104,5 +113,25 @@ describe('createThemeSaver', () => {
     process.off('unhandledRejection', unhandled);
     expect(unhandled).not.toHaveBeenCalled();
     expect(JSON.parse(fs.files[path] as string).theme).toBe('dracula');
+  });
+
+  it('writes through a symlinked config to its real target', async () => {
+    const real = '/dotfiles/ccstatusboard.json';
+    const fs = memFs({ [real]: '{"sort":"cost"}' }, { links: { [path]: real } });
+    const save = createThemeSaver({ path, fs });
+    save('nord');
+    await save.flush();
+    expect(JSON.parse(fs.files[real] as string)).toEqual({ sort: 'cost', theme: 'nord' });
+    expect(fs.files[path]).toBeUndefined();
+  });
+
+  it('removes the temp file when the rename fails', async () => {
+    const fs = memFs();
+    fs.rename.mockRejectedValueOnce(new Error('EXDEV'));
+    const save = createThemeSaver({ path, fs });
+    save('mono');
+    await save.flush();
+    expect(fs.log).toContain(`rm:${tmp}`);
+    expect(fs.files[tmp]).toBeUndefined();
   });
 });

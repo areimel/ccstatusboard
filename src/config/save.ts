@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ThemeName } from '../domain/types.js';
 import { isEnoent } from './load.js';
@@ -8,6 +8,8 @@ export interface SaverFs {
   writeFile(p: string, data: string): Promise<void>;
   rename(a: string, b: string): Promise<void>;
   mkdir(p: string, opts: { recursive: true }): Promise<unknown>;
+  realpath(p: string): Promise<string>;
+  rm(p: string, opts: { force: true }): Promise<void>;
 }
 
 const realFs: SaverFs = {
@@ -15,6 +17,8 @@ const realFs: SaverFs = {
   writeFile: (p, data) => writeFile(p, data, 'utf8'),
   rename,
   mkdir,
+  realpath,
+  rm,
 };
 
 export interface ThemeSaver {
@@ -23,7 +27,17 @@ export interface ThemeSaver {
   flush(): Promise<void>;
 }
 
-async function writeTheme(path: string, name: ThemeName, fs: SaverFs): Promise<void> {
+/** Resolve symlinks (dotfile managers) so the rename replaces the real file, not the link. */
+async function resolveTarget(path: string, fs: SaverFs): Promise<string> {
+  try {
+    return await fs.realpath(path);
+  } catch {
+    return path;
+  }
+}
+
+async function writeTheme(configPath: string, name: ThemeName, fs: SaverFs): Promise<void> {
+  const path = await resolveTarget(configPath, fs);
   let existing: Record<string, unknown> = {};
   try {
     const parsed: unknown = JSON.parse(await fs.readFile(path));
@@ -32,10 +46,16 @@ async function writeTheme(path: string, name: ThemeName, fs: SaverFs): Promise<v
   } catch (e) {
     if (!isEnoent(e)) return; // unreadable or invalid JSON: never clobber the user's file
   }
-  const tmp = `${path}.tmp`;
+  // Per-process temp name so two running instances never interleave writes.
+  const tmp = `${path}.${process.pid}.tmp`;
   await fs.mkdir(dirname(path), { recursive: true });
-  await fs.writeFile(tmp, `${JSON.stringify({ ...existing, theme: name }, null, 2)}\n`);
-  await fs.rename(tmp, path);
+  try {
+    await fs.writeFile(tmp, `${JSON.stringify({ ...existing, theme: name }, null, 2)}\n`);
+    await fs.rename(tmp, path);
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => undefined);
+    throw e;
+  }
 }
 
 /**

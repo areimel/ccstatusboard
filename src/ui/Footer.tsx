@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import { displayWidth } from '../domain/format.js';
+import { THEME_NAMES } from '../domain/types.js';
 import { useTheme } from './theme.js';
 
 const HINTS: Array<[string, string]> = [
@@ -15,6 +16,8 @@ const HINTS: Array<[string, string]> = [
 
 const COLUMN_GAP = 2;
 const PADDING_X = 1;
+// Fit-check against the longest name so the hint doesn't flicker in and out while cycling.
+const LONGEST_THEME = THEME_NAMES.reduce((a, b) => (b.length > a.length ? b : a));
 
 function hintsWidth(hints: Array<[string, string]>): number {
   const text = hints.reduce((n, [key, label]) => n + displayWidth(key) + displayWidth(label), 0);
@@ -43,9 +46,13 @@ export function Footer({ mode, search, width }: FooterProps): JSX.Element {
       </Box>
     );
   }
-  const quit = HINTS.slice(-1);
-  const withTheme: Array<[string, string]> = [...HINTS.slice(0, -1), ['t', theme.name], ...quit];
-  const hints = width === undefined || hintsWidth(withTheme) <= width ? withTheme : HINTS;
+  const withTheme = (label: string): Array<[string, string]> => [
+    ...HINTS.slice(0, -1),
+    ['t', label],
+    ...HINTS.slice(-1),
+  ];
+  const fits = width === undefined || hintsWidth(withTheme(LONGEST_THEME)) <= width;
+  const hints = fits ? withTheme(theme.name) : HINTS;
   return (
     <Box paddingX={PADDING_X} columnGap={COLUMN_GAP}>
       {hints.map(([key, label]) => (
