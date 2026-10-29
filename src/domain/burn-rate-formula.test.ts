@@ -27,12 +27,12 @@ describe('windowStart', () => {
 
 describe('averageRate', () => {
   it('is pct per elapsed hour', () => {
-    expect(averageRate(30, NOW - 2 * H, NOW)).toBeCloseTo(15);
+    expect(averageRate(30, NOW - 2 * H, NOW, 'block')).toBeCloseTo(15);
   });
   it('is undefined when nothing or too little has elapsed', () => {
-    expect(averageRate(30, NOW, NOW)).toBeUndefined();
-    expect(averageRate(30, NOW + H, NOW)).toBeUndefined();
-    expect(averageRate(30, NOW - 30_000, NOW)).toBeUndefined();
+    expect(averageRate(30, NOW, NOW, 'block')).toBeUndefined();
+    expect(averageRate(30, NOW + H, NOW, 'block')).toBeUndefined();
+    expect(averageRate(30, NOW - 14 * M, NOW, 'block')).toBeUndefined();
   });
 });
 
@@ -158,13 +158,25 @@ describe('projectBurn', () => {
     expect(p?.hitAt).toBeUndefined();
   });
   it('ignores pre-reset samples', () => {
-    const resetsAt = NOW + 5 * H - 10 * M; // window started 10min ago
+    const resetsAt = NOW + 5 * H - 20 * M; // window started 20min ago
     const samples = [
       { t: NOW - 60 * M, pct: 90 },
       { t: NOW - 30 * M, pct: 98 },
     ];
-    const p = projectBurn({ label: 'b', percent: 2, resetsAt }, samples, NOW, 'block');
+    const p = projectBurn({ label: 'b', percent: 4, resetsAt }, samples, NOW, 'block');
     expect(p?.ratePctPerHour).toBeCloseTo(12); // average only
+  });
+
+  it('does not project a false critical from one early prompt', () => {
+    const resetsAt = NOW + 5 * H - 3 * M; // window started 3min ago
+    const p = projectBurn({ label: 'b', percent: 4, resetsAt }, [], NOW, 'block');
+    expect(p?.band).toBe('under');
+    expect(p?.hitAt).toBeUndefined();
+  });
+
+  it('uses the week warm-up for weekly windows', () => {
+    const resetsAt = NOW + WINDOW_MS.week - 2 * H; // 2h into the week
+    expect(projectBurn({ label: 'w', percent: 5, resetsAt }, [], NOW, 'week')?.ratePctPerHour).toBe(0);
   });
 });
 

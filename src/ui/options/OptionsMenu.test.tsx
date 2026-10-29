@@ -11,15 +11,16 @@ const delay = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 const DOWN = '\u001B[B';
 const RIGHT = '\u001B[C';
 
-function setup() {
+function setup(initial: Config = DEFAULT_CONFIG, maxHeight?: number) {
   const onChange = vi.fn();
   const onClose = vi.fn();
   function Harness(): React.JSX.Element {
-    const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
+    const [config, setConfig] = useState<Config>(initial);
     return (
       <OptionsMenu
         config={config}
         width={60}
+        {...(maxHeight === undefined ? {} : { maxHeight })}
         onChange={(p) => {
           onChange(p);
           setConfig((c) => ({ ...c, ...p }));
@@ -95,5 +96,20 @@ describe('OptionsMenu', () => {
     await delay();
     await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', ' ', '\r');
     expect(onChange).toHaveBeenCalledWith({ columns: expect.not.arrayContaining(['status']) });
+  });
+
+  it('columns editor keeps the user order', async () => {
+    const { press, onChange } = setup({ ...DEFAULT_CONFIG, columns: ['cost', 'name', 'status'] });
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\r');
+    expect(onChange).toHaveBeenCalledWith({ columns: ['cost', 'name', 'status'] });
+  });
+
+  it('columns editor fits a short overlay budget', async () => {
+    const maxHeight = 18;
+    const { press, frame } = setup(DEFAULT_CONFIG, maxHeight);
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r');
+    expect(frame().split('\n').length).toBeLessThanOrEqual(maxHeight);
   });
 });

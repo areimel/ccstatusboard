@@ -30,6 +30,8 @@ describe('configSchema', () => {
 
   it('enforces minimums and enums', () => {
     expect(configSchema.safeParse({ refreshMs: 100 }).success).toBe(false);
+    expect(configSchema.safeParse({ refreshMs: 3_000_000_000 }).success).toBe(false);
+    expect(configSchema.safeParse({ usagePollSeconds: 3_000_000 }).success).toBe(false);
     expect(configSchema.safeParse({ usagePollSeconds: 10 }).success).toBe(false);
     expect(configSchema.safeParse({ endedWindowHours: -1 }).success).toBe(false);
     expect(configSchema.safeParse({ theme: 'neon' }).success).toBe(false);

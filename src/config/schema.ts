@@ -19,8 +19,9 @@ export const DEFAULT_CONFIG: Config = Object.freeze({
 
 export const configSchema = z.strictObject({
   theme: z.enum(THEME_NAMES).default(DEFAULT_CONFIG.theme),
-  refreshMs: z.number().int().min(250).default(DEFAULT_CONFIG.refreshMs),
-  usagePollSeconds: z.number().int().min(30).default(DEFAULT_CONFIG.usagePollSeconds),
+  // Upper bounds keep timer delays below the 2^31-1 ms limit (larger values fire immediately).
+  refreshMs: z.number().int().min(250).max(60_000).default(DEFAULT_CONFIG.refreshMs),
+  usagePollSeconds: z.number().int().min(30).max(86_400).default(DEFAULT_CONFIG.usagePollSeconds),
   endedWindowHours: z.number().min(0).default(DEFAULT_CONFIG.endedWindowHours),
   columns: z
     .array(z.enum(COLUMN_KEYS))

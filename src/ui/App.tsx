@@ -16,7 +16,7 @@ import { OptionsMenu } from './options/OptionsMenu.js';
 import { SystemPanel, systemPanelRows } from './SystemPanel.js';
 import { clamp, initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 import { useKeymap } from './useKeymap.js';
-import { SPARE_ROWS, SYSTEM_MIN_ROWS, computeLayout, useTerminalSize } from './layout.js';
+import { FOOTER_ROWS, SPARE_ROWS, SYSTEM_MIN_ROWS, computeLayout, useTerminalSize } from './layout.js';
 
 export { initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 export { MIN_COLUMNS, MIN_ROWS, DETAIL_MIN_ROWS } from './layout.js';
@@ -88,6 +88,7 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
       <OptionsMenu
         config={cfg}
         width={Math.min(64, columns)}
+        maxHeight={rows - headerRows - FOOTER_ROWS - SPARE_ROWS}
         onChange={changeConfig}
         onClose={() => reduce({ type: 'closeOptions' })}
       />

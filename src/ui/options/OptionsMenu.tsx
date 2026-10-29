@@ -9,14 +9,22 @@ import { adjust, editText, formatValue, OPTIONS, parseNumberInput } from './opti
 export interface OptionsMenuProps {
   config: Config;
   width: number;
+  /** Rows available to the overlay; the inline columns list shrinks to fit. */
+  maxHeight?: number;
   onChange: (patch: Partial<Config>) => void;
   onClose: () => void;
 }
 
 type Mode = 'nav' | 'number' | 'columns';
 const LABEL_W = 15;
+const CHROME_ROWS = 3; // 2 border rows + hint line
+const MIN_LIST_ROWS = 3;
 
-export function OptionsMenu({ config, width, onChange, onClose }: OptionsMenuProps): JSX.Element {
+export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: OptionsMenuProps): JSX.Element {
+  const maxListRows =
+    maxHeight === undefined
+      ? COLUMN_KEYS.length
+      : Math.max(MIN_LIST_ROWS, maxHeight - OPTIONS.length - CHROME_ROWS);
   const theme = useTheme();
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<Mode>('nav');
@@ -60,10 +68,13 @@ export function OptionsMenu({ config, width, onChange, onClose }: OptionsMenuPro
         <MultiSelect
           options={COLUMN_KEYS.map((c) => ({ label: c, value: c }))}
           defaultValue={config.columns}
-          visibleOptionCount={COLUMN_KEYS.length}
+          visibleOptionCount={Math.min(COLUMN_KEYS.length, maxListRows)}
           onSubmit={(v) => {
             if (v.length > 0) {
-              onChange({ columns: COLUMN_KEYS.filter((c): c is ColumnKey => v.includes(c)) });
+              // Keep the user's existing order; newly enabled columns follow in canonical order.
+              const kept = config.columns.filter((c) => v.includes(c));
+              const added = COLUMN_KEYS.filter((c): c is ColumnKey => v.includes(c) && !kept.includes(c));
+              onChange({ columns: [...kept, ...added] });
               setMode('nav');
             }
           }}

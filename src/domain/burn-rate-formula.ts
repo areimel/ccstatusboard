@@ -31,8 +31,14 @@ export const RECENT_LOOKBACK_MS: Record<BurnWindowKind, number> = {
 /** Recent samples must span at least this long, otherwise the slope is noise. */
 export const MIN_RECENT_SPAN_MS = 5 * MINUTE_MS;
 
-/** Below this much elapsed window time the average rate is not meaningful. */
-export const MIN_AVERAGE_ELAPSED_MS = MINUTE_MS;
+/**
+ * Below this much elapsed window time the average rate is not meaningful: one
+ * early prompt over a tiny denominator would project a false CRITICAL.
+ */
+export const MIN_AVERAGE_ELAPSED_MS: Record<BurnWindowKind, number> = {
+  block: 15 * MINUTE_MS,
+  week: 6 * HOUR_MS,
+};
 
 /** Weight of the recent slope in the blend (the average gets 1 - this). */
 export const RECENT_WEIGHT = 0.6;
@@ -55,9 +61,14 @@ export function windowStart(resetsAt: number, kind: BurnWindowKind): number {
 }
 
 /** Percentage points per hour since window start; undefined if too little time has elapsed. */
-export function averageRate(pct: number, start: number, now: number): number | undefined {
+export function averageRate(
+  pct: number,
+  start: number,
+  now: number,
+  kind: BurnWindowKind,
+): number | undefined {
   const elapsed = now - start;
-  if (elapsed < MIN_AVERAGE_ELAPSED_MS) return undefined;
+  if (elapsed < MIN_AVERAGE_ELAPSED_MS[kind]) return undefined;
   return pct / (elapsed / HOUR_MS);
 }
 
@@ -137,7 +148,7 @@ export function projectBurn(
   if (!limit || limit.resetsAt === undefined) return undefined;
   const start = windowStart(limit.resetsAt, kind);
   const rate =
-    blendedRate(averageRate(limit.percent, start, now), recentRate(samples, now, kind, start)) ?? 0;
+    blendedRate(averageRate(limit.percent, start, now, kind), recentRate(samples, now, kind, start)) ?? 0;
   const remainingHours = Math.max(0, limit.resetsAt - now) / HOUR_MS;
   const projectedPct = limit.percent + rate * remainingHours;
   return {
