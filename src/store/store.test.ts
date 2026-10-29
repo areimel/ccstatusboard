@@ -83,6 +83,26 @@ describe('Store sessions', () => {
   });
 });
 
+describe('Store project', () => {
+  it('uses the resolved project name and falls back to the cwd basename', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg({ cwd: '/work/proj/sub' }));
+    store.flush();
+    expect(session(store.getSnapshot()).project).toBe('sub');
+    store.setProject('/work/proj/sub', 'proj');
+    store.flush();
+    expect(session(store.getSnapshot()).project).toBe('proj');
+  });
+
+  it('sanitizes the project name', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setProject('/work/proj', 'a\u001b[31mb');
+    store.flush();
+    expect(session(store.getSnapshot()).project).not.toContain('\u001b');
+  });
+});
+
 describe('Store pricing and context', () => {
   it('falls back to cost-state with costApprox when pricing is unavailable', () => {
     const store = makeStore();

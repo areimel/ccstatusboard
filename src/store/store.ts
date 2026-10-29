@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } from '../domain/aggregate.js';
 import { DedupSet } from '../domain/dedup.js';
 import { projectBurn } from '../domain/burn-rate-formula.js';
@@ -72,6 +73,8 @@ export class Store {
   private system: SystemStats | undefined;
   private readonly sysHistory: SystemHistory = { cpu: [], rx: [], tx: [] };
   private procStats = new Map<number, ProcStats>();
+  /** cwd → resolved project (git repo) name. */
+  private readonly projects = new Map<string, string>();
 
   private readonly opts: StoreOptions;
 
@@ -115,6 +118,12 @@ export class Store {
 
   setAgents(sessionId: string, a: { activeCount: number; names: string[] }): void {
     this.session(sessionId).agents = { activeCount: a.activeCount, names: [...a.names] };
+    this.markDirty();
+  }
+
+  setProject(cwd: string, name: string): void {
+    if (this.projects.get(cwd) === name) return;
+    this.projects.set(cwd, name);
     this.markDirty();
   }
 
@@ -257,6 +266,7 @@ export class Store {
       const visible = s.live || lastActivityOf(s) >= cutoff || (s.endedAt ?? 0) >= cutoff;
       if (!visible) continue;
       const view = buildSessionView(s, lookup);
+      if (view.cwd) view.project = sanitizeText(this.projects.get(view.cwd) ?? basename(view.cwd));
       const proc = s.live && s.registry ? this.procStats.get(s.registry.pid) : undefined;
       if (proc) {
         view.cpuPercent = proc.cpuPercent;

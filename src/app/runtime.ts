@@ -9,6 +9,7 @@ import { PricingProvider } from '../collectors/pricing.js';
 import { TranscriptTailer } from '../collectors/transcriptTailer.js';
 import { HistoryScanner } from '../collectors/historyScanner.js';
 import { SessionRegistry } from '../collectors/sessionRegistry.js';
+import { createProjectResolver } from '../collectors/projectName.js';
 import { scanSubagents } from '../collectors/subagents.js';
 import { ProcStatsSampler, type ProcStatsDeps } from '../collectors/procStats.js';
 import { SystemMonitor, type SystemMonitorDeps } from '../collectors/system/systemMonitor.js';
@@ -30,6 +31,8 @@ export interface RuntimeOptions {
   version: string;
   now?: () => number;
   fetch?: typeof fetch;
+  /** cwd → project name resolver override (tests stub it to avoid spawning git). */
+  resolveProject?: (cwd: string) => Promise<string>;
   /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
   /** System monitor: `false` disables it (tests); partial deps replace the real IO. */
   systemMonitor?: false | Partial<SystemMonitorDeps>;
@@ -60,6 +63,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     claudeDirFound: existsSync(claudeDir),
   });
 
+  const resolveProject = opts.resolveProject ?? createProjectResolver();
   const files = new Map<string, TrackedFile>();
   const live = new Map<string, RegistryEntry>();
   /** sessionId → main transcript path, once found. */
@@ -128,6 +132,11 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     claudeDir,
     onUpsert: (e) => {
       store.upsertRegistry(e);
+      void resolveProject(e.cwd)
+        .then((name) => {
+          if (!stopped) store.setProject(e.cwd, name);
+        })
+        .catch(() => undefined);
       const known = live.has(e.sessionId);
       live.set(e.sessionId, e);
       if (!known) void attachTranscript(e).catch(() => undefined);

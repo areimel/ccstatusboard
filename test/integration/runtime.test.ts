@@ -41,6 +41,7 @@ async function boot(
     credentials?: boolean;
     createClaudeDir?: boolean;
     readCredentials?: RuntimeOptions['readCredentials'];
+    resolveProject?: RuntimeOptions['resolveProject'];
   } = {},
 ) {
   fx = await makeClaudeDir(sessions, { credentials: o.credentials, createClaudeDir: o.createClaudeDir });
@@ -49,6 +50,7 @@ async function boot(
     claudeDir: fx.claudeDir,
     cacheDir: fx.cacheDir,
     version: '0.1.0-test',
+    resolveProject: o.resolveProject ?? (async (cwd) => cwd.split('/').pop() ?? cwd),
     fetch: o.fetch ?? makeFakeFetch({ usage: usageFixture(Date.now()), pricing: PRICING_FIXTURE }),
     ...(o.readCredentials ? { readCredentials: o.readCredentials } : {}),
   });
@@ -118,6 +120,18 @@ describe('runtime integration', () => {
     );
     expect(ended.status).toBe('ended');
   }, 20_000);
+
+  it('resolves the project name for a live session through the injected resolver', async () => {
+    const resolveProject = vi.fn(async () => 'my-repo');
+    const { store } = await boot([liveSession([assistantLine({ id: 'a1', ts: iso(60_000), usage })])], {
+      resolveProject,
+    });
+    const v = await waitFor(() =>
+      store.getSnapshot().sessions.find((x) => x.sessionId === 'live' && x.project === 'my-repo'),
+    );
+    expect(v.project).toBe('my-repo');
+    expect(resolveProject).toHaveBeenCalledWith('/work/live');
+  });
 
   it('offline: limits error, pricing unavailable, costs "—", session falls back to cost-state ≈', async () => {
     const { store } = await boot(
