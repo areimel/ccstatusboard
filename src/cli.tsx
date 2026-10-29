@@ -2,7 +2,7 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import { render, type Instance } from 'ink';
 import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './config/load.js';
-import { createThemeSaver } from './config/save.js';
+import { createConfigSaver } from './config/save.js';
 import { THEME_NAMES, type Config } from './domain/types.js';
 import { cacheDir, resolveClaudeDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
@@ -97,7 +97,7 @@ async function main(argv: string[]): Promise<number | undefined> {
     return 1;
   }
 
-  const saveTheme = createThemeSaver({ path: resolveConfigPath(parsed.flags) });
+  const saveConfig = createConfigSaver({ path: resolveConfigPath(parsed.flags) });
   const claudeDir = resolveClaudeDir({ flag: parsed.flags.claudeDir ?? null, config: config.claudeDir });
   const runtime = createRuntime({ config, claudeDir, cacheDir: cacheDir(), version: VERSION });
 
@@ -117,7 +117,7 @@ async function main(argv: string[]): Promise<number | undefined> {
     restore();
     // Let a just-made theme save land, but never let a slow disk hold up quitting.
     const timeout = new Promise<void>((r) => setTimeout(r, SAVE_FLUSH_MS));
-    void Promise.race([saveTheme.flush(), timeout]).finally(() => process.exit(code));
+    void Promise.race([saveConfig.flush(), timeout]).finally(() => process.exit(code));
   };
   const crash = (err: unknown) => {
     try {
@@ -139,7 +139,12 @@ async function main(argv: string[]): Promise<number | undefined> {
   process.stdout.write(ENTER_ALT);
   altActive = true;
   ink.instance = render(
-    <App store={runtime.store} config={config} onQuit={() => shutdown(0)} onThemeChange={saveTheme} />,
+    <App
+      store={runtime.store}
+      config={config}
+      onQuit={() => shutdown(0)}
+      onThemeChange={(name) => saveConfig({ theme: name })}
+    />,
     {
       exitOnCtrlC: false,
     },
