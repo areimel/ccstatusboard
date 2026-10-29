@@ -15,6 +15,7 @@ describe('HelpOverlay', () => {
       'Toggle detail',
       'Top / bottom',
       'Cycle sort',
+      'project',
       'Toggle filter',
       'Search',
       'Options',
@@ -25,6 +26,8 @@ describe('HelpOverlay', () => {
       expect(out).toContain(s);
     }
     for (const g of ['● waiting', '◐ busy', '○ idle', '· ended']) expect(out).toContain(g);
+    expect(out).toContain('Dimmed rows are idle');
+    expect(out).toContain('group headers and subagent rows');
   });
 });
 

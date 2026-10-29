@@ -41,8 +41,8 @@ Options:
   --theme <name>        start theme (t / T cycles; saved to config)
 ${wrapNames(THEME_NAMES, ' '.repeat(24), 78)}
   --refresh <ms>        UI refresh interval (default 1000, min 250)
-  --ended-hours <n>     show ended sessions from the last n hours (default 24)
-  --sort <key>          status | activity | cost | ctx | name
+  --ended-hours <n>     keep exited sessions listed for n hours (default 0 = remove)
+  --sort <key>          project | status | activity | cost | ctx | name
   --claude-dir <path>   Claude Code config dir (default $CLAUDE_CONFIG_DIR or ~/.claude)
   --no-usage-api        do not call the Anthropic usage API (limits show "disabled")
   --config <path>       config file (default ~/.config/ccstatusboard/config.json)

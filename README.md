@@ -12,8 +12,11 @@ An htop-style terminal dashboard for **all** your Claude Code sessions: usage li
 │ burn  $4.10/h   24h ▁▂▃▅▇▆▅▃▂▃▅▆▇▅▃▂▁▁▂▃▅▆▇▆            month $412.75 │
 ╰──────────────────────────────────────────────────────────────────────╯
 ╭─ Sessions ───────────────────────────────────────────────────────────╮
-│ ●    ccstatusboard   opus-5.5  main    ███████░░░ 61%   $4.20   now   │
-│ ◐ 2  power-tools     sonnet    feat/x  ██░░░░░░░░ 22%   $1.10   3s    │
+│ ── ccstatusboard (1) ─────────────────────────────────────────────── │
+│ ◐    ccstatusboard   opus-5.5  ███████░░░ 61%   $4.20   now           │
+│   ├─ Explore                                              12s        │
+│ ── power-tools (1) ───────────────────────────────────────────────── │
+│ ○    power-tools     sonnet    ██░░░░░░░░ 22%   $1.10   3m           │
 ╰──────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -35,10 +38,11 @@ ccstatusboard
 - **Burn rate:** a projection under each limit: the pace you are on, where it lands at reset, and when (if ever) you hit 100%. See [Burn rate](#burn-rate).
 - **Estimated cost (USD):** current block, today, this week, this month, and an optional `plan` ratio against your subscription price. Burn rate ($/h) and a 24-hour sparkline.
 - **System:** CPU, memory, swap and disk meters, network download/upload sparklines and a per-core strip. Hidden on terminals shorter than 30 rows, or with `showSystem: false`.
-- **Sessions:** waiting for you (and why), working (with active subagent count), idle, or ended in the last 24h (dimmed). Each row shows model, git branch, context-window fill, CPU and memory of the session's process, cost, last activity and uptime.
+- **Sessions:** grouped by project (the git repo name, so worktrees and subfolders of one repo share a group) under `── <project> (n) ──` header rows. Each row shows waiting (and why), working, or idle status, model, context-window fill, CPU and memory of the session's process, cost, last activity and uptime. The git branch is hidden by default; turn it on under Options → Columns. Live sessions idle past the cutoff (`idleCutoffMinutes`, default 1h) are dimmed. Exited sessions are removed at once unless `endedWindowHours` keeps them.
+- **Subagents:** active subagents appear as tree rows (`├─` / `└─`) under their parent session, with the agent type and last activity.
 - **Detail pane:** token breakdown, per-model cost, active agents, cwd, permission mode, Claude Code version.
 
-Legend: `●` waiting, `◐` busy, `○` idle, `·` ended.
+Legend: `●` waiting, `◐` busy, `○` idle, `·` ended. Group headers and subagent rows cannot be selected: `j`/`k` move between sessions.
 
 ## Usage
 
@@ -50,8 +54,8 @@ ccstatusboard [options]
 | --------------------- | ----------------------------------------------------------------------- |
 | `--theme <name>`      | Start theme; `t` / `T` cycle and save it (see below)                    |
 | `--refresh <ms>`      | UI refresh interval (default 1000, minimum 250)                         |
-| `--ended-hours <n>`   | Show ended sessions from the last n hours (default 24)                  |
-| `--sort <key>`        | `status`, `activity`, `cost`, `ctx` or `name`                           |
+| `--ended-hours <n>`   | Keep ended sessions for n hours (default 0: removed when they exit)     |
+| `--sort <key>`        | `project` (default), `status`, `activity`, `cost`, `ctx` or `name`      |
 | `--claude-dir <path>` | Claude Code config dir (default `$CLAUDE_CONFIG_DIR`, else `~/.claude`) |
 | `--no-usage-api`      | Do not call the Anthropic usage API (limits show "disabled")            |
 | `--config <path>`     | Config file path (default `~/.config/ccstatusboard/config.json`)        |
@@ -60,34 +64,37 @@ ccstatusboard [options]
 
 ## Keys
 
-| Key               | Action                                              |
-| ----------------- | --------------------------------------------------- |
-| `↑` `↓` / `j` `k` | Move selection                                      |
-| `g` / `G`         | Top / bottom                                        |
-| `Enter`           | Toggle detail pane                                  |
-| `s`               | Cycle sort: status, activity, cost, ctx, name       |
-| `t` / `T`         | Next / previous theme (saved to the config file)    |
-| `f`               | Filter: all / live only                             |
-| `/`               | Search by name or cwd (`Enter` keeps, `Esc` clears) |
-| `Esc`             | Options menu (when not searching, see below)        |
-| `?` / `F1`        | Toggle help                                         |
-| `q` / `Ctrl-C`    | Quit                                                |
+| Key               | Action                                                 |
+| ----------------- | ------------------------------------------------------ |
+| `↑` `↓` / `j` `k` | Move selection                                         |
+| `g` / `G`         | Top / bottom                                           |
+| `Enter`           | Toggle detail pane                                     |
+| `s`               | Cycle sort: project, status, activity, cost, ctx, name |
+| `t` / `T`         | Next / previous theme (saved to the config file)       |
+| `f`               | Filter: all / live only                                |
+| `/`               | Search by name or cwd (`Enter` keeps, `Esc` clears)    |
+| `Esc`             | Options menu (when not searching, see below)           |
+| `?` / `F1`        | Toggle help                                            |
+| `q` / `Ctrl-C`    | Quit                                                   |
 
 ## Options
 
 Press `Esc` outside search to open the Options menu. `↑` `↓` move, `←` `→` change a value, `Enter` edits numbers and column visibility, and `Esc` closes the menu. Changes apply immediately and are written to the config file.
 
-| Option                                           | Config key         | Default   |
-| ------------------------------------------------ | ------------------ | --------- |
-| Theme                                            | `theme`            | `default` |
-| Subscription price (per month, for `plan` ratio) | `subscriptionUSD`  | unset     |
-| Sort                                             | `sort`             | `status`  |
-| Detail pane                                      | `showDetail`       | on        |
-| System panel                                     | `showSystem`       | on        |
-| Columns                                          | `columns`          | all       |
-| Ended window                                     | `endedWindowHours` | 24 h      |
-| Refresh                                          | `refreshMs`        | 1000 ms   |
-| Usage poll                                       | `usagePollSeconds` | 60 s      |
+| Option                                           | Config key          | Default             |
+| ------------------------------------------------ | ------------------- | ------------------- |
+| Theme                                            | `theme`             | `default`           |
+| Subscription price (per month, for `plan` ratio) | `subscriptionUSD`   | unset               |
+| Sort                                             | `sort`              | `project`           |
+| Detail pane                                      | `showDetail`        | on                  |
+| System panel                                     | `showSystem`        | on                  |
+| Columns                                          | `columns`           | all but `branch`    |
+| Dim idle after                                   | `idleCutoffMinutes` | 60 min (`1h`)       |
+| Keep exited                                      | `endedWindowHours`  | 0 (removed on exit) |
+| Refresh                                          | `refreshMs`         | 1000 ms             |
+| Usage poll                                       | `usagePollSeconds`  | 60 s                |
+
+"Dim idle after" takes minutes or hours: `45`, `90m`, `1.5h`, `2h` or `1h 30m`. The arrow keys step it by 15 minutes. "Keep exited" is in hours; `0` removes an exited session at once.
 
 `claudeDir` and `usageApi` are shown but read-only in the menu: change them with `--claude-dir` / `--no-usage-api` or in the file, then restart.
 
@@ -117,9 +124,10 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
   "theme": "default",
   "refreshMs": 1000,
   "usagePollSeconds": 60,
-  "endedWindowHours": 24,
-  "columns": ["status", "name", "model", "branch", "ctx", "cpu", "mem", "cost", "last", "uptime"],
-  "sort": "status",
+  "endedWindowHours": 0,
+  "idleCutoffMinutes": 60,
+  "columns": ["status", "project", "name", "model", "ctx", "cpu", "mem", "cost", "last", "uptime"],
+  "sort": "project",
   "showDetail": true,
   "showSystem": true,
   "subscriptionUSD": null,
@@ -129,7 +137,10 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
 ```
 
 - `usagePollSeconds` has a minimum of 30 and `refreshMs` a minimum of 250.
-- `columns` takes any of `status`, `name`, `model`, `branch`, `ctx`, `cpu`, `mem`, `cost`, `last`, `uptime`. The default is all of them, in that order. `cpu` and `mem` are the session's own process; they show `—` for sessions that are not live.
+- `columns` takes any of `status`, `project`, `name`, `model`, `branch`, `ctx`, `cpu`, `mem`, `cost`, `last`, `uptime`. The default is all of them except `branch`, in that order. `cpu` and `mem` are the session's own process; they show `—` for sessions that are not live.
+- `endedWindowHours` (default `0`) is how long exited sessions stay listed. `0` removes them as soon as they exit; a positive value keeps them that many hours, dimmed.
+- `idleCutoffMinutes` (default `60`, range 1 to 10080) dims live sessions with no activity for longer than this.
+- `sort` takes `project` (default, grouped by project), `status`, `activity`, `cost`, `ctx` or `name`.
 - `showSystem` (default `true`) turns the System panel on or off.
 - `subscriptionUSD` (default `null`) is your monthly plan price in USD, a positive number. `null` hides the `plan` ratio.
 
@@ -138,6 +149,8 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
 | Data                               | Source                                                                                                                                |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Running sessions and status        | `~/.claude/sessions/<pid>.json`, checked against the live process table                                                               |
+| Project name                       | `git rev-parse --git-common-dir` in each session's cwd (read-only; falls back to the folder name outside a git repo)                  |
+| Subagents                          | The session's `subagents/` folder: agent transcripts, and which agents wrote recently (active ones only)                              |
 | Tokens, model, branch, context     | Session transcripts in `~/.claude/projects/**/*.jsonl` (tailed incrementally)                                                         |
 | Today / week / month totals        | A startup scan of transcripts from the last 35 days, cached in ccstatusboard's cache dir (see below)                                  |
 | 5h / weekly limits                 | Anthropic's OAuth usage endpoint (as used by Claude Code's `/usage`), polled every 60 s                                               |
