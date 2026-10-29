@@ -35,13 +35,12 @@ function normalHints(theme: string | undefined, esc: boolean): Hint[] {
   const hints = HINTS.slice(0, -1);
   if (esc) hints.push(['esc', 'Options']);
   if (theme !== undefined) hints.push(['t', theme]);
-  hints.push(HINTS.slice(-1)[0]);
-  return hints;
+  return [...hints, ...HINTS.slice(-1)];
 }
 
 // Optional-hint variants, most wanted first. The options hint is the way to reach
 // theme editing, so it outlasts the theme hint when the terminal is narrow.
-const VARIANTS = [
+const VARIANTS: readonly { theme: boolean; esc: boolean }[] = [
   { theme: true, esc: true },
   { theme: false, esc: true },
   { theme: true, esc: false },
@@ -72,7 +71,7 @@ export function Footer({ mode, search, width }: FooterProps): JSX.Element {
   }
   const fits = (v: { theme: boolean; esc: boolean }): boolean =>
     hintsWidth(normalHints(v.theme ? LONGEST_THEME : undefined, v.esc)) <= (width ?? Infinity);
-  const v = VARIANTS.find(fits) ?? VARIANTS[VARIANTS.length - 1];
+  const v = VARIANTS.find(fits) ?? { theme: false, esc: false };
   const hints = normalHints(v.theme ? theme.name : undefined, v.esc);
   return (
     <Box paddingX={PADDING_X} columnGap={COLUMN_GAP}>
