@@ -157,7 +157,7 @@ export interface UsagePollerDeps {
 
 export class UsagePoller {
   private readonly claudeDir: string;
-  private readonly intervalMs: number;
+  private intervalMs: number;
   private readonly userAgent: string;
   private readonly enabled: boolean;
   private readonly onUpdate: (s: LimitsState) => void;
@@ -190,6 +190,11 @@ export class UsagePoller {
     this.now = d.now ?? Date.now;
     this.setT = d.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
     this.clearT = d.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
+  }
+
+  /** Applies a new poll interval from the next scheduled poll on. */
+  setIntervalSeconds(seconds: number): void {
+    this.intervalMs = Math.max(MIN_INTERVAL_S, seconds) * 1000;
   }
 
   /** One poll. Emits a state and returns the delay in ms until the next poll. */

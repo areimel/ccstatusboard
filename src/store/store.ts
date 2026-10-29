@@ -1,15 +1,18 @@
 import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } from '../domain/aggregate.js';
 import { DedupSet } from '../domain/dedup.js';
+import { projectBurn } from '../domain/burn-rate-formula.js';
 import {
-  emptySystemHistory,
-  type Limit,
+  type BurnProjection,
   type LimitsState,
   type PriceLookup,
   type PricingStatus,
+  type ProcStats,
   type RegistryEntry,
   type ScanProgress,
   type SessionView,
   type Snapshot,
+  type SystemHistory,
+  type SystemStats,
   type TimeWindow,
   type TranscriptEvent,
   type UsageRecord,
@@ -22,7 +25,8 @@ import {
   todayWindow,
   weekWindowFromLimit,
 } from '../domain/windows.js';
-import { sanitizeOptional, sanitizeText, sanitizeWindowTotals } from './sanitize.js';
+import { LimitHistory } from './limitHistory.js';
+import { nonNeg, sanitizeLimits, sanitizeSystem, sanitizeText, sanitizeWindowTotals } from './sanitize.js';
 import {
   applySessionEvent,
   buildSessionView,
@@ -41,6 +45,12 @@ export interface StoreOptions {
 }
 
 const TESTED_MAJOR_MINOR = '2.1';
+const SYSTEM_HISTORY_POINTS = 60;
+
+function pushCapped(arr: number[], v: number): void {
+  arr.push(v);
+  if (arr.length > SYSTEM_HISTORY_POINTS) arr.splice(0, arr.length - SYSTEM_HISTORY_POINTS);
+}
 
 export class Store {
   private readonly sessions = new Map<string, SessionState>();
@@ -58,8 +68,15 @@ export class Store {
   private pending: ReturnType<typeof setTimeout> | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
+  private readonly limitHistory = new LimitHistory();
+  private system: SystemStats | undefined;
+  private readonly sysHistory: SystemHistory = { cpu: [], rx: [], tx: [] };
+  private procStats = new Map<number, ProcStats>();
 
-  constructor(private readonly opts: StoreOptions) {
+  private readonly opts: StoreOptions;
+
+  constructor(opts: StoreOptions) {
+    this.opts = { ...opts };
     this.claudeDirFound = opts.claudeDirFound;
     this.snapshot = this.compute();
   }
@@ -103,6 +120,39 @@ export class Store {
 
   setLimits(l: LimitsState): void {
     this.limits = sanitizeLimits(l);
+    const now = this.opts.now();
+    const t = l.fetchedAt ?? now;
+    this.limitHistory.record('block', this.limits.block, t, now);
+    this.limitHistory.record('week', this.limits.weekly, t, now);
+    this.markDirty();
+  }
+
+  setSystem(stats: SystemStats): void {
+    this.system = sanitizeSystem(stats);
+    pushCapped(this.sysHistory.cpu, this.system.cpu.total);
+    pushCapped(this.sysHistory.rx, this.system.net.rxPerSec);
+    pushCapped(this.sysHistory.tx, this.system.net.txPerSec);
+    this.markDirty();
+  }
+
+  setProcStats(map: Map<number, ProcStats>): void {
+    const next = new Map<number, ProcStats>();
+    for (const [pid, p] of map)
+      next.set(pid, { cpuPercent: nonNeg(p.cpuPercent), rssBytes: nonNeg(p.rssBytes) });
+    this.procStats = next;
+    this.markDirty();
+  }
+
+  /** Applies live config changes; a new refreshMs restarts the flush interval. */
+  setOptions(patch: { refreshMs?: number; endedWindowHours?: number }): void {
+    if (patch.endedWindowHours !== undefined) this.opts.endedWindowHours = patch.endedWindowHours;
+    if (patch.refreshMs !== undefined && patch.refreshMs !== this.opts.refreshMs) {
+      this.opts.refreshMs = patch.refreshMs;
+      if (this.ticker) {
+        clearInterval(this.ticker);
+        this.ticker = setInterval(() => this.flush(), this.opts.refreshMs);
+      }
+    }
     this.markDirty();
   }
 
@@ -186,6 +236,12 @@ export class Store {
     return resetsAt !== undefined ? weekWindowFromLimit(resetsAt, now) : rollingWeekWindow(now);
   }
 
+  private burn(now: number): { block?: BurnProjection; week?: BurnProjection } {
+    const block = projectBurn(this.limits.block, this.limitHistory.samples('block'), now, 'block');
+    const week = projectBurn(this.limits.weekly, this.limitHistory.samples('week'), now, 'week');
+    return { ...(block ? { block } : {}), ...(week ? { week } : {}) };
+  }
+
   private compute(): Snapshot {
     const now = this.opts.now();
     const lookup = this.lookup;
@@ -199,7 +255,14 @@ export class Store {
         if (warning && !warnings.includes(warning)) warnings.push(warning);
       }
       const visible = s.live || lastActivityOf(s) >= cutoff || (s.endedAt ?? 0) >= cutoff;
-      if (visible) sessions.push(buildSessionView(s, lookup));
+      if (!visible) continue;
+      const view = buildSessionView(s, lookup);
+      const proc = s.live && s.registry ? this.procStats.get(s.registry.pid) : undefined;
+      if (proc) {
+        view.cpuPercent = proc.cpuPercent;
+        view.memBytes = proc.rssBytes;
+      }
+      sessions.push(view);
     }
     return {
       now,
@@ -219,8 +282,13 @@ export class Store {
       scan: this.scan,
       sessions,
       warnings,
-      systemHistory: emptySystemHistory(),
-      burn: {},
+      ...(this.system ? { system: this.system } : {}),
+      systemHistory: {
+        cpu: [...this.sysHistory.cpu],
+        rx: [...this.sysHistory.rx],
+        tx: [...this.sysHistory.tx],
+      },
+      burn: this.burn(now),
     };
   }
 }
@@ -228,22 +296,6 @@ export class Store {
 function isTestedVersion(version: string): boolean {
   const [major, minor] = version.split('.');
   return `${major}.${minor}` === TESTED_MAJOR_MINOR;
-}
-
-function sanitizeLimit(l: Limit): Limit {
-  return { ...l, label: sanitizeText(l.label) };
-}
-
-/** Limits come from the network; strip control chars from every string the UI may render. */
-function sanitizeLimits(l: LimitsState): LimitsState {
-  return {
-    ...l,
-    ...(l.block ? { block: sanitizeLimit(l.block) } : {}),
-    ...(l.weekly ? { weekly: sanitizeLimit(l.weekly) } : {}),
-    perModelWeekly: l.perModelWeekly.map(sanitizeLimit),
-    ...(l.extra ? { extra: { ...l.extra, currency: sanitizeOptional(l.extra.currency) } } : {}),
-    ...(l.error !== undefined ? { error: sanitizeText(l.error) } : {}),
-  };
 }
 
 /** Inserts `v` into ascending `arr`: O(1) append for in-order data, binary search otherwise. */
