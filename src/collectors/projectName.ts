@@ -21,8 +21,9 @@ export function createProjectResolver(deps: ProjectResolverDeps = {}): (cwd: str
         const name = out.endsWith('/.git') ? basename(dirname(out)) : basename(out).replace(/\.git$/, '');
         if (name) return name;
       }
-    } catch {
-      // not a repo, git missing or timed out: fall through
+    } catch (e) {
+      // A non-zero git exit (not a repo) is final; a timeout or spawn error is retried next call.
+      if (!isExitError(e)) cache.delete(cwd);
     }
     return basename(cwd);
   };
@@ -35,4 +36,10 @@ export function createProjectResolver(deps: ProjectResolverDeps = {}): (cwd: str
     }
     return p;
   };
+}
+
+function isExitError(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const err = e as { code?: unknown; killed?: unknown };
+  return typeof err.code === 'number' && err.killed !== true;
 }

@@ -127,8 +127,10 @@ export class Store {
   }
 
   setProject(cwd: string, name: string): void {
-    if (this.projects.get(cwd) === name) return;
-    this.projects.set(cwd, name);
+    // Keyed like view.cwd, which is already sanitized.
+    const key = sanitizeText(cwd);
+    if (this.projects.get(key) === name) return;
+    this.projects.set(key, name);
     this.markDirty();
   }
 

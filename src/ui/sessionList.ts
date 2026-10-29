@@ -48,7 +48,7 @@ const desc = (a: number | null | undefined, b: number | null | undefined) => {
 };
 
 export const NO_PROJECT = '—';
-const projectOf = (s: SessionView) => s.project ?? NO_PROJECT;
+const projectOf = (s: SessionView) => s.project || NO_PROJECT;
 const byStatusThenActivity = (a: SessionView, b: SessionView) =>
   STATUS_RANK[a.status] - STATUS_RANK[b.status] || byActivity(a, b);
 
@@ -159,13 +159,12 @@ export function rowWindow(
   const size = Math.max(1, maxRows);
   const pos = rows.findIndex((r) => r.kind === 'session' && r.index === selectedIndex);
   const sel = Math.max(0, pos);
-  let start = sel >= size ? sel - size + 1 : 0;
-  for (let g = sel - 1; g >= 0 && g >= sel - size + 1; g--) {
-    if (rows[g]?.kind === 'group') {
-      start = Math.min(start, g);
-      break;
-    }
-  }
+  // The selected session's block: its group header (if directly above) through its subagent rows.
+  let blockEnd = sel + 1;
+  while (rows[blockEnd]?.kind === 'agent') blockEnd++;
+  const blockStart = rows[sel - 1]?.kind === 'group' ? sel - 1 : sel;
+  // Show the whole block when it fits; otherwise keep the selected row at the top.
+  const start = blockEnd - blockStart <= size ? Math.max(0, blockEnd - size) : sel;
   return { start, end: Math.min(rows.length, start + size) };
 }
 

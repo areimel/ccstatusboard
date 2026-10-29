@@ -33,11 +33,11 @@ export interface RuntimeOptions {
   fetch?: typeof fetch;
   /** cwd → project name resolver override (tests stub it to avoid spawning git). */
   resolveProject?: (cwd: string) => Promise<string>;
-  /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
   /** System monitor: `false` disables it (tests); partial deps replace the real IO. */
   systemMonitor?: false | Partial<SystemMonitorDeps>;
   /** Per-process sampler: `false` disables it (tests); partial deps replace the real IO. */
   procStats?: false | Partial<ProcStatsDeps>;
+  /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
   readCredentials?: (claudeDir: string) => Promise<CredentialsResult>;
 }
 

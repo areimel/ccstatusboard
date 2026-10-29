@@ -220,6 +220,25 @@ describe('rowWindow', () => {
   it('shows everything when it fits', () => {
     expect(rowWindow(rows, 8, 50)).toEqual({ start: 0, end: 12 });
   });
+  it("shows the selected session's subagent rows when scrolled to it", () => {
+    const agent = (id: string) => ({ id, name: id, lastActivity: NOW });
+    const withAgents = buildRows(
+      sorted.map((s, i) => (i === 8 ? { ...s, subagents: [agent('x'), agent('y')] } : s)),
+      'project',
+    );
+    const { start, end } = rowWindow(withAgents, 8, 4);
+    expect(withAgents.slice(start, end).map((r) => r.kind)).toEqual(['session', 'session', 'agent', 'agent']);
+  });
+  it('keeps the selected row when its block is taller than the window', () => {
+    const agent = (id: string) => ({ id, name: id, lastActivity: NOW });
+    const withAgents = buildRows(
+      sorted.map((s, i) => (i === 4 ? { ...s, subagents: ['p', 'q', 'r', 's'].map(agent) } : s)),
+      'project',
+    );
+    const { start } = rowWindow(withAgents, 4, 3);
+    const first = withAgents[start];
+    expect(first?.kind === 'session' && first.index).toBe(4);
+  });
 });
 
 describe('buildRows agents', () => {
