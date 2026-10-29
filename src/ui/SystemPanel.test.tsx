@@ -4,20 +4,12 @@ import { SystemPanel, systemPanelRows } from './SystemPanel.js';
 import { makeSnapshot } from '../../test/helpers/snapshot.js';
 import { renderSized } from '../../test/helpers/renderSized.js';
 import { stripAnsi } from '../../test/helpers/ansi.js';
+import { makeSystemStats } from '../../test/helpers/system.js';
 import type { Snapshot, SystemStats } from '../domain/types.js';
 
 afterEach(cleanup);
 
-const GB = 1024 ** 3;
-const SYSTEM: SystemStats = {
-  sampledAt: 0,
-  cpu: { total: 42, perCore: [10, 50, 90, 100] },
-  mem: { used: 5.1 * GB, total: 15.6 * GB },
-  swap: { used: 0.5 * GB, total: 2 * GB },
-  disk: { used: 100 * GB, total: 500 * GB, mount: '/' },
-  net: { rxPerSec: 1.2 * 1024 ** 2, txPerSec: 34 * 1024 },
-  load: [1.2, 0.9, 0.8],
-};
+const SYSTEM = makeSystemStats();
 const snap = (system?: SystemStats | null): Snapshot =>
   makeSnapshot({
     ...(system === null ? {} : { system: system ?? SYSTEM }),

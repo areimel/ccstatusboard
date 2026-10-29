@@ -35,6 +35,16 @@ export function formatBytes(n: number | undefined): string {
   return `${trimZero(v.toFixed(digits))}${BYTE_UNITS[i]}`;
 }
 
+/** used/total as a percentage; undefined when total is not a positive finite number. */
+export function ratioPercent(used: number, total: number): number | undefined {
+  return Number.isFinite(total) && total > 0 ? (used / total) * 100 : undefined;
+}
+
+/** `a/b` pair, e.g. 5.1G/15.6G. */
+export function formatPair(a: number, b: number, fmt: (n: number) => string = formatBytes): string {
+  return `${fmt(a)}/${fmt(b)}`;
+}
+
 /** Transfer rate: 1.2M/s. */
 export function formatRate(bytesPerSec: number | undefined): string {
   const b = formatBytes(bytesPerSec);

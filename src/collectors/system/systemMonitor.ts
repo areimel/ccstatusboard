@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process';
 import { readFile as fsReadFile, statfs as fsStatfs } from 'node:fs/promises';
 import os from 'node:os';
+import { runCommand } from '../../core/exec.js';
 import type { SystemStats } from '../../domain/types.js';
 import { cpuUsage, type CpuTimes } from './cpu.js';
 import { readDisk, type DiskDeps } from './disk.js';
@@ -35,12 +35,7 @@ const realDeps: SystemMonitorDeps = {
   freemem: () => os.freemem(),
   readFile: (p) => fsReadFile(p, 'utf8'),
   statfs: (p) => fsStatfs(p),
-  exec: (cmd, args) =>
-    new Promise((resolve, reject) => {
-      execFile(cmd, args, { timeout: 2000, encoding: 'utf8' }, (err, stdout) =>
-        err ? reject(err) : resolve(stdout),
-      );
-    }),
+  exec: (cmd, args) => runCommand(cmd, args, { timeoutMs: 2000 }),
   now: () => Date.now(),
   setTimeout: (fn, ms) => setTimeout(fn, ms),
   clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout),

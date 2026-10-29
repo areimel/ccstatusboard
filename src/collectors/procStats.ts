@@ -1,9 +1,6 @@
-import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { promisify } from 'node:util';
+import { runCommand } from '../core/exec.js';
 import type { ProcStats } from '../domain/types.js';
-
-const execFileAsync = promisify(execFile);
 
 export interface ProcStatsDeps {
   platform: NodeJS.Platform;
@@ -66,15 +63,7 @@ const defaultDeps: ProcStatsDeps = {
   platform: process.platform,
   readFile: (path) => readFile(path, 'utf8'),
   // `ps -p` exits 1 when any listed pid is gone; keep the rows it did print.
-  exec: async (cmd, args) => {
-    try {
-      return (await execFileAsync(cmd, args, { timeout: PS_TIMEOUT_MS })).stdout;
-    } catch (e) {
-      const stdout = (e as { stdout?: unknown }).stdout;
-      if (typeof stdout === 'string' && stdout.trim() !== '') return stdout;
-      throw e;
-    }
-  },
+  exec: (cmd, args) => runCommand(cmd, args, { timeoutMs: PS_TIMEOUT_MS, keepPartialStdout: true }),
   now: () => Date.now(),
 };
 

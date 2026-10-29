@@ -65,6 +65,9 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
   /** sessionId → main transcript path, once found. */
   const mainTranscript = new Map<string, string>();
   const timers: NodeJS.Timeout[] = [];
+  const every = (fn: () => Promise<unknown>, ms: number): void => {
+    timers.push(setInterval(() => void fn().catch(() => undefined), ms));
+  };
   let started = false;
   let stopped = false;
 
@@ -213,13 +216,12 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       tailer.start();
       poller.start();
       systemMonitor?.start();
-      if (procSampler)
-        timers.push(setInterval(() => void sampleProcs().catch(() => undefined), PROC_SAMPLE_MS));
+      if (procSampler) every(sampleProcs, PROC_SAMPLE_MS);
       void scanner.run().catch(() => {
         if (!stopped) store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
       });
-      timers.push(setInterval(() => void scanAgents().catch(() => undefined), AGENT_SCAN_MS));
-      timers.push(setInterval(() => void loadPricing().catch(() => undefined), PRICING_RELOAD_MS));
+      every(scanAgents, AGENT_SCAN_MS);
+      every(loadPricing, PRICING_RELOAD_MS);
       await Promise.all([
         loadPricing().catch(() => {
           if (!stopped) store.setPricing(null, 'unavailable');

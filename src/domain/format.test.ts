@@ -4,12 +4,14 @@ import {
   formatBytes,
   formatClock,
   formatDuration,
+  formatPair,
   formatPercent,
   formatRate,
   formatWeekdayTime,
   formatResetsAt,
   formatTokens,
   formatUSD,
+  ratioPercent,
   shortModel,
   truncate,
   truncateDisplay,
@@ -178,5 +180,26 @@ describe('formatWeekdayTime', () => {
   it('renders weekday and HH:MM in local time', () => {
     const ts = new Date(2026, 9, 13, 14, 0).getTime(); // Tue
     expect(formatWeekdayTime(ts)).toBe('Tue 14:00');
+  });
+});
+
+describe('ratioPercent', () => {
+  it('computes a percentage', () => {
+    expect(ratioPercent(1, 4)).toBe(25);
+  });
+  it('is undefined for non-positive or non-finite totals', () => {
+    expect(ratioPercent(1, 0)).toBeUndefined();
+    expect(ratioPercent(1, -5)).toBeUndefined();
+    expect(ratioPercent(1, Number.NaN)).toBeUndefined();
+    expect(ratioPercent(1, Number.POSITIVE_INFINITY)).toBeUndefined();
+  });
+});
+
+describe('formatPair', () => {
+  it('joins bytes by default', () => {
+    expect(formatPair(1024, 2048)).toBe('1K/2K');
+  });
+  it('accepts a custom formatter', () => {
+    expect(formatPair(1, 2, String)).toBe('1/2');
   });
 });

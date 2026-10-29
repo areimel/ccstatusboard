@@ -6,12 +6,13 @@ import type { Limit, LimitsState, Snapshot } from '../domain/types.js';
 import { formatDuration, formatResetsAt, formatUSD } from '../domain/format.js';
 import { KeyValue } from './KeyValue.js';
 import { BURN_RATE_ROWS, BurnRate } from './BurnRate.js';
-import { Meter } from './Meter.js';
+import { MeterStack, type MeterRow } from './MeterStack.js';
+import { splitColumns } from './layout.js';
 import { Panel } from './Panel.js';
 import { useTheme } from './theme.js';
 
 const RIGHT_WIDTH = 20;
-const SUFFIX_WIDTH = 18;
+const COST_LABEL_WIDTH = 7;
 
 const STATUS_MESSAGE: Partial<Record<LimitsState['status'], string>> = {
   loading: 'loading…',
@@ -20,12 +21,6 @@ const STATUS_MESSAGE: Partial<Record<LimitsState['status'], string>> = {
   expired: 'expired — open Claude Code to refresh',
   error: 'limits unavailable',
 };
-
-interface MeterRow {
-  label: string;
-  percent: number | undefined;
-  suffix?: string;
-}
 
 function meterRows(limits: LimitsState, now: number): MeterRow[] {
   const toRow = (l: Limit): MeterRow => ({
@@ -86,21 +81,10 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
     );
   }
   const rows = meterRows(limits, now);
-  const labelWidth = Math.max(...rows.map((r) => r.label.length));
-  const meterWidth = Math.max(10, Math.min(60, leftWidth - labelWidth - 1 - SUFFIX_WIDTH - 1));
   const isStale = isLimitsStale(limits);
   return (
     <Box flexDirection="column">
-      {rows.map((r) => (
-        <Meter
-          key={r.label}
-          label={r.label}
-          labelWidth={labelWidth}
-          percent={r.percent}
-          width={meterWidth}
-          {...(r.suffix ? { suffix: r.suffix } : {})}
-        />
-      ))}
+      <MeterStack rows={rows} leftWidth={leftWidth} />
       {isStale ? (
         <Text color={theme.dim} wrap="truncate-end">
           stale {limits.fetchedAt === undefined ? '?' : formatDuration(now - limits.fetchedAt)}
@@ -130,13 +114,13 @@ function CostColumn({
   return (
     <Box flexDirection="column" width={RIGHT_WIDTH}>
       {rows.map(([label, v]) => (
-        <KeyValue key={label} label={label} value={formatUSD(v)} labelWidth={7} />
+        <KeyValue key={label} label={label} value={formatUSD(v)} labelWidth={COST_LABEL_WIDTH} />
       ))}
       {ratio === undefined ? null : (
         <KeyValue
           label="plan"
           value={`${ratio.toFixed(1)}×`}
-          labelWidth={7}
+          labelWidth={COST_LABEL_WIDTH}
           valueColor={ratio >= 1 ? theme.ok : theme.dim}
         />
       )}
@@ -155,8 +139,7 @@ export function UsagePanel({
   subscriptionUSD?: number | null;
 }): JSX.Element {
   const theme = useTheme();
-  const inner = Math.max(20, width - 4);
-  const leftWidth = Math.max(20, inner - RIGHT_WIDTH - 2);
+  const { leftWidth } = splitColumns(width, RIGHT_WIDTH);
   const burn = snapshot.costs.burnRatePerHour;
   const burnText = burn === null ? 'burn —' : `burn ${formatUSD(burn)}/h`;
   const sparkWidth = Math.max(8, Math.min(48, leftWidth - burnText.length - 8));

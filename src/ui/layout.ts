@@ -10,6 +10,16 @@ export const TABLE_CHROME_ROWS = 3;
 export const FOOTER_ROWS = 1;
 export const SPARE_ROWS = 1;
 
+/** Panel inner width and left-column width beside a fixed-width right column. */
+export function splitColumns(
+  width: number,
+  rightWidth: number,
+  gap = 2,
+): { inner: number; leftWidth: number } {
+  const inner = Math.max(20, width - 4);
+  return { inner, leftWidth: Math.max(20, inner - rightWidth - gap) };
+}
+
 export interface PanelRows {
   rows: number;
 }

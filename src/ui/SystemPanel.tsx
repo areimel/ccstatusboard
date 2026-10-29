@@ -1,25 +1,17 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import { Sparkline } from '@pppp606/ink-chart';
-import { formatBytes, formatRate } from '../domain/format.js';
+import { formatPair, formatRate, ratioPercent } from '../domain/format.js';
 import type { Snapshot, SystemStats } from '../domain/types.js';
-import { Meter } from './Meter.js';
+import { MeterStack, type MeterRow } from './MeterStack.js';
+import { splitColumns } from './layout.js';
 import { Panel } from './Panel.js';
 import { levelColor, useTheme } from './theme.js';
 
 const RIGHT_WIDTH = 26;
-const SUFFIX_WIDTH = 18;
 const RATE_WIDTH = 10; // '↑ 1023K/s' is the widest rate label
 const BLOCKS = '▁▂▃▄▅▆▇█';
 
-interface MeterRow {
-  label: string;
-  percent: number | undefined;
-  suffix: string;
-}
-
-const pct = (used: number, total: number): number | undefined =>
-  total > 0 ? (used / total) * 100 : undefined;
 const fmt1 = (n: number): string => n.toFixed(1);
 
 function meterRows(s: SystemStats): MeterRow[] {
@@ -27,21 +19,21 @@ function meterRows(s: SystemStats): MeterRow[] {
     { label: 'CPU', percent: s.cpu.total, suffix: `load ${s.load.map(fmt1).join(' ')}` },
     {
       label: 'Mem',
-      percent: pct(s.mem.used, s.mem.total),
-      suffix: `${formatBytes(s.mem.used)}/${formatBytes(s.mem.total)}`,
+      percent: ratioPercent(s.mem.used, s.mem.total),
+      suffix: formatPair(s.mem.used, s.mem.total),
     },
   ];
   if (s.swap.total > 0) {
     rows.push({
       label: 'Swap',
-      percent: pct(s.swap.used, s.swap.total),
-      suffix: `${formatBytes(s.swap.used)}/${formatBytes(s.swap.total)}`,
+      percent: ratioPercent(s.swap.used, s.swap.total),
+      suffix: formatPair(s.swap.used, s.swap.total),
     });
   }
   rows.push({
     label: 'Disk',
-    percent: pct(s.disk.used, s.disk.total),
-    suffix: `${formatBytes(s.disk.used)}/${formatBytes(s.disk.total)} ${s.disk.mount}`,
+    percent: ratioPercent(s.disk.used, s.disk.total),
+    suffix: `${formatPair(s.disk.used, s.disk.total)} ${s.disk.mount}`,
   });
   return rows;
 }
@@ -104,25 +96,12 @@ export function SystemPanel({ snapshot, width }: { snapshot: Snapshot; width: nu
       </Panel>
     );
   }
-  const inner = Math.max(20, width - 4);
-  const leftWidth = Math.max(20, inner - RIGHT_WIDTH - 2);
-  const rows = meterRows(system);
-  const labelWidth = Math.max(...rows.map((r) => r.label.length));
-  const meterWidth = Math.max(10, Math.min(60, leftWidth - labelWidth - 1 - SUFFIX_WIDTH - 1));
+  const { leftWidth } = splitColumns(width, RIGHT_WIDTH);
   return (
     <Panel title="System" width={width}>
       <Box flexDirection="row" columnGap={2}>
         <Box flexDirection="column" width={leftWidth}>
-          {rows.map((r) => (
-            <Meter
-              key={r.label}
-              label={r.label}
-              labelWidth={labelWidth}
-              percent={r.percent}
-              width={meterWidth}
-              suffix={r.suffix}
-            />
-          ))}
+          <MeterStack rows={meterRows(system)} leftWidth={leftWidth} />
         </Box>
         <NetColumn system={system} history={snapshot.systemHistory} />
       </Box>

@@ -3,6 +3,7 @@ import { App } from './App.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { makeOverflowSnapshot, makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { renderSized, type SizedRender } from '../../test/helpers/renderSized.js';
+import { GB, makeSystemStats } from '../../test/helpers/system.js';
 import type { Config, Snapshot, SystemStats } from '../domain/types.js';
 
 // Laid out in a fake TTY whose columns/rows match `size` (ink-testing-library is fixed at 100 columns).
@@ -133,8 +134,7 @@ describe('App help overlay at minimum width', () => {
 });
 
 describe('App system panel', () => {
-  const GB = 1024 ** 3;
-  const system: SystemStats = {
+  const system: SystemStats = makeSystemStats({
     sampledAt: NOW,
     cpu: { total: 42, perCore: [10, 20, 30, 40, 50, 60, 70, 80] },
     mem: { used: 8 * GB, total: 16 * GB },
@@ -142,7 +142,7 @@ describe('App system panel', () => {
     disk: { used: 100 * GB, total: 500 * GB, mount: '/' },
     net: { rxPerSec: 2048, txPerSec: 1024 },
     load: [1.1, 0.9, 0.7],
-  };
+  });
   const history = { cpu: [10, 40, 80, 20], rx: [1, 5, 2, 8], tx: [2, 2, 3, 1] };
   const withSystem = (over: Partial<Snapshot> = {}): Snapshot =>
     makeSnapshot({ system, systemHistory: history, ...over });

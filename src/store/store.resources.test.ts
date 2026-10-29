@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LimitsState, SystemStats } from '../domain/types.js';
+import { makeSystemStats } from '../../test/helpers/system.js';
 import { HOUR, makeStore, MIN, NOW, reg, session, usage } from './testFixtures.js';
 
 afterEach(() => vi.useRealTimers());
@@ -11,15 +12,16 @@ const limits = (percent: number, fetchedAt: number, resetsAt = NOW + 2 * HOUR): 
   fetchedAt,
 });
 
-const stats = (cpu: number, rx = 1, tx = 2): SystemStats => ({
-  sampledAt: NOW,
-  cpu: { total: cpu, perCore: [cpu] },
-  mem: { used: 1, total: 2 },
-  swap: { used: 0, total: 0 },
-  disk: { used: 1, total: 2, mount: '/' },
-  net: { rxPerSec: rx, txPerSec: tx },
-  load: [0, 0, 0],
-});
+const stats = (cpu: number, rx = 1, tx = 2): SystemStats =>
+  makeSystemStats({
+    sampledAt: NOW,
+    cpu: { total: cpu, perCore: [cpu] },
+    mem: { used: 1, total: 2 },
+    swap: { used: 0, total: 0 },
+    disk: { used: 1, total: 2, mount: '/' },
+    net: { rxPerSec: rx, txPerSec: tx },
+    load: [0, 0, 0],
+  });
 
 describe('Store burn projection', () => {
   it('projects block burn after samples and omits week without a limit', () => {
