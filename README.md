@@ -46,7 +46,7 @@ ccstatusboard [options]
 
 | Flag                  | Meaning                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |
-| `--theme <name>`      | `default`, `mono`, `dracula` or `solarized`                             |
+| `--theme <name>`      | Start theme; `t` / `T` cycle and save it (see below)                    |
 | `--refresh <ms>`      | UI refresh interval (default 1000, minimum 250)                         |
 | `--ended-hours <n>`   | Show ended sessions from the last n hours (default 24)                  |
 | `--sort <key>`        | `status`, `activity`, `cost`, `ctx` or `name`                           |
@@ -64,10 +64,17 @@ ccstatusboard [options]
 | `g` / `G`         | Top / bottom                                        |
 | `Enter`           | Toggle detail pane                                  |
 | `s`               | Cycle sort: status, activity, cost, ctx, name       |
+| `t` / `T`         | Next / previous theme (saved to the config file)    |
 | `f`               | Filter: all / live only                             |
 | `/`               | Search by name or cwd (`Enter` keeps, `Esc` clears) |
 | `?` / `F1`        | Toggle help                                         |
 | `q` / `Ctrl-C`    | Quit                                                |
+
+## Themes
+
+`default`, `mono`, `dracula`, `solarized`, `solarized-light`, `monokai`, `gruvbox`, `nord`, `tokyonight`, `catppuccin`, `onedark`, `cyberpunk`.
+
+`t` / `T` switch to the next / previous theme. The choice is written to the `theme` key of the config file (`~/.config/ccstatusboard/config.json`, or the `--config` path), keeping other keys intact.
 
 ## Config file
 

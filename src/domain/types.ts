@@ -164,7 +164,22 @@ export interface Snapshot {
   warnings: string[];
 }
 
-export type ThemeName = 'default' | 'mono' | 'dracula' | 'solarized';
+/** Order matters: it is the live theme cycle order. */
+export const THEME_NAMES = [
+  'default',
+  'mono',
+  'dracula',
+  'solarized',
+  'solarized-light',
+  'monokai',
+  'gruvbox',
+  'nord',
+  'tokyonight',
+  'catppuccin',
+  'onedark',
+  'cyberpunk',
+] as const;
+export type ThemeName = (typeof THEME_NAMES)[number];
 export type ColumnKey = 'status' | 'name' | 'model' | 'branch' | 'ctx' | 'cost' | 'last' | 'uptime';
 export type SortKey = 'status' | 'activity' | 'cost' | 'ctx' | 'name';
 

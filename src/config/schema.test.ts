@@ -31,6 +31,7 @@ describe('configSchema', () => {
     expect(configSchema.safeParse({ usagePollSeconds: 10 }).success).toBe(false);
     expect(configSchema.safeParse({ endedWindowHours: -1 }).success).toBe(false);
     expect(configSchema.safeParse({ theme: 'neon' }).success).toBe(false);
+    expect(configSchema.safeParse({ theme: 'gruvbox' }).success).toBe(true);
     expect(configSchema.safeParse({ sort: 'size' }).success).toBe(false);
     expect(configSchema.safeParse({ columns: ['bogus'] }).success).toBe(false);
     expect(configSchema.safeParse({ refreshMs: Number.NaN }).success).toBe(false);

@@ -11,6 +11,7 @@ const KEYS: Array<[string, string]> = [
   ['f', 'Toggle filter (all / live)'],
   ['/', 'Search by name or cwd (Esc clears)'],
   ['? / F1', 'Toggle this help'],
+  ['t / T', 'Cycle theme (next / previous)'],
   ['q / Ctrl-C', 'Quit'],
 ];
 
