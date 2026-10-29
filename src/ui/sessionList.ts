@@ -138,6 +138,14 @@ export function buildRows(sessions: SessionView[], sort: SortKey): TableRow[] {
       });
     }
     rows.push({ kind: 'session', session, index });
+    session.subagents.forEach((agent, i) => {
+      rows.push({
+        kind: 'agent',
+        agent,
+        parent: session.sessionId,
+        last: i === session.subagents.length - 1,
+      });
+    });
   });
   return rows;
 }
@@ -159,4 +167,9 @@ export function rowWindow(
     }
   }
   return { start, end: Math.min(rows.length, start + size) };
+}
+
+/** A live session with no activity for longer than the cutoff (exactly at the cutoff is not stale). */
+export function isStale(s: SessionView, now: number, cutoffMinutes: number): boolean {
+  return s.live && now - s.lastActivity > cutoffMinutes * 60_000;
 }

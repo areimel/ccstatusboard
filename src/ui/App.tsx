@@ -121,6 +121,7 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
           now={snapshot.now}
           sort={cfg.sort}
           filter={ui.filter}
+          idleCutoffMinutes={cfg.idleCutoffMinutes}
           emptyMessage={emptyMessage}
         />
         {detailShown && <DetailPane session={visible[selected]} now={snapshot.now} width={columns} />}

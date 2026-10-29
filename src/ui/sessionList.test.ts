@@ -3,6 +3,7 @@ import type { ColumnKey } from '../domain/types.js';
 import {
   buildRows,
   filterSessions,
+  isStale,
   requiredWidth,
   rowWindow,
   scrollWindow,
@@ -218,5 +219,39 @@ describe('rowWindow', () => {
   });
   it('shows everything when it fits', () => {
     expect(rowWindow(rows, 8, 50)).toEqual({ start: 0, end: 12 });
+  });
+});
+
+describe('buildRows agents', () => {
+  it('emits tree rows after each session with last flag', () => {
+    const agents = ['x', 'y'].map((id) => ({ id, name: id, lastActivity: NOW }));
+    const rows = buildRows(
+      [makeSession({ sessionId: 's', subagents: agents }), makeSession({ sessionId: 't' })],
+      'status',
+    );
+    expect(rows.map((r) => r.kind)).toEqual(['session', 'agent', 'agent', 'session']);
+    expect(rows.flatMap((r) => (r.kind === 'agent' ? [r.last] : []))).toEqual([false, true]);
+    expect(rows.flatMap((r) => (r.kind === 'agent' ? [r.parent] : []))).toEqual(['s', 's']);
+  });
+  it('rowWindow keeps selection visible among agent rows', () => {
+    const agents = [1, 2, 3].map((n) => ({ id: `${n}`, name: 'a', lastActivity: NOW }));
+    const rows = buildRows(
+      [0, 1, 2].map((n) => makeSession({ sessionId: `s${n}`, subagents: agents })),
+      'status',
+    );
+    const { start, end } = rowWindow(rows, 2, 5);
+    expect(end - start).toBe(5);
+    expect(rows.slice(start, end).some((r) => r.kind === 'session' && r.index === 2)).toBe(true);
+  });
+});
+
+describe('isStale', () => {
+  const s = (over = {}) => makeSession({ lastActivity: NOW - 60 * 60_000, ...over });
+  it('is not stale exactly at the cutoff, stale just past it', () => {
+    expect(isStale(s(), NOW, 60)).toBe(false);
+    expect(isStale(s({ lastActivity: NOW - 60 * 60_000 - 1 }), NOW, 60)).toBe(true);
+  });
+  it('never stale when not live', () => {
+    expect(isStale(s({ live: false, lastActivity: 0 }), NOW, 60)).toBe(false);
   });
 });

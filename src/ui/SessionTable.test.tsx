@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import chalk from 'chalk';
 import { render } from 'ink-testing-library';
 import type { ColumnKey, SessionView } from '../domain/types.js';
 import { SessionTable } from './SessionTable.js';
@@ -142,5 +143,58 @@ describe('SessionTable', () => {
   it('no group headers for other sorts', async () => {
     const out = await frame([makeSession({ project: 'alpha' })], { sort: 'status' });
     expect(out).not.toContain('── alpha');
+  });
+
+  it('renders subagent tree rows under their session', async () => {
+    const out = await frame(
+      [
+        makeSession({
+          sessionId: 'p',
+          name: 'parent',
+          project: 'alpha',
+          subagents: [
+            { id: '1', name: 'Explore', lastActivity: NOW - 5_000 },
+            { id: '2', name: 'Plan', lastActivity: NOW - 120_000 },
+          ],
+        }),
+        makeSession({ sessionId: 'q', name: 'other', project: 'alpha' }),
+      ],
+      { sort: 'project', columns: ['status', 'name', 'model', 'last'] },
+    );
+    const lines = out.split('\n');
+    const at = (t: string) => lines.findIndex((l) => l.includes(t));
+    expect(at('├─')).toBe(at('parent') + 1);
+    expect(at('└─')).toBe(at('parent') + 2);
+    expect(lines[at('├─')]).toContain('◐ Explore');
+    expect(lines[at('└─')]).toMatch(/◐ Plan\s+2m/);
+    expect(at('other')).toBe(at('└─') + 1);
+  });
+  it('dims stale live sessions only', async () => {
+    const old = NOW - 61 * 60_000;
+    const prevLevel = chalk.level;
+    chalk.level = 1;
+    const r = render(
+      <SessionTable
+        sessions={[
+          makeSession({ sessionId: 'a', name: 'freshy' }),
+          makeSession({ sessionId: 'b', name: 'stalely', lastActivity: old }),
+        ]}
+        selectedIndex={0}
+        columns={['status', 'name']}
+        width={60}
+        maxRows={5}
+        now={NOW}
+        sort="status"
+        filter="all"
+        idleCutoffMinutes={60}
+      />,
+    );
+    await vi.waitFor(() => expect(stripAnsi(r.lastFrame())).toContain('Sessions'));
+    const raw = (r.lastFrame() ?? '').split('\n');
+    chalk.level = prevLevel;
+    // eslint-disable-next-line no-control-regex
+    const dim = (t: string) => /\x1b\[2m/.test(raw.find((l) => l.includes(t)) ?? '');
+    expect(dim('stalely')).toBe(true);
+    expect(dim('freshy')).toBe(false);
   });
 });
