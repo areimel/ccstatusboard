@@ -4,7 +4,14 @@ import { Badge, MultiSelect, TextInput } from '@inkjs/ui';
 import { COLUMN_KEYS, type ColumnKey, type Config } from '../../domain/types.js';
 import { Overlay } from '../Overlay.js';
 import { useTheme } from '../theme.js';
-import { adjust, editText, formatValue, OPTIONS, parseNumberInput } from './optionsModel.js';
+import {
+  adjust,
+  editText,
+  formatValue,
+  OPTIONS,
+  parseDurationInput,
+  parseNumberInput,
+} from './optionsModel.js';
 
 export interface OptionsMenuProps {
   config: Config;
@@ -42,7 +49,7 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
       const patch = adjust(config, desc.key, key.leftArrow || input === 'h' ? -1 : 1);
       if (Object.keys(patch).length > 0) onChange(patch);
     } else if (key.return) {
-      if (desc.kind === 'number') setMode('number');
+      if (desc.kind === 'number' || desc.kind === 'duration') setMode('number');
       else if (desc.kind === 'columns') setMode('columns');
       else {
         const patch = adjust(config, desc.key, 1);
@@ -52,7 +59,7 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
   });
 
   const submitNumber = (text: string): void => {
-    const n = parseNumberInput(desc, text);
+    const n = desc.kind === 'duration' ? parseDurationInput(text) : parseNumberInput(desc, text);
     if (n !== undefined) {
       onChange({ [desc.key]: n });
       setMode('nav');

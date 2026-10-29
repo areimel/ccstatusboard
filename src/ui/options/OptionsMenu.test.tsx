@@ -87,9 +87,35 @@ describe('OptionsMenu', () => {
   it('readonly row ignores right', async () => {
     const { press, onChange } = setup();
     await delay();
-    for (let i = 0; i < 9; i++) await press(DOWN);
+    for (let i = 0; i < 10; i++) await press(DOWN);
     await press(RIGHT, '\r');
     expect(onChange).not.toHaveBeenCalled();
+  });
+  it('Enter on idle cutoff, type 2h, Enter', async () => {
+    const { press, frame, onChange } = setup();
+    await delay();
+    // Editor prefills the current value ("1h"); clear it before typing.
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\u007F', '\u007F', '2', 'h', '\r');
+    expect(onChange).toHaveBeenCalledWith({ idleCutoffMinutes: 120 });
+    expect(frame()).toContain('2h');
+  });
+  it('invalid duration input is rejected and Esc cancels the edit', async () => {
+    const { press, onChange, onClose } = setup();
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '0', '.', '5', 'm', '\r');
+    expect(onChange).not.toHaveBeenCalled();
+    await press('\u001B');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+  it('keep exited shows off at zero', async () => {
+    const { press, frame } = setup();
+    await delay();
+    for (let i = 0; i < 7; i++) await press(DOWN);
+    const row = frame()
+      .split('\n')
+      .find((l) => l.includes('Keep exited'));
+    expect(row).toBeDefined();
+    expect(row).toContain('off');
   });
   it('columns editor: deselect one and submit', async () => {
     const { press, onChange } = setup();
