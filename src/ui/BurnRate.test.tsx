@@ -42,7 +42,7 @@ describe('BurnRate', () => {
     const o = out({ block: proj() });
     expect(o).toContain('Burn Rate');
     expect(o).toMatch(/5h\s+proj 112%\s+OVER\s+hits /);
-    expect(o).toContain(`hits ${formatClock(NOW + 3_600_000)} (78% of block)`);
+    expect(o).toContain(`hits ${formatClock(NOW + 3_600_000, false)} (78% of block)`);
   });
 
   it('shows weekday+time for the week row', () => {

@@ -9,7 +9,7 @@ import { levelColor, useTheme } from './theme.js';
 
 const RIGHT_WIDTH = 26;
 const SUFFIX_WIDTH = 18;
-const RATE_WIDTH = 8;
+const RATE_WIDTH = 10; // '↑ 1023K/s' is the widest rate label
 const BLOCKS = '▁▂▃▄▅▆▇█';
 
 interface MeterRow {
@@ -66,10 +66,12 @@ function NetRow({ arrow, rate, data }: { arrow: string; rate: number; data: numb
   const sparkWidth = RIGHT_WIDTH - RATE_WIDTH - 1;
   return (
     <Box columnGap={1}>
-      <Text color={theme.text} bold wrap="truncate-end">
-        {`${arrow} ${formatRate(rate)}`.padEnd(RATE_WIDTH)}
-      </Text>
-      <Box width={sparkWidth}>
+      <Box width={RATE_WIDTH} flexShrink={0}>
+        <Text color={theme.text} bold wrap="truncate-end">
+          {`${arrow} ${formatRate(rate)}`}
+        </Text>
+      </Box>
+      <Box width={sparkWidth} flexShrink={0}>
         {data.length > 0 ? <Sparkline data={data.slice(-sparkWidth)} width={sparkWidth} /> : null}
       </Box>
     </Box>

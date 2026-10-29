@@ -92,9 +92,10 @@ export function shortModel(model: string | undefined): string {
     .replace(/-(\d+)-(\d+)$/, '-$1.$2');
 }
 
-export function formatClock(ts: number): string {
+export function formatClock(ts: number, withSeconds = true): string {
   const d = new Date(ts);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return withSeconds ? `${hm}:${pad2(d.getSeconds())}` : hm;
 }
 
 export function truncate(s: string, width: number): string {

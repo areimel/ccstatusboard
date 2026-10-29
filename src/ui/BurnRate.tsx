@@ -28,7 +28,7 @@ function bandColor(theme: Theme, band: BurnBand): string {
 function hitsText(p: BurnProjection, now: number, kind: 'block' | 'week'): string {
   if (p.hitAt === undefined) return 'hits n/a';
   if (p.hitAt <= now) return 'limit reached';
-  const when = kind === 'block' ? formatClock(p.hitAt) : formatWeekdayTime(p.hitAt);
+  const when = kind === 'block' ? formatClock(p.hitAt, false) : formatWeekdayTime(p.hitAt);
   const pct = p.hitWindowPct === undefined ? '' : ` (${formatPercent(p.hitWindowPct)} of ${kind})`;
   return `hits ${when}${pct}`;
 }

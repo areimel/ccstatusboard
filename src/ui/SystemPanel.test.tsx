@@ -59,6 +59,7 @@ describe('SystemPanel', () => {
 
   it.each([
     ['full', snap()],
+    ['wide rates', snap({ ...SYSTEM, net: { rxPerSec: 1023 * 1024 ** 2, txPerSec: 1000 * 1024 } })],
     ['no swap', snap({ ...SYSTEM, swap: { used: 0, total: 0 } })],
     ['sampling', snap(null)],
   ])('systemPanelRows matches rendered height (%s)', async (_n, s) => {

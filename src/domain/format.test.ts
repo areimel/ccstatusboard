@@ -147,6 +147,7 @@ describe('shortModel', () => {
 describe('formatClock / truncate', () => {
   it('formats local HH:MM:SS', () => {
     expect(formatClock(NOW)).toBe('14:32:07');
+    expect(formatClock(NOW, false)).toBe('14:32');
   });
   it('truncates with ellipsis', () => {
     expect(truncate('ccstatusboard', 20)).toBe('ccstatusboard');
