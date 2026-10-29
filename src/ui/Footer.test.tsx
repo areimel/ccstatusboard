@@ -11,6 +11,16 @@ describe('Footer', () => {
     }
   });
 
+  it('shows the theme hint when width is unknown or wide, hides it at 60 columns', () => {
+    expect(stripAnsi(render(<Footer mode="normal" search="" />).lastFrame())).toContain('tdefault');
+    expect(stripAnsi(render(<Footer mode="normal" search="" width={120} />).lastFrame())).toContain(
+      'tdefault',
+    );
+    const narrow = stripAnsi(render(<Footer mode="normal" search="" width={60} />).lastFrame());
+    expect(narrow).not.toContain('tdefault');
+    expect(narrow).toContain('qQuit');
+  });
+
   it('shows the search prompt in search mode', () => {
     const out = stripAnsi(render(<Footer mode="search" search="pet" />).lastFrame());
     expect(out).toContain('/pet');

@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
-import type { Config, SortKey } from '../domain/types.js';
+import type { Config, SortKey, ThemeName } from '../domain/types.js';
+import { cycle } from '../domain/cycle.js';
 import type { Store } from '../store/store.js';
 import { useSnapshot } from '../store/useSnapshot.js';
 import { ThemeProvider } from '@inkjs/ui';
-import { THEMES, ThemeContext, inkUiTheme } from './theme.js';
+import { THEMES, ThemeContext, cycleTheme, inkUiTheme } from './theme.js';
 import { Panel } from './Panel.js';
 import { Header, headerWarnings } from './Header.js';
 import { UsagePanel, usagePanelRows } from './UsagePanel.js';
@@ -29,6 +30,7 @@ export interface UiState {
   search: string;
   mode: 'normal' | 'search' | 'help';
   showDetail: boolean;
+  theme: ThemeName;
 }
 
 export type UiAction =
@@ -44,7 +46,9 @@ export type UiAction =
         | 'startSearch'
         | 'endSearch'
         | 'clearSearch'
-        | 'toggleHelp';
+        | 'toggleHelp'
+        | 'nextTheme'
+        | 'prevTheme';
     }
   | { type: 'searchInput'; char: string }
   | { type: 'searchBackspace' };
@@ -53,6 +57,8 @@ export interface AppProps {
   store: Pick<Store, 'subscribe' | 'getSnapshot'>;
   config: Config;
   onQuit: () => void;
+  /** Called when the user switches theme (not on mount); the caller persists it. */
+  onThemeChange?: (name: ThemeName) => void;
   /** Test-only terminal size override; defaults to live stdout size. */
   size?: { columns: number; rows: number };
 }
@@ -65,6 +71,7 @@ export function initialUiState(config: Config): UiState {
     search: '',
     mode: 'normal',
     showDetail: config.showDetail,
+    theme: config.theme,
   };
 }
 
@@ -86,8 +93,7 @@ export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
     case 'toggleDetail':
       return { ...s, showDetail: !s.showDetail };
     case 'cycleSort': {
-      const next = SORT_ORDER[(SORT_ORDER.indexOf(s.sort) + 1) % SORT_ORDER.length] ?? 'status';
-      return { ...s, sort: next, selectedIndex: 0 };
+      return { ...s, sort: cycle(SORT_ORDER, s.sort, 1), selectedIndex: 0 };
     }
     case 'toggleFilter':
       return { ...s, filter: s.filter === 'all' ? 'live' : 'all', selectedIndex: 0 };
@@ -99,6 +105,10 @@ export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
       return { ...s, mode: 'normal', search: '', selectedIndex: 0 };
     case 'toggleHelp':
       return { ...s, mode: s.mode === 'help' ? 'normal' : 'help' };
+    case 'nextTheme':
+      return { ...s, theme: cycleTheme(s.theme, 1) };
+    case 'prevTheme':
+      return { ...s, theme: cycleTheme(s.theme, -1) };
     case 'searchInput':
       return { ...s, search: s.search + a.char, selectedIndex: 0 };
     case 'searchBackspace':
@@ -124,10 +134,21 @@ function useTerminalSize(override?: { columns: number; rows: number }): { column
 // F1 arrives as ESC O P; Ink may strip the leading ESC.
 const isF1 = (input: string) => input === '\u001bOP' || input === 'OP';
 
-export function App({ store, config, onQuit, size }: AppProps): React.JSX.Element {
+export function App({ store, config, onQuit, onThemeChange, size }: AppProps): React.JSX.Element {
   const snapshot = useSnapshot(store);
   const { columns, rows } = useTerminalSize(size);
   const [ui, setUi] = useState<UiState>(() => initialUiState(config));
+
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    onThemeChange?.(ui.theme);
+  }, [ui.theme]);
+  const theme = THEMES[ui.theme];
+  const inkTheme = useMemo(() => inkUiTheme(theme), [theme]);
 
   const visible = useMemo(
     () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), ui.sort),
@@ -162,6 +183,8 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
     else if (key.return) dispatch({ type: 'toggleDetail' });
     else if (input === 's') dispatch({ type: 'cycleSort' });
     else if (input === 'f') dispatch({ type: 'toggleFilter' });
+    else if (input === 't') dispatch({ type: 'nextTheme' });
+    else if (input === 'T') dispatch({ type: 'prevTheme' });
     else if (input === '/') dispatch({ type: 'startSearch' });
     else if (input === '?' || isF1(input)) dispatch({ type: 'toggleHelp' });
     else if (key.escape && ui.search) dispatch({ type: 'clearSearch' });
@@ -217,14 +240,14 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
   }
 
   return (
-    <ThemeContext.Provider value={THEMES[config.theme]}>
-      <ThemeProvider theme={inkUiTheme(THEMES[config.theme])}>
+    <ThemeContext.Provider value={theme}>
+      <ThemeProvider theme={inkTheme}>
         {/* Backstop: never draw taller than the budget even if a child miscounts its rows. */}
         <Box flexDirection="column" width={columns} maxHeight={rows - SPARE_ROWS} overflow="hidden">
           <Header snapshot={snapshot} />
           {ui.mode !== 'help' && <UsagePanel snapshot={snapshot} width={columns} />}
           {body}
-          <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} />
+          <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} width={columns} />
         </Box>
       </ThemeProvider>
     </ThemeContext.Provider>

@@ -19,6 +19,7 @@ describe('uiReducer', () => {
       search: '',
       mode: 'normal',
       showDetail: true,
+      theme: 'default',
     });
   });
   it('moves selection and clamps to [0, rowCount-1]', () => {
@@ -63,6 +64,11 @@ describe('uiReducer', () => {
     expect(s).toMatchObject({ mode: 'normal', search: 'a' });
     s = uiReducer(s, { type: 'clearSearch' }, 3);
     expect(s).toMatchObject({ mode: 'normal', search: '' });
+  });
+  it('nextTheme/prevTheme wrap around', () => {
+    const last = { ...base, theme: 'cyberpunk' as const };
+    expect(uiReducer(last, { type: 'nextTheme' }, 3).theme).toBe('default');
+    expect(uiReducer(base, { type: 'prevTheme' }, 3).theme).toBe('cyberpunk');
   });
   it('toggleHelp and toggleDetail flip', () => {
     const h = uiReducer(base, { type: 'toggleHelp' }, 3);
@@ -224,5 +230,51 @@ describe('App search empty state', () => {
     await delay();
     stdin.write('z');
     await vi.waitFor(() => expect(lastFrame()).toContain('No sessions match'));
+  });
+});
+
+describe('App theme switching', () => {
+  it('t/T change the footer theme name and call onThemeChange, not on mount', async () => {
+    const onThemeChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      <App
+        store={fakeStore(twoSessions())}
+        config={DEFAULT_CONFIG}
+        onQuit={vi.fn()}
+        onThemeChange={onThemeChange}
+        size={BIG}
+      />,
+    );
+    await delay();
+    expect(onThemeChange).not.toHaveBeenCalled();
+    expect(lastFrame()).toContain('tdefault');
+    stdin.write('t');
+    await vi.waitFor(() => expect(onThemeChange).toHaveBeenLastCalledWith('mono'));
+    expect(lastFrame()).toContain('tmono');
+    stdin.write('T');
+    await vi.waitFor(() => expect(onThemeChange).toHaveBeenLastCalledWith('default'));
+    expect(lastFrame()).toContain('tdefault');
+    expect(onThemeChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("'t' in search mode is typed into the query and does not change theme", async () => {
+    const onThemeChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      <App
+        store={fakeStore(twoSessions())}
+        config={DEFAULT_CONFIG}
+        onQuit={vi.fn()}
+        onThemeChange={onThemeChange}
+        size={BIG}
+      />,
+    );
+    stdin.write('/');
+    await delay();
+    stdin.write('t');
+    await vi.waitFor(() => expect(lastFrame()).toContain('/t'));
+    expect(onThemeChange).not.toHaveBeenCalled();
+    stdin.write('\r');
+    await delay();
+    expect(lastFrame()).toContain('tdefault');
   });
 });

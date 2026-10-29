@@ -17,6 +17,8 @@ describe('HelpOverlay', () => {
       'Cycle sort',
       'Toggle filter',
       'Search',
+      't / T',
+      'Cycle theme',
       'Quit',
     ]) {
       expect(out).toContain(s);
