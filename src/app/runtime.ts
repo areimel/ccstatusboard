@@ -122,7 +122,11 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       }
       const activity = await scanSubagents(join(dirname(main), e.sessionId, 'subagents'), now());
       if (stopped || !live.has(e.sessionId)) continue;
-      store.setAgents(e.sessionId, { activeCount: activity.activeCount, names: activity.names });
+      store.setAgents(e.sessionId, {
+        activeCount: activity.activeCount,
+        names: activity.names,
+        agents: activity.agents,
+      });
       for (const f of activity.files) track(f, e.sessionId, true);
     }
     if (!stopped) store.setClaudeDirFound(existsSync(claudeDir));

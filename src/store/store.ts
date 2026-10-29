@@ -12,6 +12,7 @@ import {
   type ScanProgress,
   type SessionView,
   type Snapshot,
+  type SubagentView,
   type SystemHistory,
   type SystemStats,
   type TimeWindow,
@@ -116,8 +117,12 @@ export class Store {
     this.markDirty();
   }
 
-  setAgents(sessionId: string, a: { activeCount: number; names: string[] }): void {
-    this.session(sessionId).agents = { activeCount: a.activeCount, names: [...a.names] };
+  setAgents(sessionId: string, a: { activeCount: number; names: string[]; agents?: SubagentView[] }): void {
+    this.session(sessionId).agents = {
+      activeCount: a.activeCount,
+      names: [...a.names],
+      list: (a.agents ?? []).map((x) => ({ ...x })),
+    };
     this.markDirty();
   }
 

@@ -83,6 +83,36 @@ describe('Store sessions', () => {
   });
 });
 
+describe('Store subagents', () => {
+  const agents = [
+    { id: 'a', name: 'Explore', lastActivity: NOW - 20_000 },
+    { id: 'b', name: 'Pl\u001b[31man', lastActivity: NOW - 5_000 },
+  ];
+
+  it('exposes sanitized active subagents sorted by recent activity, cleared on end', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setAgents('s1', { activeCount: 2, names: ['Explore', 'Plan'], agents });
+    store.flush();
+    const subs = session(store.getSnapshot()).subagents;
+    expect(subs.map((a) => a.id)).toEqual(['b', 'a']);
+    expect(subs[0]?.name).not.toContain('\u001b');
+    expect(subs[1]).toEqual({ id: 'a', name: 'Explore', lastActivity: NOW - 20_000 });
+
+    store.markEnded('s1');
+    store.flush();
+    expect(session(store.getSnapshot()).subagents).toEqual([]);
+  });
+
+  it('defaults to no subagents when setAgents omits the list', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setAgents('s1', { activeCount: 1, names: ['Explore'] });
+    store.flush();
+    expect(session(store.getSnapshot()).subagents).toEqual([]);
+  });
+});
+
 describe('Store project', () => {
   it('uses the resolved project name and falls back to the cwd basename', () => {
     const store = makeStore();
