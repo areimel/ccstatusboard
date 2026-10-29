@@ -4,6 +4,7 @@ import { Sparkline } from '@pppp606/ink-chart';
 import { Spinner } from '@inkjs/ui';
 import type { Limit, LimitsState, Snapshot } from '../domain/types.js';
 import { formatDuration, formatResetsAt, formatUSD } from '../domain/format.js';
+import { KeyValue } from './KeyValue.js';
 import { Meter } from './Meter.js';
 import { Panel } from './Panel.js';
 import { useTheme } from './theme.js';
@@ -103,7 +104,6 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
 }
 
 function CostColumn({ snapshot }: { snapshot: Snapshot }) {
-  const theme = useTheme();
   const { costs, scan } = snapshot;
   const rows: Array<[string, number | null]> = [
     ['block', costs.block.costUSD],
@@ -114,12 +114,7 @@ function CostColumn({ snapshot }: { snapshot: Snapshot }) {
   return (
     <Box flexDirection="column" width={RIGHT_WIDTH}>
       {rows.map(([label, v]) => (
-        <Text key={label} wrap="truncate-end">
-          <Text color={theme.dim}>{label.padEnd(7)}</Text>
-          <Text color={theme.text} bold>
-            {formatUSD(v)}
-          </Text>
-        </Text>
+        <KeyValue key={label} label={label} value={formatUSD(v)} labelWidth={7} />
       ))}
       {scan.done ? null : <Spinner label={`scanning ${scan.filesDone}/${scan.filesTotal}…`} />}
     </Box>

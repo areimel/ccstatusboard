@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
-import { Panel } from './Panel.js';
+import { Overlay } from './Overlay.js';
 import { useTheme } from './theme.js';
 
 const KEYS: Array<[string, string]> = [
@@ -21,7 +21,7 @@ const LEGEND = ['● waiting', '◐ busy', '○ idle', '· ended'];
 export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
   const theme = useTheme();
   return (
-    <Panel title="Help" width={width}>
+    <Overlay title="Help" width={width}>
       {KEYS.map(([key, label]) => (
         <Box key={key}>
           <Box width={14}>
@@ -39,6 +39,6 @@ export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Elemen
           </Text>
         ))}
       </Box>
-    </Panel>
+    </Overlay>
   );
 }
