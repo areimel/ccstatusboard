@@ -74,8 +74,13 @@ export function formatResetsAt(ts: number, now: number): string {
   const d = ts - now;
   if (d <= 0) return 'resets now';
   if (d < 86_400_000) return `resets ${formatDuration(d)}`;
+  return `resets ${formatWeekdayTime(ts)}`;
+}
+
+/** Weekday + HH:MM, e.g. `Tue 14:00`. */
+export function formatWeekdayTime(ts: number): string {
   const date = new Date(ts);
-  return `resets ${WEEKDAYS[date.getDay()]} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  return `${WEEKDAYS[date.getDay()]} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
 export function shortModel(model: string | undefined): string {
