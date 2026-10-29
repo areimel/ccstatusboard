@@ -2,7 +2,7 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import { render, type Instance } from 'ink';
 import { ConfigError, loadConfig, parseCliArgs } from './config/load.js';
-import type { Config } from './domain/types.js';
+import { THEME_NAMES, type Config } from './domain/types.js';
 import { cacheDir, resolveClaudeDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
 import { superviseInk } from './app/supervise.js';
@@ -18,7 +18,7 @@ const HELP = `Usage: ccstatusboard [options]
 htop-style dashboard for all Claude Code sessions, usage limits and costs.
 
 Options:
-  --theme <name>        default | mono | dracula | solarized
+  --theme <name>        ${THEME_NAMES.join(' | ')}
   --refresh <ms>        UI refresh interval (default 1000, min 250)
   --ended-hours <n>     show ended sessions from the last n hours (default 24)
   --sort <key>          status | activity | cost | ctx | name
