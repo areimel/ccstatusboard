@@ -20,6 +20,33 @@ export function formatTokens(n: number): string {
   return `${trimZero((n / 1_000_000).toFixed(1))}M`;
 }
 
+const BYTE_UNITS = ['B', 'K', 'M', 'G', 'T'];
+
+/** Compact binary size: 512B, 412M, 15.6G. */
+export function formatBytes(n: number | undefined): string {
+  if (n === undefined || !Number.isFinite(n) || n < 0) return '—';
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < BYTE_UNITS.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  const digits = i === 0 || v >= 100 ? 0 : 1;
+  return `${trimZero(v.toFixed(digits))}${BYTE_UNITS[i]}`;
+}
+
+/** Transfer rate: 1.2M/s. */
+export function formatRate(bytesPerSec: number | undefined): string {
+  const b = formatBytes(bytesPerSec);
+  return b === '—' ? b : `${b}/s`;
+}
+
+/** Whole-number percent: 12%. */
+export function formatPercent(pct: number | undefined): string {
+  if (pct === undefined || !Number.isFinite(pct)) return '—';
+  return `${Math.round(pct)}%`;
+}
+
 export function formatDuration(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   if (totalSec < 60) return `${totalSec}s`;

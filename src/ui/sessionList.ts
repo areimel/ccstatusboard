@@ -6,6 +6,8 @@ export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
   model: 10,
   branch: 12,
   ctx: 17,
+  cpu: 5,
+  mem: 6,
   cost: 9,
   last: 8,
   uptime: 6,
@@ -13,7 +15,7 @@ export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
 
 export const NAME_MAX_WIDTH = 32;
 const CHROME = 4; // border (2) + paddingX (2)
-const DROP_ORDER: ColumnKey[] = ['uptime', 'branch', 'last', 'model'];
+const DROP_ORDER: ColumnKey[] = ['uptime', 'mem', 'cpu', 'branch', 'last', 'model'];
 
 export function requiredWidth(columns: ColumnKey[]): number {
   const sum = columns.reduce((acc, c) => acc + COLUMN_WIDTHS[c], 0);

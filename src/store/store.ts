@@ -1,17 +1,18 @@
 import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } from '../domain/aggregate.js';
 import { DedupSet } from '../domain/dedup.js';
-import type {
-  Limit,
-  LimitsState,
-  PriceLookup,
-  PricingStatus,
-  RegistryEntry,
-  ScanProgress,
-  SessionView,
-  Snapshot,
-  TimeWindow,
-  TranscriptEvent,
-  UsageRecord,
+import {
+  emptySystemHistory,
+  type Limit,
+  type LimitsState,
+  type PriceLookup,
+  type PricingStatus,
+  type RegistryEntry,
+  type ScanProgress,
+  type SessionView,
+  type Snapshot,
+  type TimeWindow,
+  type TranscriptEvent,
+  type UsageRecord,
 } from '../domain/types.js';
 import {
   blockWindowFromLimit,
@@ -218,6 +219,8 @@ export class Store {
       scan: this.scan,
       sessions,
       warnings,
+      systemHistory: emptySystemHistory(),
+      burn: {},
     };
   }
 }

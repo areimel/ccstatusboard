@@ -1,7 +1,15 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import type { ColumnKey, DisplayStatus, SessionView, SortKey } from '../domain/types.js';
-import { formatAgo, formatDuration, formatUSD, shortModel, truncate } from '../domain/format.js';
+import {
+  formatAgo,
+  formatBytes,
+  formatDuration,
+  formatPercent,
+  formatUSD,
+  shortModel,
+  truncate,
+} from '../domain/format.js';
 import { Panel } from './Panel.js';
 import { COLUMN_WIDTHS, nameWidth, scrollWindow, visibleColumns } from './sessionList.js';
 import { levelColor, useTheme, type Theme } from './theme.js';
@@ -21,6 +29,8 @@ const HEADERS: Record<ColumnKey, string> = {
   model: 'MODEL',
   branch: 'BRANCH',
   ctx: 'CTX',
+  cpu: 'CPU',
+  mem: 'MEM',
   cost: 'COST',
   last: 'LAST',
   uptime: 'UP',
@@ -60,6 +70,10 @@ function cellText(col: ColumnKey, s: SessionView, now: number, nameW: number): s
       return s.gitBranch ?? '—';
     case 'ctx':
       return ctxBar(s.contextPercent);
+    case 'cpu':
+      return s.live ? formatPercent(s.cpuPercent) : '—';
+    case 'mem':
+      return s.live ? formatBytes(s.memBytes) : '—';
     case 'cost':
       return formatUSD(s.costUSD, s.costApprox);
     case 'last':
@@ -76,6 +90,7 @@ function cellColor(col: ColumnKey, s: SessionView, theme: Theme): string {
     return s.status === 'ended' ? theme.dim : theme.text;
   }
   if (col === 'ctx' && s.contextPercent !== undefined) return levelColor(theme, s.contextPercent, [60, 80]);
+  if (col === 'cpu' && s.live && s.cpuPercent !== undefined) return levelColor(theme, s.cpuPercent, [50, 90]);
   return theme.text;
 }
 
