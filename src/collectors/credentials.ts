@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process';
 import { readFile as fsReadFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { runCommand } from '../core/exec.js';
 
 export type CredentialsResult =
   | { kind: 'ok'; accessToken: string; expiresAt?: number }
@@ -23,12 +23,7 @@ interface OAuthToken {
 }
 
 function defaultExec(cmd: string, args: string[], timeoutMs: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: timeoutMs, encoding: 'utf8' }, (err, stdout) => {
-      if (err) reject(err);
-      else resolve(stdout);
-    });
-  });
+  return runCommand(cmd, args, { timeoutMs });
 }
 
 function extractToken(raw: string): OAuthToken | undefined {

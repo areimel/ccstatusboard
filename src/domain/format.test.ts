@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatAgo,
+  formatBytes,
   formatClock,
   formatDuration,
+  formatPair,
+  formatPercent,
+  formatRate,
+  formatWeekdayTime,
   formatResetsAt,
   formatTokens,
   formatUSD,
+  ratioPercent,
   shortModel,
   truncate,
   truncateDisplay,
@@ -42,6 +48,50 @@ describe('formatTokens', () => {
     [3_100_000, '3.1M'],
   ])('%d → %s', (n, out) => {
     expect(formatTokens(n)).toBe(out);
+  });
+});
+
+describe('formatBytes', () => {
+  it.each([
+    [0, '0B'],
+    [512, '512B'],
+    [1023, '1023B'],
+    [1024, '1K'],
+    [1536, '1.5K'],
+    [412 * 1024 * 1024, '412M'],
+    [15.6 * 1024 ** 3, '15.6G'],
+    [100 * 1024, '100K'],
+  ])('%d → %s', (n, out) => {
+    expect(formatBytes(n)).toBe(out);
+  });
+  it('returns em dash for undefined, negative, and non-finite input', () => {
+    expect(formatBytes(undefined)).toBe('—');
+    expect(formatBytes(-1)).toBe('—');
+    expect(formatBytes(Number.NaN)).toBe('—');
+    expect(formatBytes(Number.POSITIVE_INFINITY)).toBe('—');
+  });
+});
+
+describe('formatRate', () => {
+  it('appends /s to the byte size', () => {
+    expect(formatRate(1.2 * 1024 * 1024)).toBe('1.2M/s');
+    expect(formatRate(0)).toBe('0B/s');
+  });
+  it('returns em dash without the /s suffix for missing or negative rates', () => {
+    expect(formatRate(undefined)).toBe('—');
+    expect(formatRate(-1)).toBe('—');
+  });
+});
+
+describe('formatPercent', () => {
+  it('rounds to a whole percent', () => {
+    expect(formatPercent(12.4)).toBe('12%');
+    expect(formatPercent(12.5)).toBe('13%');
+    expect(formatPercent(0)).toBe('0%');
+  });
+  it('returns em dash for undefined or non-finite input', () => {
+    expect(formatPercent(undefined)).toBe('—');
+    expect(formatPercent(Number.NaN)).toBe('—');
   });
 });
 
@@ -99,6 +149,7 @@ describe('shortModel', () => {
 describe('formatClock / truncate', () => {
   it('formats local HH:MM:SS', () => {
     expect(formatClock(NOW)).toBe('14:32:07');
+    expect(formatClock(NOW, false)).toBe('14:32');
   });
   it('truncates with ellipsis', () => {
     expect(truncate('ccstatusboard', 20)).toBe('ccstatusboard');
@@ -122,5 +173,33 @@ describe('displayWidth / truncateDisplay', () => {
     expect(truncateDisplay('日本語のセッション', 7)).toBe('日本語…');
     expect(displayWidth(truncateDisplay('日本語のセッション', 8))).toBeLessThanOrEqual(8);
     expect(truncateDisplay('abc', 0)).toBe('');
+  });
+});
+
+describe('formatWeekdayTime', () => {
+  it('renders weekday and HH:MM in local time', () => {
+    const ts = new Date(2026, 9, 13, 14, 0).getTime(); // Tue
+    expect(formatWeekdayTime(ts)).toBe('Tue 14:00');
+  });
+});
+
+describe('ratioPercent', () => {
+  it('computes a percentage', () => {
+    expect(ratioPercent(1, 4)).toBe(25);
+  });
+  it('is undefined for non-positive or non-finite totals', () => {
+    expect(ratioPercent(1, 0)).toBeUndefined();
+    expect(ratioPercent(1, -5)).toBeUndefined();
+    expect(ratioPercent(1, Number.NaN)).toBeUndefined();
+    expect(ratioPercent(1, Number.POSITIVE_INFINITY)).toBeUndefined();
+  });
+});
+
+describe('formatPair', () => {
+  it('joins bytes by default', () => {
+    expect(formatPair(1024, 2048)).toBe('1K/2K');
+  });
+  it('accepts a custom formatter', () => {
+    expect(formatPair(1, 2, String)).toBe('1/2');
   });
 });

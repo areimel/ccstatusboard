@@ -1,6 +1,6 @@
 import { mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { ThemeName } from '../domain/types.js';
+import type { Config } from '../domain/types.js';
 import { isEnoent } from './load.js';
 
 export interface SaverFs {
@@ -21,8 +21,8 @@ const realFs: SaverFs = {
   rm,
 };
 
-export interface ThemeSaver {
-  (name: ThemeName): void;
+export interface ConfigSaver {
+  (patch: Partial<Config>): void;
   /** Resolves once no write is in flight or pending. Never rejects. For tests. */
   flush(): Promise<void>;
 }
@@ -36,7 +36,7 @@ async function resolveTarget(path: string, fs: SaverFs): Promise<string> {
   }
 }
 
-async function writeTheme(configPath: string, name: ThemeName, fs: SaverFs): Promise<void> {
+async function writePatch(configPath: string, patch: Partial<Config>, fs: SaverFs): Promise<void> {
   const path = await resolveTarget(configPath, fs);
   let existing: Record<string, unknown> = {};
   try {
@@ -50,7 +50,7 @@ async function writeTheme(configPath: string, name: ThemeName, fs: SaverFs): Pro
   const tmp = `${path}.${process.pid}.tmp`;
   await fs.mkdir(dirname(path), { recursive: true });
   try {
-    await fs.writeFile(tmp, `${JSON.stringify({ ...existing, theme: name }, null, 2)}\n`);
+    await fs.writeFile(tmp, `${JSON.stringify({ ...existing, ...patch }, null, 2)}\n`);
     await fs.rename(tmp, path);
   } catch (e) {
     await fs.rm(tmp, { force: true }).catch(() => undefined);
@@ -59,20 +59,21 @@ async function writeTheme(configPath: string, name: ThemeName, fs: SaverFs): Pro
 }
 
 /**
- * Fire-and-forget persistence of the theme into the config file. Writes are
- * serialized with latest-wins coalescing; errors are swallowed.
+ * Fire-and-forget persistence of config patches into the config file. Writes
+ * are serialized; pending patches coalesce with latest-wins per key; errors are
+ * swallowed.
  */
-export function createThemeSaver(opts: { path: string; fs?: SaverFs }): ThemeSaver {
+export function createConfigSaver(opts: { path: string; fs?: SaverFs }): ConfigSaver {
   const fs = opts.fs ?? realFs;
-  let pending: ThemeName | undefined;
+  let pending: Partial<Config> | undefined;
   let running: Promise<void> | undefined;
 
   async function drain(): Promise<void> {
     while (pending !== undefined) {
-      const name = pending;
+      const patch = pending;
       pending = undefined;
       try {
-        await writeTheme(opts.path, name, fs);
+        await writePatch(opts.path, patch, fs);
       } catch {
         // no stderr surface in the TUI; a later save may succeed
       }
@@ -80,10 +81,14 @@ export function createThemeSaver(opts: { path: string; fs?: SaverFs }): ThemeSav
     running = undefined;
   }
 
-  const save = ((name: ThemeName): void => {
-    pending = name;
+  const save = ((patch: Partial<Config>): void => {
+    const defined = Object.fromEntries(
+      Object.entries(patch).filter(([, v]) => v !== undefined),
+    ) as Partial<Config>;
+    if (Object.keys(defined).length === 0) return;
+    pending = { ...pending, ...defined };
     running ??= drain();
-  }) as ThemeSaver;
+  }) as ConfigSaver;
   save.flush = async () => {
     await running;
   };

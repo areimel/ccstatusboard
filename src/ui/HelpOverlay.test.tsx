@@ -17,6 +17,7 @@ describe('HelpOverlay', () => {
       'Cycle sort',
       'Toggle filter',
       'Search',
+      'Options',
       't / T',
       'Cycle theme',
       'Quit',

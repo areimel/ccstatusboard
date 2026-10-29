@@ -10,6 +10,8 @@ import { TranscriptTailer } from '../collectors/transcriptTailer.js';
 import { HistoryScanner } from '../collectors/historyScanner.js';
 import { SessionRegistry } from '../collectors/sessionRegistry.js';
 import { scanSubagents } from '../collectors/subagents.js';
+import { ProcStatsSampler, type ProcStatsDeps } from '../collectors/procStats.js';
+import { SystemMonitor, type SystemMonitorDeps } from '../collectors/system/systemMonitor.js';
 import { UsagePoller } from '../collectors/usageApi.js';
 import type { CredentialsResult } from '../collectors/credentials.js';
 
@@ -17,6 +19,8 @@ export interface Runtime {
   store: Store;
   start(): Promise<void>;
   stop(): void;
+  /** Applies live config changes to the store and the usage poller. */
+  applyConfig(patch: Partial<Config>): void;
 }
 
 export interface RuntimeOptions {
@@ -27,10 +31,15 @@ export interface RuntimeOptions {
   now?: () => number;
   fetch?: typeof fetch;
   /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
+  /** System monitor: `false` disables it (tests); partial deps replace the real IO. */
+  systemMonitor?: false | Partial<SystemMonitorDeps>;
+  /** Per-process sampler: `false` disables it (tests); partial deps replace the real IO. */
+  procStats?: false | Partial<ProcStatsDeps>;
   readCredentials?: (claudeDir: string) => Promise<CredentialsResult>;
 }
 
 const AGENT_SCAN_MS = 5_000;
+const PROC_SAMPLE_MS = 2_000;
 const PRICING_RELOAD_MS = 6 * 3_600_000; // load() itself honours the 24h TTL
 
 interface TrackedFile {
@@ -56,6 +65,9 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
   /** sessionId → main transcript path, once found. */
   const mainTranscript = new Map<string, string>();
   const timers: NodeJS.Timeout[] = [];
+  const every = (fn: () => Promise<unknown>, ms: number): void => {
+    timers.push(setInterval(() => void fn().catch(() => undefined), ms));
+  };
   let started = false;
   let stopped = false;
 
@@ -161,19 +173,55 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     },
   });
 
+  const systemMonitor =
+    opts.systemMonitor === false
+      ? null
+      : new SystemMonitor(
+          {
+            onUpdate: (stats) => {
+              if (!stopped) store.setSystem(stats);
+            },
+          },
+          opts.systemMonitor ?? {},
+        );
+
+  const procSampler = opts.procStats === false ? null : new ProcStatsSampler(opts.procStats ?? {});
+  let sampling = false;
+  const sampleProcs = async () => {
+    if (!procSampler || sampling) return;
+    sampling = true;
+    try {
+      const pids = [...live.values()].map((e) => e.pid);
+      const stats = await procSampler.sample(pids);
+      if (!stopped) store.setProcStats(stats);
+    } finally {
+      sampling = false;
+    }
+  };
+
   return {
     store,
+    applyConfig(patch) {
+      if (stopped) return;
+      const o: { refreshMs?: number; endedWindowHours?: number } = {};
+      if (patch.refreshMs !== undefined) o.refreshMs = patch.refreshMs;
+      if (patch.endedWindowHours !== undefined) o.endedWindowHours = patch.endedWindowHours;
+      if (Object.keys(o).length > 0) store.setOptions(o);
+      if (patch.usagePollSeconds !== undefined) poller.setIntervalSeconds(patch.usagePollSeconds);
+    },
     async start() {
       if (started || stopped) return;
       started = true;
       store.start();
       tailer.start();
       poller.start();
+      systemMonitor?.start();
+      if (procSampler) every(sampleProcs, PROC_SAMPLE_MS);
       void scanner.run().catch(() => {
         if (!stopped) store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
       });
-      timers.push(setInterval(() => void scanAgents().catch(() => undefined), AGENT_SCAN_MS));
-      timers.push(setInterval(() => void loadPricing().catch(() => undefined), PRICING_RELOAD_MS));
+      every(scanAgents, AGENT_SCAN_MS);
+      every(loadPricing, PRICING_RELOAD_MS);
       await Promise.all([
         loadPricing().catch(() => {
           if (!stopped) store.setPricing(null, 'unavailable');
@@ -189,6 +237,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       registry.stop();
       tailer.stop();
       poller.stop();
+      systemMonitor?.stop();
       store.stop();
     },
   };

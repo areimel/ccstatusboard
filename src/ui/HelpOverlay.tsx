@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
-import { Panel } from './Panel.js';
+import { Overlay } from './Overlay.js';
 import { useTheme } from './theme.js';
 
 const KEYS: Array<[string, string]> = [
@@ -10,6 +10,7 @@ const KEYS: Array<[string, string]> = [
   ['s', 'Cycle sort (status → activity → cost → ctx → name)'],
   ['f', 'Toggle filter (all / live)'],
   ['/', 'Search by name or cwd (Esc clears)'],
+  ['Esc', 'Options (outside search)'],
   ['? / F1', 'Toggle this help'],
   ['t / T', 'Cycle theme (next / previous)'],
   ['q / Ctrl-C', 'Quit'],
@@ -21,7 +22,7 @@ const LEGEND = ['● waiting', '◐ busy', '○ idle', '· ended'];
 export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
   const theme = useTheme();
   return (
-    <Panel title="Help" width={width}>
+    <Overlay title="Help" width={width}>
       {KEYS.map(([key, label]) => (
         <Box key={key}>
           <Box width={14}>
@@ -39,6 +40,6 @@ export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Elemen
           </Text>
         ))}
       </Box>
-    </Panel>
+    </Overlay>
   );
 }

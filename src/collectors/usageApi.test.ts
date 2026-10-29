@@ -278,3 +278,35 @@ describe('UsagePoller.start/stop', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('UsagePoller.setIntervalSeconds', () => {
+  it('re-arms a pending regular wait with the new interval', async () => {
+    const timers: Array<{ fn: () => void; ms: number; cleared: boolean }> = [];
+    const { deps, advance } = makePoller([jsonResponse(okBody)], { intervalSeconds: 600 });
+    deps.setTimeout = (fn, ms) => {
+      const h = { fn, ms, cleared: false };
+      timers.push(h);
+      return h;
+    };
+    deps.clearTimeout = (h) => {
+      (h as { cleared: boolean }).cleared = true;
+    };
+    const p2 = new UsagePoller({
+      claudeDir: '/home/u/.claude',
+      intervalSeconds: 600,
+      version: '0.1.0',
+      enabled: true,
+      deps,
+      onUpdate: () => undefined,
+    });
+    p2.start();
+    timers[0]!.fn(); // first poll
+    await vi.waitFor(() => expect(timers).toHaveLength(2));
+    expect(timers[1]!.ms).toBe(600_000);
+    advance(10_000);
+    p2.setIntervalSeconds(30);
+    expect(timers[1]!.cleared).toBe(true);
+    expect(timers[2]!.ms).toBe(20_000);
+    p2.stop();
+  });
+});

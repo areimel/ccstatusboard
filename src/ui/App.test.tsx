@@ -11,15 +11,20 @@ afterEach(cleanup);
 const base: UiState = initialUiState(DEFAULT_CONFIG);
 
 describe('uiReducer', () => {
+  it('options open/close and applyConfig merges into config', () => {
+    const o = uiReducer(base, { type: 'openOptions' }, 3);
+    expect(o.mode).toBe('options');
+    expect(uiReducer(o, { type: 'closeOptions' }, 3).mode).toBe('normal');
+    const c = uiReducer(base, { type: 'applyConfig', patch: { theme: 'mono', sort: 'cost' } }, 3);
+    expect(c.config).toMatchObject({ theme: 'mono', sort: 'cost' });
+  });
   it('starts from config sort/showDetail with nothing selected beyond row 0', () => {
     expect(base).toEqual({
       selectedIndex: 0,
-      sort: 'status',
       filter: 'all',
       search: '',
       mode: 'normal',
-      showDetail: true,
-      theme: 'default',
+      config: DEFAULT_CONFIG,
     });
   });
   it('moves selection and clamps to [0, rowCount-1]', () => {
@@ -42,7 +47,7 @@ describe('uiReducer', () => {
     const seen: string[] = [];
     for (let i = 0; i < 5; i++) {
       s = uiReducer(s, { type: 'cycleSort' }, 3);
-      seen.push(s.sort);
+      seen.push(s.config.sort);
     }
     expect(seen).toEqual(['activity', 'cost', 'ctx', 'name', 'status']);
     expect(s.selectedIndex).toBe(0);
@@ -66,15 +71,15 @@ describe('uiReducer', () => {
     expect(s).toMatchObject({ mode: 'normal', search: '' });
   });
   it('nextTheme/prevTheme wrap around', () => {
-    const last = { ...base, theme: 'cyberpunk' as const };
-    expect(uiReducer(last, { type: 'nextTheme' }, 3).theme).toBe('default');
-    expect(uiReducer(base, { type: 'prevTheme' }, 3).theme).toBe('cyberpunk');
+    const last = { ...base, config: { ...base.config, theme: 'cyberpunk' as const } };
+    expect(uiReducer(last, { type: 'nextTheme' }, 3).config.theme).toBe('default');
+    expect(uiReducer(base, { type: 'prevTheme' }, 3).config.theme).toBe('cyberpunk');
   });
   it('toggleHelp and toggleDetail flip', () => {
     const h = uiReducer(base, { type: 'toggleHelp' }, 3);
     expect(h.mode).toBe('help');
     expect(uiReducer(h, { type: 'toggleHelp' }, 3).mode).toBe('normal');
-    expect(uiReducer(base, { type: 'toggleDetail' }, 3).showDetail).toBe(false);
+    expect(uiReducer(base, { type: 'toggleDetail' }, 3).config.showDetail).toBe(false);
   });
 });
 
@@ -234,37 +239,37 @@ describe('App search empty state', () => {
 });
 
 describe('App theme switching', () => {
-  it('t/T change the footer theme name and call onThemeChange, not on mount', async () => {
-    const onThemeChange = vi.fn();
+  it('t/T change the footer theme name and call onConfigChange, not on mount', async () => {
+    const onConfigChange = vi.fn();
     const { lastFrame, stdin } = render(
       <App
         store={fakeStore(twoSessions())}
         config={DEFAULT_CONFIG}
         onQuit={vi.fn()}
-        onThemeChange={onThemeChange}
+        onConfigChange={onConfigChange}
         size={BIG}
       />,
     );
     await delay();
-    expect(onThemeChange).not.toHaveBeenCalled();
+    expect(onConfigChange).not.toHaveBeenCalled();
     expect(lastFrame()).toContain('tdefault');
     stdin.write('t');
-    await vi.waitFor(() => expect(onThemeChange).toHaveBeenLastCalledWith('mono'));
+    await vi.waitFor(() => expect(onConfigChange).toHaveBeenLastCalledWith({ theme: 'mono' }));
     expect(lastFrame()).toContain('tmono');
     stdin.write('T');
-    await vi.waitFor(() => expect(onThemeChange).toHaveBeenLastCalledWith('default'));
+    await vi.waitFor(() => expect(onConfigChange).toHaveBeenLastCalledWith({ theme: 'default' }));
     expect(lastFrame()).toContain('tdefault');
-    expect(onThemeChange).toHaveBeenCalledTimes(2);
+    expect(onConfigChange).toHaveBeenCalledTimes(2);
   });
 
   it("'t' in search mode is typed into the query and does not change theme", async () => {
-    const onThemeChange = vi.fn();
+    const onConfigChange = vi.fn();
     const { lastFrame, stdin } = render(
       <App
         store={fakeStore(twoSessions())}
         config={DEFAULT_CONFIG}
         onQuit={vi.fn()}
-        onThemeChange={onThemeChange}
+        onConfigChange={onConfigChange}
         size={BIG}
       />,
     );
@@ -272,9 +277,72 @@ describe('App theme switching', () => {
     await delay();
     stdin.write('t');
     await vi.waitFor(() => expect(lastFrame()).toContain('/t'));
-    expect(onThemeChange).not.toHaveBeenCalled();
+    expect(onConfigChange).not.toHaveBeenCalled();
     stdin.write('\r');
     await delay();
     expect(lastFrame()).toContain('tdefault');
+  });
+});
+
+describe('App options menu', () => {
+  it('Esc opens Options, Esc closes it', async () => {
+    const { lastFrame, stdin } = renderApp(twoSessions());
+    stdin.write('\u001B');
+    await vi.waitFor(() => expect(lastFrame()).toContain('Theme'));
+    expect(lastFrame()).toContain('Options');
+    expect(lastFrame()).not.toContain('alpha');
+    stdin.write('\u001B');
+    await vi.waitFor(() => expect(lastFrame()).toContain('alpha'));
+  });
+
+  it('right arrow on Theme changes theme and reports the patch', async () => {
+    const onConfigChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      <App
+        store={fakeStore(twoSessions())}
+        config={DEFAULT_CONFIG}
+        onQuit={vi.fn()}
+        onConfigChange={onConfigChange}
+        size={BIG}
+      />,
+    );
+    stdin.write('\u001B');
+    await vi.waitFor(() => expect(lastFrame()).toContain('Theme'));
+    await delay();
+    stdin.write('\u001B[C');
+    await vi.waitFor(() => expect(onConfigChange).toHaveBeenCalledWith({ theme: 'mono' }));
+    expect(onConfigChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('Esc while a search is active clears it instead of opening Options', async () => {
+    const { lastFrame, stdin } = renderApp(twoSessions());
+    stdin.write('/');
+    await delay();
+    stdin.write('b');
+    await delay();
+    stdin.write('\r');
+    await delay();
+    expect(lastFrame()).not.toContain('alpha');
+    stdin.write('\u001B');
+    await vi.waitFor(() => expect(lastFrame()).toContain('alpha'));
+    expect(lastFrame()).not.toContain('Theme');
+  });
+
+  it('s and Enter do not call onConfigChange', async () => {
+    const onConfigChange = vi.fn();
+    const { stdin } = render(
+      <App
+        store={fakeStore(twoSessions())}
+        config={DEFAULT_CONFIG}
+        onQuit={vi.fn()}
+        onConfigChange={onConfigChange}
+        size={BIG}
+      />,
+    );
+    stdin.write('s');
+    await delay();
+    stdin.write('\r');
+    await delay();
+    expect(onConfigChange).not.toHaveBeenCalled();
   });
 });

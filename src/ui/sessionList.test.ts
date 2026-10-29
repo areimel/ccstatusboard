@@ -24,6 +24,27 @@ describe('visibleColumns (Review Focus 5: narrow terminals)', () => {
     expect(visibleColumns(ALL, 60)).toEqual(['status', 'name', 'ctx', 'cost']);
     expect(visibleColumns(ALL, 20)).toEqual(['status', 'name', 'ctx', 'cost']);
   });
+  it('drops uptime, then mem, then cpu when narrow (cpu/mem columns present)', () => {
+    const WITH_RES: ColumnKey[] = [
+      'status',
+      'name',
+      'model',
+      'branch',
+      'ctx',
+      'cpu',
+      'mem',
+      'cost',
+      'last',
+      'uptime',
+    ];
+    expect(requiredWidth(WITH_RES)).toBe(103);
+    expect(visibleColumns(WITH_RES, 103)).toEqual(WITH_RES);
+    expect(visibleColumns(WITH_RES, 102)).toEqual(WITH_RES.filter((c) => c !== 'uptime'));
+    expect(visibleColumns(WITH_RES, 95)).toEqual(WITH_RES.filter((c) => c !== 'uptime' && c !== 'mem'));
+    expect(visibleColumns(WITH_RES, 88)).toEqual(
+      WITH_RES.filter((c) => c !== 'uptime' && c !== 'mem' && c !== 'cpu'),
+    );
+  });
   it('preserves the user-configured column order and subset', () => {
     expect(visibleColumns(['cost', 'name', 'uptime', 'status'], 120)).toEqual([
       'cost',

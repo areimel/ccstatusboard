@@ -12,22 +12,26 @@ describe('configSchema', () => {
       refreshMs: 1000,
       usagePollSeconds: 60,
       endedWindowHours: 24,
-      columns: ['status', 'name', 'model', 'branch', 'ctx', 'cost', 'last', 'uptime'],
+      columns: ['status', 'name', 'model', 'branch', 'ctx', 'cpu', 'mem', 'cost', 'last', 'uptime'],
       sort: 'status',
       showDetail: true,
       claudeDir: null,
       usageApi: true,
+      subscriptionUSD: null,
+      showSystem: true,
     });
   });
 
   it('returns a fresh columns array each parse', () => {
     const a = configSchema.parse({});
     a.columns.push('name');
-    expect(configSchema.parse({}).columns).toHaveLength(8);
+    expect(configSchema.parse({}).columns).toHaveLength(10);
   });
 
   it('enforces minimums and enums', () => {
     expect(configSchema.safeParse({ refreshMs: 100 }).success).toBe(false);
+    expect(configSchema.safeParse({ refreshMs: 3_000_000_000 }).success).toBe(false);
+    expect(configSchema.safeParse({ usagePollSeconds: 3_000_000 }).success).toBe(false);
     expect(configSchema.safeParse({ usagePollSeconds: 10 }).success).toBe(false);
     expect(configSchema.safeParse({ endedWindowHours: -1 }).success).toBe(false);
     expect(configSchema.safeParse({ theme: 'neon' }).success).toBe(false);
