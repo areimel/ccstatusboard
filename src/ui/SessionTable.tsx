@@ -11,11 +11,13 @@ import {
   truncate,
 } from '../domain/format.js';
 import { Panel } from './Panel.js';
-import { COLUMN_WIDTHS, nameWidth, scrollWindow, visibleColumns } from './sessionList.js';
+import { COLUMN_WIDTHS, buildRows, nameWidth, rowWindow, visibleColumns } from './sessionList.js';
 import { levelColor, useTheme, type Theme } from './theme.js';
 
 export {
   COLUMN_WIDTHS,
+  buildRows,
+  rowWindow,
   filterSessions,
   requiredWidth,
   scrollWindow,
@@ -131,7 +133,9 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
   const { sessions, selectedIndex, width, maxRows, now, sort, filter } = props;
   const cols = visibleColumns(props.columns, width);
   const nameW = nameWidth(cols, width);
-  const { start, end } = scrollWindow(selectedIndex, sessions.length, maxRows);
+  const rows = buildRows(sessions, sort);
+  const { start, end } = rowWindow(rows, selectedIndex, maxRows);
+  const inner = Math.max(20, width - 4);
   const title = `Sessions ── sort: ${sort} ── filter: ${filter}`;
   return (
     <Panel title={title} width={width}>
@@ -147,18 +151,22 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
       {sessions.length === 0 ? (
         <Text color={theme.dim}>{props.emptyMessage ?? 'No Claude Code sessions in the last 24h'}</Text>
       ) : (
-        sessions
-          .slice(start, end)
-          .map((s, i) => (
+        rows.slice(start, end).map((r) =>
+          r.kind === 'group' ? (
+            <Text key={`g-${r.project}`} color={theme.dim} bold wrap="truncate-end">
+              {`── ${r.project} (${r.count}) `.padEnd(inner, '─')}
+            </Text>
+          ) : r.kind === 'session' ? (
             <Row
-              key={s.sessionId}
-              session={s}
+              key={r.session.sessionId}
+              session={r.session}
               cols={cols}
               nameW={nameW}
               now={now}
-              selected={start + i === selectedIndex}
+              selected={r.index === selectedIndex}
             />
-          ))
+          ) : null,
+        )
       )}
     </Panel>
   );

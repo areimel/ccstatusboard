@@ -124,4 +124,23 @@ describe('SessionTable', () => {
     );
     expect(await frame([])).toContain('No Claude Code sessions in the last 24h');
   });
+
+  it('renders group headers (not selectable) when sorted by project', async () => {
+    const out = await frame(
+      [
+        makeSession({ sessionId: 'a1', name: 'one', project: 'alpha' }),
+        makeSession({ sessionId: 'a2', name: 'two', project: 'alpha' }),
+        makeSession({ sessionId: 'b1', name: 'three', project: 'beta' }),
+      ],
+      { sort: 'project', selectedIndex: 2, columns: ['status', 'name', 'last'] },
+    );
+    expect(out).toContain('── alpha (2) ───');
+    expect(out).toContain('── beta (1) ───');
+    expect(out.indexOf('── alpha')).toBeLessThan(out.indexOf('one'));
+    expect(out.indexOf('── beta')).toBeLessThan(out.indexOf('three'));
+  });
+  it('no group headers for other sorts', async () => {
+    const out = await frame([makeSession({ project: 'alpha' })], { sort: 'status' });
+    expect(out).not.toContain('── alpha');
+  });
 });

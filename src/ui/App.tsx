@@ -76,6 +76,10 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
       ...(systemShown ? [{ rows: systemPanelRows(snapshot) }] : []),
     ],
   });
+  const emptyMessage =
+    cfg.endedWindowHours === 0
+      ? 'No live Claude Code sessions'
+      : `No Claude Code sessions in the last ${cfg.endedWindowHours}h`;
   if (tooSmall) {
     return <Text>Terminal too small</Text>;
   }
@@ -102,11 +106,7 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   } else if (snapshot.sessions.length === 0 || visible.length === 0) {
     body = (
       <Panel title="Sessions" width={columns}>
-        <Text>
-          {snapshot.sessions.length === 0
-            ? `No Claude Code sessions in the last ${cfg.endedWindowHours}h`
-            : 'No sessions match'}
-        </Text>
+        <Text>{snapshot.sessions.length === 0 ? emptyMessage : 'No sessions match'}</Text>
       </Panel>
     );
   } else {
@@ -121,7 +121,7 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
           now={snapshot.now}
           sort={cfg.sort}
           filter={ui.filter}
-          emptyMessage={`No Claude Code sessions in the last ${cfg.endedWindowHours}h`}
+          emptyMessage={emptyMessage}
         />
         {detailShown && <DetailPane session={visible[selected]} now={snapshot.now} width={columns} />}
       </>

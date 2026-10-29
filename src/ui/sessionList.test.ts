@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { ColumnKey } from '../domain/types.js';
-import { filterSessions, requiredWidth, scrollWindow, sortSessions, visibleColumns } from './sessionList.js';
+import {
+  buildRows,
+  filterSessions,
+  requiredWidth,
+  rowWindow,
+  scrollWindow,
+  sortSessions,
+  visibleColumns,
+} from './sessionList.js';
 import { makeSession, NOW } from '../../test/helpers/snapshot.js';
 
 const ALL: ColumnKey[] = ['status', 'name', 'model', 'branch', 'ctx', 'cost', 'last', 'uptime'];
@@ -131,5 +139,84 @@ describe('scrollWindow', () => {
     expect(scrollWindow(0, 10, 3)).toEqual({ start: 0, end: 3 });
     expect(scrollWindow(7, 10, 3)).toEqual({ start: 5, end: 8 });
     expect(scrollWindow(2, 2, 5)).toEqual({ start: 0, end: 2 });
+  });
+});
+
+describe('sortSessions project', () => {
+  const mk = (id: string, project: string | undefined, status: 'waiting' | 'busy' | 'idle', ago: number) =>
+    makeSession({ sessionId: id, project, status, lastActivity: NOW - ago });
+  const list = [
+    mk('z-idle', 'zeta', 'idle', 1_000),
+    mk('a-idle', 'alpha', 'idle', 5_000),
+    mk('none', undefined, 'waiting', 0),
+    mk('b-busy-old', 'beta', 'busy', 9_000),
+    mk('b-wait', 'beta', 'waiting', 8_000),
+    mk('a-idle2', 'alpha', 'idle', 2_000),
+  ];
+  it('orders groups by best status, then recency, then name; no-project last', () => {
+    expect(sortSessions(list, 'project').map((x) => x.sessionId)).toEqual([
+      'b-wait',
+      'b-busy-old',
+      'z-idle',
+      'a-idle2',
+      'a-idle',
+      'none',
+    ]);
+  });
+  it('breaks ties by name', () => {
+    const t = [mk('2', 'b', 'idle', 1000), mk('1', 'a', 'idle', 1000)];
+    expect(sortSessions(t, 'project').map((x) => x.sessionId)).toEqual(['1', '2']);
+  });
+});
+
+describe('buildRows', () => {
+  const sorted = sortSessions(
+    [
+      makeSession({ sessionId: '1', project: 'a' }),
+      makeSession({ sessionId: '2', project: 'a' }),
+      makeSession({ sessionId: '3', project: 'b' }),
+      makeSession({ sessionId: '4' }),
+    ],
+    'project',
+  );
+  it('emits group headers with counts and session-only indexes', () => {
+    const rows = buildRows(sorted, 'project');
+    expect(
+      rows.map((r) =>
+        r.kind === 'group' ? `g:${r.project}:${r.count}` : r.kind === 'session' ? `s${r.index}` : 'x',
+      ),
+    ).toEqual(['g:a:2', 's0', 's1', 'g:b:1', 's2', 'g:—:1', 's3']);
+  });
+  it('has no group rows for other sorts', () => {
+    expect(buildRows(sorted, 'status').every((r) => r.kind === 'session')).toBe(true);
+  });
+});
+
+describe('rowWindow', () => {
+  const sorted = sortSessions(
+    ['a', 'b', 'c'].flatMap((p) =>
+      [1, 2, 3].map((n) => makeSession({ sessionId: `${p}${n}`, project: p, lastActivity: NOW - n })),
+    ),
+    'project',
+  );
+  const rows = buildRows(sorted, 'project'); // 12 rows
+  const visibleSel = (sel: number, max: number) => {
+    const { start, end } = rowWindow(rows, sel, max);
+    return rows.slice(start, end);
+  };
+  it('keeps the selected session visible and within maxRows', () => {
+    for (let sel = 0; sel < 9; sel++) {
+      const w = visibleSel(sel, 4);
+      expect(w.length).toBeLessThanOrEqual(4);
+      expect(w.some((r) => r.kind === 'session' && r.index === sel)).toBe(true);
+    }
+  });
+  it('keeps the group header when it fits', () => {
+    // selected is the first session of group b (row 5); scrolled window still shows b's header.
+    expect(visibleSel(3, 4).some((r) => r.kind === 'group' && r.project === 'b')).toBe(true);
+    expect(visibleSel(1, 3)[0]?.kind).toBe('group');
+  });
+  it('shows everything when it fits', () => {
+    expect(rowWindow(rows, 8, 50)).toEqual({ start: 0, end: 12 });
   });
 });

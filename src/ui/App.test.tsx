@@ -129,6 +129,12 @@ describe('App rendering', () => {
       }).lastFrame(),
     ).toContain('No Claude Code sessions in the last 24h');
     expect(
+      renderApp(makeSnapshot({ sessions: [] }), BIG, vi.fn(), {
+        ...DEFAULT_CONFIG,
+        endedWindowHours: 0,
+      }).lastFrame(),
+    ).toContain('No live Claude Code sessions');
+    expect(
       renderApp(makeSnapshot({ sessions: [], claudeDirFound: false, claudeDir: '/nope' })).lastFrame(),
     ).toContain('Claude Code data not found at /nope');
   });

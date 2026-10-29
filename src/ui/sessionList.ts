@@ -1,4 +1,4 @@
-import type { ColumnKey, DisplayStatus, SessionView, SortKey } from '../domain/types.js';
+import type { ColumnKey, DisplayStatus, SessionView, SortKey, SubagentView } from '../domain/types.js';
 
 export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
   status: 5,
@@ -16,7 +16,7 @@ export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
 
 export const NAME_MAX_WIDTH = 32;
 const CHROME = 4; // border (2) + paddingX (2)
-const DROP_ORDER: ColumnKey[] = ['uptime', 'mem', 'cpu', 'branch', 'last', 'model'];
+const DROP_ORDER: ColumnKey[] = ['uptime', 'mem', 'cpu', 'branch', 'project', 'last', 'model'];
 
 export function requiredWidth(columns: ColumnKey[]): number {
   const sum = columns.reduce((acc, c) => acc + COLUMN_WIDTHS[c], 0);
@@ -47,16 +47,42 @@ const desc = (a: number | null | undefined, b: number | null | undefined) => {
   return b - a;
 };
 
+export const NO_PROJECT = '—';
+const projectOf = (s: SessionView) => s.project ?? NO_PROJECT;
+const byStatusThenActivity = (a: SessionView, b: SessionView) =>
+  STATUS_RANK[a.status] - STATUS_RANK[b.status] || byActivity(a, b);
+
+function sortByProject(sessions: SessionView[]): SessionView[] {
+  const groups = new Map<string, SessionView[]>();
+  for (const s of sessions) {
+    const g = groups.get(projectOf(s));
+    if (g) g.push(s);
+    else groups.set(projectOf(s), [s]);
+  }
+  const ranked = [...groups.entries()].map(([project, members]) => {
+    members.sort(byStatusThenActivity);
+    return {
+      project,
+      members,
+      rank: Math.min(...members.map((m) => STATUS_RANK[m.status])),
+      last: Math.max(...members.map((m) => m.lastActivity)),
+    };
+  });
+  ranked.sort(
+    (a, b) =>
+      Number(a.project === NO_PROJECT) - Number(b.project === NO_PROJECT) ||
+      a.rank - b.rank ||
+      b.last - a.last ||
+      a.project.localeCompare(b.project),
+  );
+  return ranked.flatMap((g) => g.members);
+}
+
 export function sortSessions(sessions: SessionView[], sort: SortKey): SessionView[] {
   const out = [...sessions];
   switch (sort) {
     case 'project':
-      return out.sort(
-        (a, b) =>
-          (a.project ?? '').localeCompare(b.project ?? '') ||
-          STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
-          byActivity(a, b),
-      );
+      return sortByProject(out);
     case 'status':
       return out.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byActivity(a, b));
     case 'activity':
@@ -91,4 +117,46 @@ export function scrollWindow(
   const rows = Math.max(1, maxRows);
   const start = selected >= rows ? selected - rows + 1 : 0;
   return { start, end: Math.min(total, start + rows) };
+}
+
+export type TableRow =
+  | { kind: 'group'; project: string; count: number }
+  | { kind: 'session'; session: SessionView; index: number }
+  | { kind: 'agent'; agent: SubagentView; parent: string; last: boolean };
+
+/** Flatten already-sorted sessions into display rows (group headers only when sorting by project). */
+export function buildRows(sessions: SessionView[], sort: SortKey): TableRow[] {
+  const rows: TableRow[] = [];
+  let prev: string | undefined;
+  sessions.forEach((session, index) => {
+    if (sort === 'project' && projectOf(session) !== prev) {
+      prev = projectOf(session);
+      rows.push({
+        kind: 'group',
+        project: prev,
+        count: sessions.filter((s) => projectOf(s) === prev).length,
+      });
+    }
+    rows.push({ kind: 'session', session, index });
+  });
+  return rows;
+}
+
+/** Window over rows that keeps the selected session (and, if it fits, its group header) visible. */
+export function rowWindow(
+  rows: TableRow[],
+  selectedIndex: number,
+  maxRows: number,
+): { start: number; end: number } {
+  const size = Math.max(1, maxRows);
+  const pos = rows.findIndex((r) => r.kind === 'session' && r.index === selectedIndex);
+  const sel = Math.max(0, pos);
+  let start = sel >= size ? sel - size + 1 : 0;
+  for (let g = sel - 1; g >= 0 && g >= sel - size + 1; g--) {
+    if (rows[g]?.kind === 'group') {
+      start = Math.min(start, g);
+      break;
+    }
+  }
+  return { start, end: Math.min(rows.length, start + size) };
 }
