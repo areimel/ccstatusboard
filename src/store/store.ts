@@ -268,7 +268,10 @@ export class Store {
         const warning = v && !isTestedVersion(v) ? `⚠ untested Claude Code v${sanitizeText(v)}` : null;
         if (warning && !warnings.includes(warning)) warnings.push(warning);
       }
-      const visible = s.live || lastActivityOf(s) >= cutoff || (s.endedAt ?? 0) >= cutoff;
+      // endedWindowHours === 0 means "remove on exit": ended and history-only sessions are hidden.
+      const visible =
+        s.live ||
+        (this.opts.endedWindowHours > 0 && (lastActivityOf(s) >= cutoff || (s.endedAt ?? 0) >= cutoff));
       if (!visible) continue;
       const view = buildSessionView(s, lookup);
       if (view.cwd) view.project = sanitizeText(this.projects.get(view.cwd) ?? basename(view.cwd));

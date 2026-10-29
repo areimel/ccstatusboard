@@ -83,6 +83,41 @@ describe('Store sessions', () => {
   });
 });
 
+describe('Store ended-session visibility', () => {
+  it('endedWindowHours 0 hides an ended session right after markEnded, and history-only sessions', () => {
+    const store = makeStore({ endedWindowHours: 0 });
+    store.upsertRegistry(reg());
+    store.applyEvents('hist', [usage('h', NOW - MIN, { sessionId: 'hist' })]);
+    store.flush();
+    expect(store.getSnapshot().sessions.map((s) => s.sessionId)).toEqual(['s1']);
+    store.markEnded('s1');
+    store.flush();
+    expect(store.getSnapshot().sessions).toEqual([]);
+  });
+
+  it('endedWindowHours 24 keeps a just-ended session', () => {
+    const store = makeStore({ endedWindowHours: 24 });
+    store.upsertRegistry(reg());
+    store.markEnded('s1');
+    store.flush();
+    expect(session(store.getSnapshot()).status).toBe('ended');
+  });
+
+  it('setOptions changes visibility live', () => {
+    const store = makeStore({ endedWindowHours: 24 });
+    store.upsertRegistry(reg());
+    store.markEnded('s1');
+    store.flush();
+    expect(store.getSnapshot().sessions).toHaveLength(1);
+    store.setOptions({ endedWindowHours: 0 });
+    store.flush();
+    expect(store.getSnapshot().sessions).toEqual([]);
+    store.setOptions({ endedWindowHours: 24 });
+    store.flush();
+    expect(store.getSnapshot().sessions).toHaveLength(1);
+  });
+});
+
 describe('Store subagents', () => {
   const agents = [
     { id: 'a', name: 'Explore', lastActivity: NOW - 20_000 },
