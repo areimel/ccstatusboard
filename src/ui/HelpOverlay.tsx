@@ -1,26 +1,30 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
-import { Panel } from './Panel.js';
+import { Overlay } from './Overlay.js';
 import { useTheme } from './theme.js';
 
 const KEYS: Array<[string, string]> = [
   ['↑/↓  j/k', 'Move selection'],
   ['⏎', 'Toggle detail pane'],
   ['g / G', 'Top / bottom'],
-  ['s', 'Cycle sort (status → activity → cost → ctx → name)'],
+  ['s', 'Cycle sort (project → status → … → name)'],
   ['f', 'Toggle filter (all / live)'],
   ['/', 'Search by name or cwd (Esc clears)'],
+  ['Esc', 'Options (outside search)'],
   ['? / F1', 'Toggle this help'],
+  ['t / T', 'Cycle theme (next / previous)'],
   ['q / Ctrl-C', 'Quit'],
 ];
 
 const LEGEND = ['● waiting', '◐ busy', '○ idle', '· ended'];
 
+const NOTES = ['Dimmed rows are idle past the cutoff.', 'j/k skip group headers and subagent rows.'];
+
 /** `width` defaults to 64; App passes `Math.min(64, columns)` so the border fits narrow terminals. */
 export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
   const theme = useTheme();
   return (
-    <Panel title="Help" width={width}>
+    <Overlay title="Help" width={width}>
       {KEYS.map(([key, label]) => (
         <Box key={key}>
           <Box width={14}>
@@ -38,6 +42,11 @@ export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Elemen
           </Text>
         ))}
       </Box>
-    </Panel>
+      {NOTES.map((n) => (
+        <Text key={n} color={theme.dim}>
+          {n}
+        </Text>
+      ))}
+    </Overlay>
   );
 }

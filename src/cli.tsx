@@ -1,8 +1,9 @@
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { render, type Instance } from 'ink';
-import { ConfigError, loadConfig, parseCliArgs } from './config/load.js';
-import type { Config } from './domain/types.js';
+import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './config/load.js';
+import { createConfigSaver } from './config/save.js';
+import { THEME_NAMES, type Config } from './domain/types.js';
 import { cacheDir, resolveClaudeDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
 import { superviseInk } from './app/supervise.js';
@@ -13,15 +14,35 @@ const VERSION = (
   JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
 ).version;
 
+const SAVE_FLUSH_MS = 500;
+
+/** Joins names with ' | ' and wraps them so no line exceeds `width` columns. */
+function wrapNames(names: readonly string[], indent: string, width: number): string {
+  const lines: string[] = [];
+  let line = '';
+  for (const name of names) {
+    const next = line ? `${line} | ${name}` : name;
+    if (line && indent.length + next.length + 2 > width) {
+      lines.push(`${indent}${line} |`);
+      line = name;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(`${indent}${line}`);
+  return lines.join('\n');
+}
+
 const HELP = `Usage: ccstatusboard [options]
 
 htop-style dashboard for all Claude Code sessions, usage limits and costs.
 
 Options:
-  --theme <name>        default | mono | dracula | solarized
+  --theme <name>        start theme (t / T cycles; saved to config)
+${wrapNames(THEME_NAMES, ' '.repeat(24), 78)}
   --refresh <ms>        UI refresh interval (default 1000, min 250)
-  --ended-hours <n>     show ended sessions from the last n hours (default 24)
-  --sort <key>          status | activity | cost | ctx | name
+  --ended-hours <n>     keep exited sessions listed for n hours (default 0 = remove)
+  --sort <key>          project | status | activity | cost | ctx | name
   --claude-dir <path>   Claude Code config dir (default $CLAUDE_CONFIG_DIR or ~/.claude)
   --no-usage-api        do not call the Anthropic usage API (limits show "disabled")
   --config <path>       config file (default ~/.config/ccstatusboard/config.json)
@@ -76,6 +97,7 @@ async function main(argv: string[]): Promise<number | undefined> {
     return 1;
   }
 
+  const saveConfig = createConfigSaver({ path: resolveConfigPath(parsed.flags) });
   const claudeDir = resolveClaudeDir({ flag: parsed.flags.claudeDir ?? null, config: config.claudeDir });
   const runtime = createRuntime({ config, claudeDir, cacheDir: cacheDir(), version: VERSION });
 
@@ -93,7 +115,9 @@ async function main(argv: string[]): Promise<number | undefined> {
   };
   const shutdown = (code: number) => {
     restore();
-    process.exit(code);
+    // Let a just-made theme save land, but never let a slow disk hold up quitting.
+    const timeout = new Promise<void>((r) => setTimeout(r, SAVE_FLUSH_MS));
+    void Promise.race([saveConfig.flush(), timeout]).finally(() => process.exit(code));
   };
   const crash = (err: unknown) => {
     try {
@@ -114,9 +138,20 @@ async function main(argv: string[]): Promise<number | undefined> {
 
   process.stdout.write(ENTER_ALT);
   altActive = true;
-  ink.instance = render(<App store={runtime.store} config={config} onQuit={() => shutdown(0)} />, {
-    exitOnCtrlC: false,
-  });
+  ink.instance = render(
+    <App
+      store={runtime.store}
+      config={config}
+      onQuit={() => shutdown(0)}
+      onConfigChange={(patch) => {
+        saveConfig(patch);
+        runtime.applyConfig(patch);
+      }}
+    />,
+    {
+      exitOnCtrlC: false,
+    },
+  );
   // A render error unmounts Ink and only rejects waitUntilExit(): restore the terminal and exit 1.
   superviseInk(ink.instance, { onExit: () => shutdown(0), onCrash: crash });
   await runtime.start(); // render first so the loading state is visible immediately

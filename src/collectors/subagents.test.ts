@@ -28,7 +28,12 @@ describe('scanSubagents', () => {
         throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       },
     };
-    await expect(scanSubagents(DIR, NOW, d)).resolves.toEqual({ activeCount: 0, names: [], files: [] });
+    await expect(scanSubagents(DIR, NOW, d)).resolves.toEqual({
+      activeCount: 0,
+      names: [],
+      files: [],
+      agents: [],
+    });
   });
 
   it('lists all agent jsonl files and counts only recently modified ones as active', async () => {
@@ -48,6 +53,10 @@ describe('scanSubagents', () => {
     ]);
     expect(r.activeCount).toBe(2);
     expect(r.names).toEqual(['Explore', 'agent']);
+    expect(r.agents).toEqual([
+      { id: 'b', name: 'Explore', lastActivity: NOW - 5_000 },
+      { id: 'c', name: 'agent', lastActivity: NOW },
+    ]);
   });
 
   it('honors a custom active window', async () => {

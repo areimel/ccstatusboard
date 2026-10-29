@@ -1,10 +1,12 @@
 import { readdir as fsReaddir, readFile as fsReadFile, stat as fsStat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 export interface AgentActivity {
   activeCount: number;
   names: string[];
   files: string[];
+  /** Active agents with per-agent detail. */
+  agents: { id: string; name: string; lastActivity: number }[];
 }
 
 export interface SubagentDeps {
@@ -28,7 +30,7 @@ export async function scanSubagents(
   try {
     names = await readdir(dir);
   } catch {
-    return { activeCount: 0, names: [], files: [] };
+    return { activeCount: 0, names: [], files: [], agents: [] };
   }
 
   const files = names
@@ -37,6 +39,7 @@ export async function scanSubagents(
     .map((n) => join(dir, n));
 
   const activeNames: string[] = [];
+  const agents: AgentActivity['agents'] = [];
   for (const file of files) {
     let mtimeMs: number;
     try {
@@ -45,9 +48,17 @@ export async function scanSubagents(
       continue;
     }
     if (mtimeMs < now - activeWindowMs) continue;
-    activeNames.push(await agentName(file, readFile));
+    const name = await agentName(file, readFile);
+    activeNames.push(name);
+    agents.push({
+      id: basename(file)
+        .replace(/^agent-/, '')
+        .replace(/\.jsonl$/, ''),
+      name,
+      lastActivity: mtimeMs,
+    });
   }
-  return { activeCount: activeNames.length, names: activeNames, files };
+  return { activeCount: activeNames.length, names: activeNames, files, agents };
 }
 
 async function agentName(file: string, readFile: (p: string) => Promise<string>): Promise<string> {

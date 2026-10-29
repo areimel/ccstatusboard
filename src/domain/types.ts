@@ -115,6 +115,14 @@ export interface ScanProgress {
 
 export type DisplayStatus = 'waiting' | 'busy' | 'idle' | 'ended';
 
+/** An active subagent of a live session. */
+export interface SubagentView {
+  id: string;
+  /** agent type, e.g. 'Explore' */
+  name: string;
+  lastActivity: number;
+}
+
 export interface SessionView {
   sessionId: string;
   pid?: number;
@@ -125,8 +133,12 @@ export interface SessionView {
   waitingFor?: string;
   activeAgents: number;
   agentNames: string[];
+  /** Active subagents of a live session (empty otherwise). */
+  subagents: SubagentView[];
   name: string;
   cwd?: string;
+  /** Git repo name (or cwd basename) the session runs in. */
+  project?: string;
   gitBranch?: string;
   model?: string;
   contextTokens?: number;
@@ -141,6 +153,60 @@ export interface SessionView {
   lastActivity: number;
   permissionMode?: string;
   version?: string;
+  /** Current CPU usage of the session's main process (100 = one full core). */
+  cpuPercent?: number;
+  /** Resident memory of the session's main process, in bytes. */
+  memBytes?: number;
+}
+
+/** Machine-wide resource sample emitted by the system monitor. */
+export interface SystemStats {
+  sampledAt: number;
+  /** total and perCore are 0–100. */
+  cpu: { total: number; perCore: number[] };
+  /** Bytes. */
+  mem: { used: number; total: number };
+  swap: { used: number; total: number };
+  disk: { used: number; total: number; mount: string };
+  /** Bytes per second, summed over non-loopback interfaces. */
+  net: { rxPerSec: number; txPerSec: number };
+  load: [number, number, number];
+}
+
+/** Per-process resource sample, keyed by pid in maps. */
+export interface ProcStats {
+  /** 100 = one full core. */
+  cpuPercent: number;
+  rssBytes: number;
+}
+
+/** Rolling history used for System panel sparklines, oldest first. */
+export interface SystemHistory {
+  cpu: number[];
+  rx: number[];
+  tx: number[];
+}
+
+/** One observation of a limit's utilization, used for burn-rate slopes. */
+export interface LimitSample {
+  t: number;
+  pct: number;
+}
+
+export type BurnBand = 'under' | 'near' | 'over' | 'critical';
+export type BurnWindowKind = 'block' | 'week';
+
+export interface BurnProjection {
+  currentPct: number;
+  /** Percentage points per hour. */
+  ratePctPerHour: number;
+  /** Projected utilization at window reset. */
+  projectedPct: number;
+  band: BurnBand;
+  /** Epoch ms when the limit is projected to be hit; undefined = not projected to hit. */
+  hitAt?: number;
+  /** Fraction (0–100) of the window elapsed at hitAt. */
+  hitWindowPct?: number;
 }
 
 export interface Snapshot {
@@ -162,22 +228,60 @@ export interface Snapshot {
   scan: ScanProgress;
   sessions: SessionView[];
   warnings: string[];
+  system?: SystemStats;
+  systemHistory: SystemHistory;
+  burn: { block?: BurnProjection; week?: BurnProjection };
 }
 
-export type ThemeName = 'default' | 'mono' | 'dracula' | 'solarized';
-export type ColumnKey = 'status' | 'name' | 'model' | 'branch' | 'ctx' | 'cost' | 'last' | 'uptime';
-export type SortKey = 'status' | 'activity' | 'cost' | 'ctx' | 'name';
+/** Order matters: it is the live theme cycle order. */
+export const THEME_NAMES = [
+  'default',
+  'mono',
+  'dracula',
+  'solarized',
+  'solarized-light',
+  'monokai',
+  'gruvbox',
+  'nord',
+  'tokyonight',
+  'catppuccin',
+  'onedark',
+  'cyberpunk',
+] as const;
+export type ThemeName = (typeof THEME_NAMES)[number];
+export const COLUMN_KEYS = [
+  'status',
+  'project',
+  'name',
+  'model',
+  'branch',
+  'ctx',
+  'cpu',
+  'mem',
+  'cost',
+  'last',
+  'uptime',
+] as const;
+export type ColumnKey = (typeof COLUMN_KEYS)[number];
+export const SORT_KEYS = ['project', 'status', 'activity', 'cost', 'ctx', 'name'] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
 
 export interface Config {
   theme: ThemeName;
   refreshMs: number;
   usagePollSeconds: number;
+  /** Hours an exited session stays listed; 0 removes it on exit. */
   endedWindowHours: number;
+  /** Live sessions idle longer than this are dimmed. */
+  idleCutoffMinutes: number;
   columns: ColumnKey[];
   sort: SortKey;
   showDetail: boolean;
   claudeDir: string | null;
   usageApi: boolean;
+  /** Monthly subscription price in USD; drives the plan value ratio. null = unset. */
+  subscriptionUSD: number | null;
+  showSystem: boolean;
 }
 
 export const ZERO_TOKENS: TokenCounts = Object.freeze({
@@ -196,6 +300,10 @@ export function addTokens(a: TokenCounts, b: TokenCounts): TokenCounts {
     cacheWrite1h: a.cacheWrite1h + b.cacheWrite1h,
     cacheRead: a.cacheRead + b.cacheRead,
   };
+}
+
+export function emptySystemHistory(): SystemHistory {
+  return { cpu: [], rx: [], tx: [] };
 }
 
 export function emptyWindowTotals(): WindowTotals {

@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Text, useInput, useStdout } from 'ink';
-import type { Config, SortKey } from '../domain/types.js';
+import React, { useMemo, useState } from 'react';
+import { Box, Text } from 'ink';
+import type { Config } from '../domain/types.js';
 import type { Store } from '../store/store.js';
 import { useSnapshot } from '../store/useSnapshot.js';
 import { ThemeProvider } from '@inkjs/ui';
-import { THEMES, ThemeContext, inkUiTheme } from './theme.js';
+import { THEMES, ThemeContext, cycleTheme, inkUiTheme } from './theme.js';
 import { Panel } from './Panel.js';
 import { Header, headerWarnings } from './Header.js';
 import { UsagePanel, usagePanelRows } from './UsagePanel.js';
@@ -12,175 +12,91 @@ import { Footer } from './Footer.js';
 import { SessionTable, filterSessions, sortSessions } from './SessionTable.js';
 import { DetailPane } from './DetailPane.js';
 import { HelpOverlay } from './HelpOverlay.js';
+import { OptionsMenu } from './options/OptionsMenu.js';
+import { SystemPanel, systemPanelRows } from './SystemPanel.js';
+import { clamp, initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
+import { useKeymap } from './useKeymap.js';
+import { FOOTER_ROWS, SPARE_ROWS, SYSTEM_MIN_ROWS, computeLayout, useTerminalSize } from './layout.js';
 
-export const MIN_COLUMNS = 60;
-export const MIN_ROWS = 16;
-export const DETAIL_MIN_ROWS = 24;
-const TABLE_CHROME_ROWS = 3;
-const FOOTER_ROWS = 1;
-const SPARE_ROWS = 1;
-const DETAIL_ROWS = 6;
-const SORT_ORDER: SortKey[] = ['status', 'activity', 'cost', 'ctx', 'name'];
-
-export interface UiState {
-  selectedIndex: number;
-  sort: SortKey;
-  filter: 'all' | 'live';
-  search: string;
-  mode: 'normal' | 'search' | 'help';
-  showDetail: boolean;
-}
-
-export type UiAction =
-  | {
-      type:
-        | 'up'
-        | 'down'
-        | 'top'
-        | 'bottom'
-        | 'toggleDetail'
-        | 'cycleSort'
-        | 'toggleFilter'
-        | 'startSearch'
-        | 'endSearch'
-        | 'clearSearch'
-        | 'toggleHelp';
-    }
-  | { type: 'searchInput'; char: string }
-  | { type: 'searchBackspace' };
+export { initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
+export { MIN_COLUMNS, MIN_ROWS, DETAIL_MIN_ROWS } from './layout.js';
 
 export interface AppProps {
   store: Pick<Store, 'subscribe' | 'getSnapshot'>;
   config: Config;
   onQuit: () => void;
+  /** Called with a config patch to persist/apply: Options edits and t/T theme switches (never on mount). */
+  onConfigChange?: (patch: Partial<Config>) => void;
   /** Test-only terminal size override; defaults to live stdout size. */
   size?: { columns: number; rows: number };
 }
-
-export function initialUiState(config: Config): UiState {
-  return {
-    selectedIndex: 0,
-    sort: config.sort,
-    filter: 'all',
-    search: '',
-    mode: 'normal',
-    showDetail: config.showDetail,
-  };
-}
-
-function clamp(i: number, rowCount: number): number {
-  if (rowCount <= 0) return 0;
-  return Math.min(Math.max(i, 0), rowCount - 1);
-}
-
-export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
-  switch (a.type) {
-    case 'up':
-      return { ...s, selectedIndex: clamp(s.selectedIndex - 1, rowCount) };
-    case 'down':
-      return { ...s, selectedIndex: clamp(s.selectedIndex + 1, rowCount) };
-    case 'top':
-      return { ...s, selectedIndex: 0 };
-    case 'bottom':
-      return { ...s, selectedIndex: clamp(rowCount - 1, rowCount) };
-    case 'toggleDetail':
-      return { ...s, showDetail: !s.showDetail };
-    case 'cycleSort': {
-      const next = SORT_ORDER[(SORT_ORDER.indexOf(s.sort) + 1) % SORT_ORDER.length] ?? 'status';
-      return { ...s, sort: next, selectedIndex: 0 };
-    }
-    case 'toggleFilter':
-      return { ...s, filter: s.filter === 'all' ? 'live' : 'all', selectedIndex: 0 };
-    case 'startSearch':
-      return { ...s, mode: 'search' };
-    case 'endSearch':
-      return { ...s, mode: 'normal' };
-    case 'clearSearch':
-      return { ...s, mode: 'normal', search: '', selectedIndex: 0 };
-    case 'toggleHelp':
-      return { ...s, mode: s.mode === 'help' ? 'normal' : 'help' };
-    case 'searchInput':
-      return { ...s, search: s.search + a.char, selectedIndex: 0 };
-    case 'searchBackspace':
-      return { ...s, search: s.search.slice(0, -1), selectedIndex: 0 };
-  }
-}
-
-function useTerminalSize(override?: { columns: number; rows: number }): { columns: number; rows: number } {
-  const { stdout } = useStdout();
-  const read = () => ({ columns: stdout.columns || 80, rows: stdout.rows || 24 });
-  const [size, setSize] = useState(read);
-  useEffect(() => {
-    if (override) return;
-    const onResize = () => setSize(read());
-    stdout.on('resize', onResize);
-    return () => {
-      stdout.off('resize', onResize);
-    };
-  }, [stdout, override]);
-  return override ?? size;
-}
-
-// F1 arrives as ESC O P; Ink may strip the leading ESC.
-const isF1 = (input: string) => input === '\u001bOP' || input === 'OP';
-
-export function App({ store, config, onQuit, size }: AppProps): React.JSX.Element {
+export function App({ store, config, onQuit, onConfigChange, size }: AppProps): React.JSX.Element {
   const snapshot = useSnapshot(store);
   const { columns, rows } = useTerminalSize(size);
   const [ui, setUi] = useState<UiState>(() => initialUiState(config));
 
+  const cfg = ui.config;
+  const theme = THEMES[cfg.theme];
+  const inkTheme = useMemo(() => inkUiTheme(theme), [theme]);
+
   const visible = useMemo(
-    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), ui.sort),
-    [snapshot.sessions, ui.filter, ui.search, ui.sort],
+    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), cfg.sort),
+    [snapshot.sessions, ui.filter, ui.search, cfg.sort],
   );
   const selected = clamp(ui.selectedIndex, visible.length);
   // Re-clamp against the current list so a stale index never leaks into the reducer.
-  const dispatch = (a: UiAction) =>
+  const reduce = (a: UiAction) =>
     setUi((s) =>
       uiReducer({ ...s, selectedIndex: clamp(s.selectedIndex, visible.length) }, a, visible.length),
     );
-
-  useInput((input, key) => {
-    if (key.ctrl && input === 'c') return onQuit();
-    if (ui.mode === 'search') {
-      if (key.escape) dispatch({ type: 'clearSearch' });
-      else if (key.return) dispatch({ type: 'endSearch' });
-      else if (key.backspace || key.delete) dispatch({ type: 'searchBackspace' });
-      else if (input && !key.ctrl && !key.meta) dispatch({ type: 'searchInput', char: input });
-      return;
+  const dispatch = (a: UiAction) => {
+    reduce(a);
+    // Only the theme is persisted when changed via hotkeys; sort/detail persist via Options only.
+    if (a.type === 'nextTheme' || a.type === 'prevTheme') {
+      onConfigChange?.({ theme: cycleTheme(cfg.theme, a.type === 'nextTheme' ? 1 : -1) });
     }
-    if (ui.mode === 'help') {
-      if (input === 'q') return onQuit();
-      dispatch({ type: 'toggleHelp' });
-      return;
-    }
-    if (input === 'q') return onQuit();
-    if (key.upArrow || input === 'k') dispatch({ type: 'up' });
-    else if (key.downArrow || input === 'j') dispatch({ type: 'down' });
-    else if (input === 'g') dispatch({ type: 'top' });
-    else if (input === 'G') dispatch({ type: 'bottom' });
-    else if (key.return) dispatch({ type: 'toggleDetail' });
-    else if (input === 's') dispatch({ type: 'cycleSort' });
-    else if (input === 'f') dispatch({ type: 'toggleFilter' });
-    else if (input === '/') dispatch({ type: 'startSearch' });
-    else if (input === '?' || isF1(input)) dispatch({ type: 'toggleHelp' });
-    else if (key.escape && ui.search) dispatch({ type: 'clearSearch' });
-  });
+  };
+  const changeConfig = (patch: Partial<Config>) => {
+    reduce({ type: 'applyConfig', patch });
+    onConfigChange?.(patch);
+  };
 
-  if (columns < MIN_COLUMNS || rows < MIN_ROWS) {
-    return <Text>Terminal too small</Text>;
-  }
+  useKeymap({ ui, dispatch, onQuit });
 
   const headerRows = 1 + (headerWarnings(snapshot).length > 0 ? 1 : 0);
-  // header + usage panel + table borders (2) + table header (1) + footer (1) + 1 spare row,
-  // so the frame stays strictly shorter than the terminal (Ink full-clears at exact height).
-  const fixedRows = headerRows + usagePanelRows(snapshot) + TABLE_CHROME_ROWS + FOOTER_ROWS + SPARE_ROWS;
-  const detailShown = ui.showDetail && rows >= DETAIL_MIN_ROWS && rows - fixedRows - DETAIL_ROWS >= 1;
-  const maxRows = Math.max(1, rows - fixedRows - (detailShown ? DETAIL_ROWS : 0));
+  const overlay = ui.mode === 'help' || ui.mode === 'options';
+  const systemShown = cfg.showSystem && rows >= SYSTEM_MIN_ROWS && !overlay;
+  const { tooSmall, detailShown, maxRows } = computeLayout({
+    rows,
+    columns,
+    showDetail: cfg.showDetail,
+    panels: [
+      { rows: headerRows },
+      { rows: usagePanelRows(snapshot, cfg.subscriptionUSD) },
+      ...(systemShown ? [{ rows: systemPanelRows(snapshot) }] : []),
+    ],
+  });
+  const emptyMessage =
+    cfg.endedWindowHours === 0
+      ? 'No live Claude Code sessions'
+      : `No Claude Code sessions in the last ${cfg.endedWindowHours}h`;
+  if (tooSmall) {
+    return <Text>Terminal too small</Text>;
+  }
 
   let body: React.JSX.Element;
   if (ui.mode === 'help') {
     body = <HelpOverlay width={Math.min(64, columns)} />;
+  } else if (ui.mode === 'options') {
+    body = (
+      <OptionsMenu
+        config={cfg}
+        width={Math.min(64, columns)}
+        maxHeight={rows - headerRows - FOOTER_ROWS - SPARE_ROWS}
+        onChange={changeConfig}
+        onClose={() => reduce({ type: 'closeOptions' })}
+      />
+    );
   } else if (!snapshot.claudeDirFound) {
     body = (
       <Panel title="Sessions" width={columns}>
@@ -190,11 +106,7 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
   } else if (snapshot.sessions.length === 0 || visible.length === 0) {
     body = (
       <Panel title="Sessions" width={columns}>
-        <Text>
-          {snapshot.sessions.length === 0
-            ? `No Claude Code sessions in the last ${config.endedWindowHours}h`
-            : 'No sessions match'}
-        </Text>
+        <Text>{snapshot.sessions.length === 0 ? emptyMessage : 'No sessions match'}</Text>
       </Panel>
     );
   } else {
@@ -203,13 +115,14 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
         <SessionTable
           sessions={visible}
           selectedIndex={selected}
-          columns={config.columns}
+          columns={cfg.columns}
           width={columns}
           maxRows={maxRows}
           now={snapshot.now}
-          sort={ui.sort}
+          sort={cfg.sort}
           filter={ui.filter}
-          emptyMessage={`No Claude Code sessions in the last ${config.endedWindowHours}h`}
+          idleCutoffMinutes={cfg.idleCutoffMinutes}
+          emptyMessage={emptyMessage}
         />
         {detailShown && <DetailPane session={visible[selected]} now={snapshot.now} width={columns} />}
       </>
@@ -217,14 +130,17 @@ export function App({ store, config, onQuit, size }: AppProps): React.JSX.Elemen
   }
 
   return (
-    <ThemeContext.Provider value={THEMES[config.theme]}>
-      <ThemeProvider theme={inkUiTheme(THEMES[config.theme])}>
+    <ThemeContext.Provider value={theme}>
+      <ThemeProvider theme={inkTheme}>
         {/* Backstop: never draw taller than the budget even if a child miscounts its rows. */}
         <Box flexDirection="column" width={columns} maxHeight={rows - SPARE_ROWS} overflow="hidden">
           <Header snapshot={snapshot} />
-          {ui.mode !== 'help' && <UsagePanel snapshot={snapshot} width={columns} />}
+          {!overlay && (
+            <UsagePanel snapshot={snapshot} width={columns} subscriptionUSD={cfg.subscriptionUSD} />
+          )}
+          {systemShown && <SystemPanel snapshot={snapshot} width={columns} />}
           {body}
-          <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} />
+          <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} width={columns} />
         </Box>
       </ThemeProvider>
     </ThemeContext.Provider>

@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { inkUiTheme, levelColor, THEMES } from './theme.js';
+import { THEME_NAMES } from '../domain/types.js';
+import { cycleTheme, inkUiTheme, levelColor, THEMES } from './theme.js';
+
+const ANSI_NAMES = new Set([
+  'black',
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'white',
+  'gray',
+  'grey',
+]);
+const validColor = (c: string) => /^#[0-9a-f]{6}$/i.test(c) || ANSI_NAMES.has(c);
 
 describe('theme', () => {
   it('defines every token for every theme', () => {
@@ -9,6 +24,29 @@ describe('theme', () => {
       for (const k of keys) expect(typeof (t as unknown as Record<string, unknown>)[k]).toBe('string');
       expect(t.gradient.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it('has a palette for every THEME_NAMES entry and nothing else', () => {
+    expect(Object.keys(THEMES).sort()).toEqual([...THEME_NAMES].sort());
+  });
+
+  it('uses only #rrggbb hex or named ANSI colors', () => {
+    for (const t of Object.values(THEMES)) {
+      const { name, gradient, ...tokens } = t;
+      for (const [k, v] of Object.entries(tokens)) expect(validColor(v), `${name}.${k}=${v}`).toBe(true);
+      for (const g of gradient) expect(validColor(g), `${name}.gradient=${g}`).toBe(true);
+    }
+  });
+
+  it('selection colors differ so the selected row is visible', () => {
+    for (const t of Object.values(THEMES)) expect(t.selectedBg).not.toBe(t.selectedFg);
+  });
+
+  it('cycleTheme wraps in both directions', () => {
+    expect(cycleTheme('default', 1)).toBe('mono');
+    expect(cycleTheme('cyberpunk', 1)).toBe('default');
+    expect(cycleTheme('default', -1)).toBe('cyberpunk');
+    expect(cycleTheme('solarized-light', -1)).toBe('solarized');
   });
 
   it('levelColor uses [50,80] by default and accepts custom thresholds', () => {

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from 'ink-testing-library';
+import { renderSized } from '../../test/helpers/renderSized.js';
+import type { BurnProjection } from '../domain/types.js';
 import { UsagePanel, usagePanelRows } from './UsagePanel.js';
 import { makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { emptyWindowTotals, type Snapshot } from '../domain/types.js';
@@ -8,8 +10,8 @@ import { stripAnsi } from '../../test/helpers/ansi.js';
 afterEach(cleanup);
 
 // TitledBox renders its title only on the second render, so wait for it.
-async function frame(snap: Snapshot = makeSnapshot()): Promise<string> {
-  const { lastFrame } = render(<UsagePanel snapshot={snap} width={100} />);
+async function frame(snap: Snapshot = makeSnapshot(), sub?: number | null): Promise<string> {
+  const { lastFrame } = render(<UsagePanel snapshot={snap} width={100} subscriptionUSD={sub} />);
   await vi.waitFor(() => expect(stripAnsi(lastFrame())).toContain('Usage'));
   return stripAnsi(lastFrame());
 }
@@ -81,6 +83,42 @@ describe('UsagePanel', () => {
   });
 });
 
+const burnProj: BurnProjection = {
+  currentPct: 58,
+  ratePctPerHour: 10,
+  projectedPct: 112,
+  band: 'over',
+  hitAt: NOW + 3_600_000,
+  hitWindowPct: 78,
+};
+
+describe('UsagePanel burn rate and plan ratio', () => {
+  it('renders the Burn Rate subsection above the burn/sparkline row', async () => {
+    const out = await frame(makeSnapshot({ burn: { block: burnProj } }));
+    expect(out).toContain('Burn Rate');
+    expect(out).toMatch(/proj 112%\s+OVER/);
+    expect(out.indexOf('Burn Rate')).toBeLessThan(out.indexOf('burn $4.10/h'));
+  });
+
+  it('omits the subsection when limits have no values', async () => {
+    const out = await frame(makeSnapshot({ limits: { status: 'disabled', perModelWeekly: [] } }));
+    expect(out).not.toContain('Burn Rate');
+  });
+
+  it('shows plan ratio when subscriptionUSD is set (ok >= 1)', async () => {
+    expect(await frame(makeSnapshot(), 100)).toMatch(/plan\s+4\.1×/);
+  });
+
+  it('hides plan ratio when unset, null, zero, or month cost unknown', async () => {
+    expect(await frame(makeSnapshot())).not.toContain('plan');
+    expect(await frame(makeSnapshot(), null)).not.toContain('plan');
+    expect(await frame(makeSnapshot(), 0)).not.toContain('plan');
+    const base = makeSnapshot();
+    const unknown = { ...base, costs: { ...base.costs, month: { ...base.costs.month, costUSD: null } } };
+    expect(await frame(unknown, 100)).not.toContain('plan');
+  });
+});
+
 describe('usagePanelRows', () => {
   const variants: Record<string, Snapshot> = {
     default: makeSnapshot(),
@@ -101,10 +139,19 @@ describe('usagePanelRows', () => {
     }),
     noCreds: makeSnapshot({ limits: { status: 'no-credentials', perModelWeekly: [] } }),
   };
+  variants.burning = makeSnapshot({ burn: { block: burnProj, week: { ...burnProj, band: 'near' } } });
   for (const [name, snap] of Object.entries(variants)) {
-    it(`equals the rendered line count (${name})`, async () => {
-      const out = await frame(snap);
-      expect(usagePanelRows(snap)).toBe(out.split('\n').length);
-    });
+    for (const sub of [undefined, 100] as const) {
+      it(`equals the rendered line count (${name}, sub=${sub})`, async () => {
+        const r = renderSized(<UsagePanel snapshot={snap} width={100} subscriptionUSD={sub} />, {
+          columns: 100,
+          rows: 60,
+        });
+        await vi.waitFor(() => expect(r.lastFrame()).toContain('Usage'));
+        const h = r.lastFrame().split('\n').length;
+        r.unmount();
+        expect(usagePanelRows(snap, sub)).toBe(h);
+      });
+    }
   }
 });

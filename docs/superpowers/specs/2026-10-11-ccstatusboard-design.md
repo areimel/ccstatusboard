@@ -162,7 +162,7 @@ One file per running Claude Code process:
 | `store/store.ts` | Holds state, applies events, recomputes snapshot at most every `refreshMs` (throttled), `subscribe/getSnapshot` | domain |
 | `store/useSnapshot.ts` | `useSyncExternalStore` hook | store |
 | `ui/App.tsx` | Layout, keyboard handling (`useInput`), selection/sort/filter/search state | ui/* |
-| `ui/theme.ts` | Themes (`default`, `mono`, `dracula`, `solarized`) → color tokens; `@inkjs/ui` `extendTheme` | @inkjs/ui |
+| `ui/theme.ts` | Themes (`default`, `mono`, `dracula`, `solarized`, `solarized-light`, `monokai`, `gruvbox`, `nord`, `tokyonight`, `catppuccin`, `onedark`, `cyberpunk`) → color tokens; `@inkjs/ui` `extendTheme` | @inkjs/ui |
 | `ui/Panel.tsx` | Titled bordered panel wrapper | ink-titled-box |
 | `ui/Header.tsx` | Gradient app name, clock, live count, warnings | ink-gradient |
 | `ui/Meter.tsx` | htop-style meter `Label [|||||||     58%] resets 2h14m` | — |
@@ -226,7 +226,7 @@ interface WindowTotals { costUSD: number | null; tokens: TokenCounts; byModel: R
 - **Meter colors:** < 50 normal, 50–80 warn, ≥ 80 danger.
 - **Default sort `status`:** waiting > busy > idle > ended, then most recent activity. Other sorts: `activity`, `cost`, `ctx`, `name`.
 - **Filter:** `all` / `live`. **Search:** `/` filters by name/cwd substring; Esc clears.
-- **Keys:** `↑↓`/`jk` move, `⏎` toggles the detail pane, `g`/`G` top/bottom, `s` cycles sort, `f` toggles filter, `/` search, `?`/`F1` help, `q`/`Ctrl-C` quit.
+- **Keys:** `↑↓`/`jk` move, `⏎` toggles the detail pane, `g`/`G` top/bottom, `s` cycles sort, `t`/`T` next/previous theme (saved to config), `f` toggles filter, `/` search, `?`/`F1` help, `q`/`Ctrl-C` quit.
 - **Responsive:** column drop order as width shrinks: UP → BRANCH → LAST → MODEL. The detail pane hides if height < 24. Sparkline width adapts.
 - **Empty states:** no `~/.claude` → "Claude Code data not found at <path>"; no sessions → "No Claude Code sessions in the last 24h".
 - **Scan progress:** while the history scan is running the cost row shows `scanning 120/840…` and the values update progressively.

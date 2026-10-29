@@ -1,0 +1,141 @@
+import { useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render } from 'ink-testing-library';
+import { OptionsMenu } from './OptionsMenu.js';
+import { DEFAULT_CONFIG } from '../../config/schema.js';
+import type { Config } from '../../domain/types.js';
+import { stripAnsi } from '../../../test/helpers/ansi.js';
+
+afterEach(cleanup);
+const delay = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+const DOWN = '\u001B[B';
+const RIGHT = '\u001B[C';
+
+function setup(initial: Config = DEFAULT_CONFIG, maxHeight?: number) {
+  const onChange = vi.fn();
+  const onClose = vi.fn();
+  function Harness(): React.JSX.Element {
+    const [config, setConfig] = useState<Config>(initial);
+    return (
+      <OptionsMenu
+        config={config}
+        width={60}
+        {...(maxHeight === undefined ? {} : { maxHeight })}
+        onChange={(p) => {
+          onChange(p);
+          setConfig((c) => ({ ...c, ...p }));
+        }}
+        onClose={onClose}
+      />
+    );
+  }
+  const r = render(<Harness />);
+  const press = async (...keys: string[]) => {
+    for (const k of keys) {
+      r.stdin.write(k);
+      await delay();
+    }
+  };
+  const frame = () => stripAnsi(r.lastFrame() ?? '');
+  return { r, press, frame, onChange, onClose };
+}
+
+describe('OptionsMenu', () => {
+  it('renders all rows with restart badges on readonly ones', async () => {
+    const { frame } = setup();
+    await vi.waitFor(() => expect(frame()).toContain('Options'));
+    expect(frame()).toContain('Theme');
+    expect(frame()).toContain('Usage API');
+    expect(frame().match(/restart/gi)).toHaveLength(2);
+    expect(frame().match(/restart/gi)).toHaveLength(2);
+  });
+  it('Esc closes', async () => {
+    const { press, onClose } = setup();
+    await delay();
+    await press('\u001B');
+    expect(onClose).toHaveBeenCalled();
+  });
+  it('right on theme cycles theme', async () => {
+    const { press, frame, onChange } = setup();
+    await delay();
+    await press(RIGHT);
+    expect(onChange).toHaveBeenCalledWith({ theme: 'mono' });
+    expect(frame()).toContain('mono');
+  });
+  it('down then right changes sort', async () => {
+    const { press, frame, onChange } = setup();
+    await delay();
+    await press(DOWN, DOWN, RIGHT);
+    expect(onChange).toHaveBeenCalledWith({ sort: 'status' });
+    expect(frame()).toContain('status');
+  });
+  it('Enter on subscription, type 200, Enter', async () => {
+    const { press, frame, onChange } = setup();
+    await delay();
+    await press(DOWN, '\r', '2', '0', '0', '\r');
+    expect(onChange).toHaveBeenCalledWith({ subscriptionUSD: 200 });
+    expect(frame()).toContain('$200/mo');
+  });
+  it('invalid number input is ignored and Esc cancels the edit', async () => {
+    const { press, onChange, onClose } = setup();
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', 'x', '\r');
+    expect(onChange).not.toHaveBeenCalled();
+    await press('\u001B');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+  it('readonly row ignores right', async () => {
+    const { press, onChange } = setup();
+    await delay();
+    for (let i = 0; i < 10; i++) await press(DOWN);
+    await press(RIGHT, '\r');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it('Enter on idle cutoff, type 2h, Enter', async () => {
+    const { press, frame, onChange } = setup();
+    await delay();
+    // Editor prefills the current value ("1h"); clear it before typing.
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\u007F', '\u007F', '2', 'h', '\r');
+    expect(onChange).toHaveBeenCalledWith({ idleCutoffMinutes: 120 });
+    expect(frame()).toContain('2h');
+  });
+  it('invalid duration input is rejected and Esc cancels the edit', async () => {
+    const { press, onChange, onClose } = setup();
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '0', '.', '5', 'm', '\r');
+    expect(onChange).not.toHaveBeenCalled();
+    await press('\u001B');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+  it('keep exited shows off at zero', async () => {
+    const { press, frame } = setup();
+    await delay();
+    for (let i = 0; i < 7; i++) await press(DOWN);
+    const row = frame()
+      .split('\n')
+      .find((l) => l.includes('Keep exited'));
+    expect(row).toBeDefined();
+    expect(row).toContain('off');
+  });
+  it('columns editor: deselect one and submit', async () => {
+    const { press, onChange } = setup();
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', ' ', '\r');
+    expect(onChange).toHaveBeenCalledWith({ columns: expect.not.arrayContaining(['status']) });
+  });
+
+  it('columns editor keeps the user order', async () => {
+    const { press, onChange } = setup({ ...DEFAULT_CONFIG, columns: ['cost', 'name', 'status'] });
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\r');
+    expect(onChange).toHaveBeenCalledWith({ columns: ['cost', 'name', 'status'] });
+  });
+
+  it('columns editor fits a short overlay budget', async () => {
+    const maxHeight = 18;
+    const { press, frame } = setup(DEFAULT_CONFIG, maxHeight);
+    await delay();
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r');
+    expect(frame().split('\n').length).toBeLessThanOrEqual(maxHeight);
+  });
+});

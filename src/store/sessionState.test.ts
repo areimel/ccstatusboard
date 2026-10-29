@@ -130,3 +130,23 @@ describe('applySessionEvent + buildSessionView', () => {
     expect(lastActivityOf(s)).toBe(9_000);
   });
 });
+
+describe('buildSessionView subagents', () => {
+  it('lists sanitized agents newest first, only while live', () => {
+    const s = createSessionState('s1');
+    s.live = true;
+    s.agents = {
+      activeCount: 2,
+      names: ['x', 'y'],
+      list: [
+        { id: 'a', name: 'Old', lastActivity: 1 },
+        { id: 'b', name: 'Ne\u001b[0mw', lastActivity: 2 },
+      ],
+    };
+    const v = buildSessionView(s, null);
+    expect(v.subagents.map((a) => a.id)).toEqual(['b', 'a']);
+    expect(v.subagents[0]?.name).not.toContain('\u001b');
+    s.live = false;
+    expect(buildSessionView(s, null).subagents).toEqual([]);
+  });
+});

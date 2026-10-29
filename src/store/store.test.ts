@@ -83,6 +83,91 @@ describe('Store sessions', () => {
   });
 });
 
+describe('Store ended-session visibility', () => {
+  it('endedWindowHours 0 hides an ended session right after markEnded, and history-only sessions', () => {
+    const store = makeStore({ endedWindowHours: 0 });
+    store.upsertRegistry(reg());
+    store.applyEvents('hist', [usage('h', NOW - MIN, { sessionId: 'hist' })]);
+    store.flush();
+    expect(store.getSnapshot().sessions.map((s) => s.sessionId)).toEqual(['s1']);
+    store.markEnded('s1');
+    store.flush();
+    expect(store.getSnapshot().sessions).toEqual([]);
+  });
+
+  it('endedWindowHours 24 keeps a just-ended session', () => {
+    const store = makeStore({ endedWindowHours: 24 });
+    store.upsertRegistry(reg());
+    store.markEnded('s1');
+    store.flush();
+    expect(session(store.getSnapshot()).status).toBe('ended');
+  });
+
+  it('setOptions changes visibility live', () => {
+    const store = makeStore({ endedWindowHours: 24 });
+    store.upsertRegistry(reg());
+    store.markEnded('s1');
+    store.flush();
+    expect(store.getSnapshot().sessions).toHaveLength(1);
+    store.setOptions({ endedWindowHours: 0 });
+    store.flush();
+    expect(store.getSnapshot().sessions).toEqual([]);
+    store.setOptions({ endedWindowHours: 24 });
+    store.flush();
+    expect(store.getSnapshot().sessions).toHaveLength(1);
+  });
+});
+
+describe('Store subagents', () => {
+  const agents = [
+    { id: 'a', name: 'Explore', lastActivity: NOW - 20_000 },
+    { id: 'b', name: 'Pl\u001b[31man', lastActivity: NOW - 5_000 },
+  ];
+
+  it('exposes sanitized active subagents sorted by recent activity, cleared on end', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setAgents('s1', { activeCount: 2, names: ['Explore', 'Plan'], agents });
+    store.flush();
+    const subs = session(store.getSnapshot()).subagents;
+    expect(subs.map((a) => a.id)).toEqual(['b', 'a']);
+    expect(subs[0]?.name).not.toContain('\u001b');
+    expect(subs[1]).toEqual({ id: 'a', name: 'Explore', lastActivity: NOW - 20_000 });
+
+    store.markEnded('s1');
+    store.flush();
+    expect(session(store.getSnapshot()).subagents).toEqual([]);
+  });
+
+  it('defaults to no subagents when setAgents omits the list', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setAgents('s1', { activeCount: 1, names: ['Explore'] });
+    store.flush();
+    expect(session(store.getSnapshot()).subagents).toEqual([]);
+  });
+});
+
+describe('Store project', () => {
+  it('uses the resolved project name and falls back to the cwd basename', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg({ cwd: '/work/proj/sub' }));
+    store.flush();
+    expect(session(store.getSnapshot()).project).toBe('sub');
+    store.setProject('/work/proj/sub', 'proj');
+    store.flush();
+    expect(session(store.getSnapshot()).project).toBe('proj');
+  });
+
+  it('sanitizes the project name', () => {
+    const store = makeStore();
+    store.upsertRegistry(reg());
+    store.setProject('/work/proj', 'a\u001b[31mb');
+    store.flush();
+    expect(session(store.getSnapshot()).project).not.toContain('\u001b');
+  });
+});
+
 describe('Store pricing and context', () => {
   it('falls back to cost-state with costApprox when pricing is unavailable', () => {
     const store = makeStore();

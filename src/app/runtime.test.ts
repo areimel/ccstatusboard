@@ -1,5 +1,5 @@
 import { appendFile, rm } from 'node:fs/promises';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRuntime, type Runtime } from './runtime.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { assistantLine } from '../../test/helpers/transcript.js';
@@ -101,7 +101,7 @@ describe('createRuntime', () => {
     const session = liveSession([assistantLine({ id: 'm1', requestId: 'r1', ts: iso(60_000), usage })]);
     fx = await makeClaudeDir([session]);
     rt = createRuntime({
-      config: { ...DEFAULT_CONFIG, refreshMs: 250 },
+      config: { ...DEFAULT_CONFIG, refreshMs: 250, endedWindowHours: 24 },
       claudeDir: fx.claudeDir,
       cacheDir: fx.cacheDir,
       version: '0.1.0-test',
@@ -162,5 +162,59 @@ describe('createRuntime', () => {
     await rt.start();
     rt.stop();
     expect(() => rt?.stop()).not.toThrow();
+  });
+});
+
+describe('createRuntime resources', () => {
+  it('applyConfig forwards to store and poller; collectors stop on stop()', async () => {
+    fx = await makeClaudeDir([]);
+    const setTimeoutSpy: string[] = [];
+    rt = createRuntime({
+      config: { ...DEFAULT_CONFIG, refreshMs: 250, usageApi: false },
+      claudeDir: fx.claudeDir,
+      cacheDir: fx.cacheDir,
+      version: '0.1.0-test',
+      fetch: makeFakeFetch({ usage: usageFixture(Date.now()), pricing: PRICING_FIXTURE }),
+      systemMonitor: {
+        setTimeout: (fn, ms) => {
+          setTimeoutSpy.push(`set:${ms}`);
+          return setTimeout(fn, 1_000_000);
+        },
+        clearTimeout: (h) => {
+          setTimeoutSpy.push('clear');
+          clearTimeout(h as NodeJS.Timeout);
+        },
+      },
+      procStats: false,
+    });
+    const spy = vi.spyOn(rt.store, 'setOptions');
+    await rt.start();
+    rt.applyConfig({ refreshMs: 500, endedWindowHours: 3, theme: 'mono' });
+    expect(spy).toHaveBeenCalledWith({ refreshMs: 500, endedWindowHours: 3 });
+    rt.applyConfig({ usagePollSeconds: 120 });
+    expect(spy).toHaveBeenCalledTimes(1);
+    await waitFor(() => setTimeoutSpy.some((x) => x.startsWith('set:')));
+    rt.stop();
+    expect(setTimeoutSpy).toContain('clear');
+  });
+
+  it('samples live pids into the store', async () => {
+    fx = await makeClaudeDir([liveSession([])]);
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    const sample = vi.fn(async (_cmd: string, _args: string[]) => '');
+    rt = createRuntime({
+      config: { ...DEFAULT_CONFIG, refreshMs: 250, usageApi: false },
+      claudeDir: fx.claudeDir,
+      cacheDir: fx.cacheDir,
+      version: '0.1.0-test',
+      fetch: makeFakeFetch({ usage: usageFixture(Date.now()), pricing: PRICING_FIXTURE }),
+      systemMonitor: false,
+      procStats: { platform: 'darwin', exec: sample, now: Date.now },
+    });
+    await rt.start();
+    await vi.advanceTimersByTimeAsync(2_100);
+    vi.useRealTimers();
+    expect(sample).toHaveBeenCalled();
+    expect(String(sample.mock.calls[0]?.[1])).toContain(String(process.pid));
   });
 });

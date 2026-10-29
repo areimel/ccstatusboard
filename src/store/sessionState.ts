@@ -6,6 +6,7 @@ import type {
   PriceLookup,
   RegistryEntry,
   SessionView,
+  SubagentView,
   TimeWindow,
   TranscriptEvent,
   UsageRecord,
@@ -30,7 +31,7 @@ export interface SessionState {
   lastEventTs: number;
   /** When the store saw the session end (process exit); keeps it visible for endedWindowHours. */
   endedAt?: number;
-  agents: { activeCount: number; names: string[] };
+  agents: { activeCount: number; names: string[]; list?: SubagentView[] };
 }
 
 export function createSessionState(sessionId: string): SessionState {
@@ -139,6 +140,11 @@ export function buildSessionView(s: SessionState, lookup: PriceLookup | null): S
     waitingFor: status === 'waiting' ? sanitizeOptional(s.registry?.waitingFor) : undefined,
     activeAgents: s.live ? s.agents.activeCount : 0,
     agentNames: s.live ? s.agents.names.map(sanitizeText) : [],
+    subagents: s.live
+      ? [...(s.agents.list ?? [])]
+          .sort((a, b) => b.lastActivity - a.lastActivity)
+          .map((a) => ({ id: a.id, name: sanitizeText(a.name), lastActivity: a.lastActivity }))
+      : [],
     name: displayName(s),
     cwd: sanitizeOptional(s.registry?.cwd ?? s.meta.cwd),
     gitBranch: sanitizeOptional(s.meta.gitBranch),

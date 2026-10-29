@@ -157,7 +157,7 @@ export interface UsagePollerDeps {
 
 export class UsagePoller {
   private readonly claudeDir: string;
-  private readonly intervalMs: number;
+  private intervalMs: number;
   private readonly userAgent: string;
   private readonly enabled: boolean;
   private readonly onUpdate: (s: LimitsState) => void;
@@ -170,6 +170,11 @@ export class UsagePoller {
   private failures = 0;
   private timer: unknown = null;
   private stopped = false;
+  private polling = false;
+  /** When the armed timer was scheduled, and whether it used the plain interval (not a backoff). */
+  private scheduledAt = 0;
+  private onInterval = false;
+  private run: (() => Promise<void>) | null = null;
 
   constructor(opts: {
     claudeDir: string;
@@ -190,6 +195,22 @@ export class UsagePoller {
     this.now = d.now ?? Date.now;
     this.setT = d.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
     this.clearT = d.clearTimeout ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
+  }
+
+  /** Applies a new poll interval, re-arming a pending regular wait (backoffs are kept). */
+  setIntervalSeconds(seconds: number): void {
+    this.intervalMs = Math.max(MIN_INTERVAL_S, seconds) * 1000;
+    if (this.stopped || this.polling || !this.onInterval || this.timer === null || !this.run) return;
+    this.clearT(this.timer);
+    this.arm(Math.max(0, this.scheduledAt + this.intervalMs - this.now()));
+  }
+
+  private arm(delay: number): void {
+    const run = this.run;
+    if (!run) return;
+    this.onInterval = delay === this.intervalMs;
+    this.scheduledAt = this.now();
+    this.timer = this.setT(() => void run(), delay);
   }
 
   /** One poll. Emits a state and returns the delay in ms until the next poll. */
@@ -259,16 +280,19 @@ export class UsagePoller {
       return;
     }
     this.onUpdate({ status: 'loading', perModelWeekly: [] });
-    const run = async (): Promise<void> => {
+    this.run = async (): Promise<void> => {
       let delay: number;
+      this.polling = true;
       try {
         delay = await this.pollOnce();
       } catch (err) {
         delay = this.fail(err instanceof Error ? err.message : 'poll failed');
+      } finally {
+        this.polling = false;
       }
-      if (!this.stopped) this.timer = this.setT(() => void run(), delay);
+      if (!this.stopped) this.arm(delay);
     };
-    this.timer = this.setT(() => void run(), 0);
+    this.arm(0);
   }
 
   stop(): void {

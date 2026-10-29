@@ -4,12 +4,15 @@ import { Sparkline } from '@pppp606/ink-chart';
 import { Spinner } from '@inkjs/ui';
 import type { Limit, LimitsState, Snapshot } from '../domain/types.js';
 import { formatDuration, formatResetsAt, formatUSD } from '../domain/format.js';
-import { Meter } from './Meter.js';
+import { KeyValue } from './KeyValue.js';
+import { BURN_RATE_ROWS, BurnRate } from './BurnRate.js';
+import { MeterStack, type MeterRow } from './MeterStack.js';
+import { splitColumns } from './layout.js';
 import { Panel } from './Panel.js';
 import { useTheme } from './theme.js';
 
 const RIGHT_WIDTH = 20;
-const SUFFIX_WIDTH = 18;
+const COST_LABEL_WIDTH = 7;
 
 const STATUS_MESSAGE: Partial<Record<LimitsState['status'], string>> = {
   loading: 'loading…',
@@ -18,12 +21,6 @@ const STATUS_MESSAGE: Partial<Record<LimitsState['status'], string>> = {
   expired: 'expired — open Claude Code to refresh',
   error: 'limits unavailable',
 };
-
-interface MeterRow {
-  label: string;
-  percent: number | undefined;
-  suffix?: string;
-}
 
 function meterRows(limits: LimitsState, now: number): MeterRow[] {
   const toRow = (l: Limit): MeterRow => ({
@@ -51,14 +48,21 @@ const hasLimitValues = (limits: LimitsState): boolean =>
 const isLimitsStale = (limits: LimitsState): boolean =>
   limits.status === 'stale' || limits.status === 'error' || limits.status === 'expired';
 
+/** Month cost as a multiple of the subscription price; undefined when not computable. */
+function planRatio(snapshot: Snapshot, subscriptionUSD: number | null | undefined): number | undefined {
+  const month = snapshot.costs.month.costUSD;
+  if (subscriptionUSD == null || subscriptionUSD <= 0 || month === null) return undefined;
+  return month / subscriptionUSD;
+}
+
 /** Exact rendered height of <UsagePanel>: 2 border rows + the taller of its two columns. */
-export function usagePanelRows(snapshot: Snapshot): number {
+export function usagePanelRows(snapshot: Snapshot, subscriptionUSD?: number | null): number {
   const { limits, scan } = snapshot;
   const limitLines = hasLimitValues(limits)
     ? meterRows(limits, snapshot.now).length + (isLimitsStale(limits) ? 1 : 0)
     : 1;
-  const left = limitLines + 1; // + burn/sparkline row
-  const right = 4 + (scan.done ? 0 : 1); // cost rows + optional spinner
+  const left = limitLines + (hasLimitValues(limits) ? BURN_RATE_ROWS : 0) + 1; // + burn/sparkline row
+  const right = 4 + (planRatio(snapshot, subscriptionUSD) === undefined ? 0 : 1) + (scan.done ? 0 : 1);
   return 2 + Math.max(left, right);
 }
 
@@ -77,21 +81,10 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
     );
   }
   const rows = meterRows(limits, now);
-  const labelWidth = Math.max(...rows.map((r) => r.label.length));
-  const meterWidth = Math.max(10, Math.min(60, leftWidth - labelWidth - 1 - SUFFIX_WIDTH - 1));
   const isStale = isLimitsStale(limits);
   return (
     <Box flexDirection="column">
-      {rows.map((r) => (
-        <Meter
-          key={r.label}
-          label={r.label}
-          labelWidth={labelWidth}
-          percent={r.percent}
-          width={meterWidth}
-          {...(r.suffix ? { suffix: r.suffix } : {})}
-        />
-      ))}
+      <MeterStack rows={rows} leftWidth={leftWidth} />
       {isStale ? (
         <Text color={theme.dim} wrap="truncate-end">
           stale {limits.fetchedAt === undefined ? '?' : formatDuration(now - limits.fetchedAt)}
@@ -102,8 +95,15 @@ function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: num
   );
 }
 
-function CostColumn({ snapshot }: { snapshot: Snapshot }) {
+function CostColumn({
+  snapshot,
+  subscriptionUSD,
+}: {
+  snapshot: Snapshot;
+  subscriptionUSD: number | null | undefined;
+}) {
   const theme = useTheme();
+  const ratio = planRatio(snapshot, subscriptionUSD);
   const { costs, scan } = snapshot;
   const rows: Array<[string, number | null]> = [
     ['block', costs.block.costUSD],
@@ -114,22 +114,32 @@ function CostColumn({ snapshot }: { snapshot: Snapshot }) {
   return (
     <Box flexDirection="column" width={RIGHT_WIDTH}>
       {rows.map(([label, v]) => (
-        <Text key={label} wrap="truncate-end">
-          <Text color={theme.dim}>{label.padEnd(7)}</Text>
-          <Text color={theme.text} bold>
-            {formatUSD(v)}
-          </Text>
-        </Text>
+        <KeyValue key={label} label={label} value={formatUSD(v)} labelWidth={COST_LABEL_WIDTH} />
       ))}
+      {ratio === undefined ? null : (
+        <KeyValue
+          label="plan"
+          value={`${ratio.toFixed(1)}×`}
+          labelWidth={COST_LABEL_WIDTH}
+          valueColor={ratio >= 1 ? theme.ok : theme.dim}
+        />
+      )}
       {scan.done ? null : <Spinner label={`scanning ${scan.filesDone}/${scan.filesTotal}…`} />}
     </Box>
   );
 }
 
-export function UsagePanel({ snapshot, width }: { snapshot: Snapshot; width: number }): JSX.Element {
+export function UsagePanel({
+  snapshot,
+  width,
+  subscriptionUSD,
+}: {
+  snapshot: Snapshot;
+  width: number;
+  subscriptionUSD?: number | null;
+}): JSX.Element {
   const theme = useTheme();
-  const inner = Math.max(20, width - 4);
-  const leftWidth = Math.max(20, inner - RIGHT_WIDTH - 2);
+  const { leftWidth } = splitColumns(width, RIGHT_WIDTH);
   const burn = snapshot.costs.burnRatePerHour;
   const burnText = burn === null ? 'burn —' : `burn ${formatUSD(burn)}/h`;
   const sparkWidth = Math.max(8, Math.min(48, leftWidth - burnText.length - 8));
@@ -138,13 +148,16 @@ export function UsagePanel({ snapshot, width }: { snapshot: Snapshot; width: num
       <Box flexDirection="row" columnGap={2}>
         <Box flexDirection="column" width={leftWidth}>
           <LimitsBlock limits={snapshot.limits} now={snapshot.now} leftWidth={leftWidth} />
+          {hasLimitValues(snapshot.limits) ? (
+            <BurnRate burn={snapshot.burn} now={snapshot.now} width={leftWidth} />
+          ) : null}
           <Box columnGap={1}>
             <Text color={theme.text}>{burnText}</Text>
             <Text color={theme.dim}> 24h</Text>
             <Sparkline data={snapshot.costs.hourlySparkline} width={sparkWidth} />
           </Box>
         </Box>
-        <CostColumn snapshot={snapshot} />
+        <CostColumn snapshot={snapshot} subscriptionUSD={subscriptionUSD} />
       </Box>
     </Panel>
   );

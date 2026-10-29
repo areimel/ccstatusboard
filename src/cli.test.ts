@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { THEME_NAMES } from './domain/types.js';
 
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -40,6 +41,9 @@ describe('cli', () => {
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('Usage: ccstatusboard');
     expect(r.stdout).toContain('--no-usage-api');
+    for (const name of THEME_NAMES) expect(r.stdout).toContain(name);
+    const themeLines = r.stdout.split('\n').filter((l) => l.startsWith(' '.repeat(24)));
+    for (const line of themeLines) expect(line.length).toBeLessThanOrEqual(80);
     expect(r.stdout).not.toContain('\u001b[?1049');
   });
 

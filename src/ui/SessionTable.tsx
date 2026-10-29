@@ -1,13 +1,24 @@
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
-import type { ColumnKey, DisplayStatus, SessionView, SortKey } from '../domain/types.js';
-import { formatAgo, formatDuration, formatUSD, shortModel, truncate } from '../domain/format.js';
+import type { ColumnKey, DisplayStatus, SessionView, SortKey, SubagentView } from '../domain/types.js';
+import {
+  formatAgo,
+  formatBytes,
+  formatDuration,
+  formatPercent,
+  formatUSD,
+  shortModel,
+  truncate,
+} from '../domain/format.js';
 import { Panel } from './Panel.js';
-import { COLUMN_WIDTHS, nameWidth, scrollWindow, visibleColumns } from './sessionList.js';
+import { COLUMN_WIDTHS, buildRows, isStale, nameWidth, rowWindow, visibleColumns } from './sessionList.js';
 import { levelColor, useTheme, type Theme } from './theme.js';
 
 export {
   COLUMN_WIDTHS,
+  isStale,
+  buildRows,
+  rowWindow,
   filterSessions,
   requiredWidth,
   scrollWindow,
@@ -17,10 +28,13 @@ export {
 
 const HEADERS: Record<ColumnKey, string> = {
   status: 'ST',
+  project: 'PROJECT',
   name: 'NAME',
   model: 'MODEL',
   branch: 'BRANCH',
   ctx: 'CTX',
+  cpu: 'CPU',
+  mem: 'MEM',
   cost: 'COST',
   last: 'LAST',
   uptime: 'UP',
@@ -37,6 +51,8 @@ export interface SessionTableProps {
   now: number;
   sort: SortKey;
   filter: 'all' | 'live';
+  /** Live sessions idle longer than this many minutes render dimmed. */
+  idleCutoffMinutes?: number;
   emptyMessage?: string;
 }
 
@@ -52,6 +68,8 @@ function cellText(col: ColumnKey, s: SessionView, now: number, nameW: number): s
       return s.activeAgents > 0 && s.status !== 'ended'
         ? `${GLYPHS[s.status]} ${s.activeAgents}`
         : GLYPHS[s.status];
+    case 'project':
+      return truncate(s.project ?? '—', COLUMN_WIDTHS.project);
     case 'name':
       return truncate(s.name, nameW);
     case 'model':
@@ -60,6 +78,10 @@ function cellText(col: ColumnKey, s: SessionView, now: number, nameW: number): s
       return s.gitBranch ?? '—';
     case 'ctx':
       return ctxBar(s.contextPercent);
+    case 'cpu':
+      return s.live ? formatPercent(s.cpuPercent) : '—';
+    case 'mem':
+      return s.live ? formatBytes(s.memBytes) : '—';
     case 'cost':
       return formatUSD(s.costUSD, s.costApprox);
     case 'last':
@@ -76,6 +98,7 @@ function cellColor(col: ColumnKey, s: SessionView, theme: Theme): string {
     return s.status === 'ended' ? theme.dim : theme.text;
   }
   if (col === 'ctx' && s.contextPercent !== undefined) return levelColor(theme, s.contextPercent, [60, 80]);
+  if (col === 'cpu' && s.live && s.cpuPercent !== undefined) return levelColor(theme, s.cpuPercent, [50, 90]);
   return theme.text;
 }
 
@@ -85,10 +108,11 @@ function Row(props: {
   nameW: number;
   now: number;
   selected: boolean;
+  stale: boolean;
 }): JSX.Element {
   const theme = useTheme();
-  const { session: s, cols, nameW, now, selected } = props;
-  const ended = s.status === 'ended';
+  const { session: s, cols, nameW, now, selected, stale } = props;
+  const faded = s.status === 'ended' || stale;
   return (
     <Box columnGap={1}>
       {cols.map((c) => (
@@ -97,7 +121,7 @@ function Row(props: {
             wrap="truncate-end"
             color={selected ? theme.selectedFg : cellColor(c, s, theme)}
             {...(selected ? { backgroundColor: theme.selectedBg } : {})}
-            dimColor={ended && !selected}
+            dimColor={faded && !selected}
             bold={c === 'status' && s.status === 'waiting'}
           >
             {cellText(c, s, now, nameW)}
@@ -108,12 +132,43 @@ function Row(props: {
   );
 }
 
+function AgentRow(props: {
+  agent: SubagentView;
+  last: boolean;
+  cols: ColumnKey[];
+  nameW: number;
+  now: number;
+}): JSX.Element {
+  const theme = useTheme();
+  const { agent, last, cols, nameW, now } = props;
+  const text = (c: ColumnKey): string => {
+    if (c === 'status') return last ? ' └─' : ' ├─';
+    if (c === 'name') return truncate(`◐ ${agent.name}`, nameW);
+    if (c === 'last') return formatAgo(agent.lastActivity, now);
+    return '';
+  };
+  return (
+    <Box columnGap={1}>
+      {cols.map((c) => (
+        <Box key={c} width={c === 'name' ? nameW : COLUMN_WIDTHS[c]}>
+          <Text wrap="truncate-end" color={c === 'name' ? theme.ok : theme.dim} dimColor>
+            {text(c)}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export function SessionTable(props: SessionTableProps): JSX.Element {
   const theme = useTheme();
   const { sessions, selectedIndex, width, maxRows, now, sort, filter } = props;
+  const cutoff = props.idleCutoffMinutes ?? 60;
   const cols = visibleColumns(props.columns, width);
   const nameW = nameWidth(cols, width);
-  const { start, end } = scrollWindow(selectedIndex, sessions.length, maxRows);
+  const rows = buildRows(sessions, sort);
+  const { start, end } = rowWindow(rows, selectedIndex, maxRows);
+  const inner = Math.max(20, width - 4);
   const title = `Sessions ── sort: ${sort} ── filter: ${filter}`;
   return (
     <Panel title={title} width={width}>
@@ -129,18 +184,32 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
       {sessions.length === 0 ? (
         <Text color={theme.dim}>{props.emptyMessage ?? 'No Claude Code sessions in the last 24h'}</Text>
       ) : (
-        sessions
-          .slice(start, end)
-          .map((s, i) => (
+        rows.slice(start, end).map((r) =>
+          r.kind === 'group' ? (
+            <Text key={`g-${r.project}`} color={theme.dim} bold wrap="truncate-end">
+              {`── ${r.project} (${r.count}) `.padEnd(inner, '─')}
+            </Text>
+          ) : r.kind === 'session' ? (
             <Row
-              key={s.sessionId}
-              session={s}
+              key={r.session.sessionId}
+              session={r.session}
               cols={cols}
               nameW={nameW}
               now={now}
-              selected={start + i === selectedIndex}
+              selected={r.index === selectedIndex}
+              stale={isStale(r.session, now, cutoff)}
             />
-          ))
+          ) : (
+            <AgentRow
+              key={`a-${r.parent}-${r.agent.id}`}
+              agent={r.agent}
+              last={r.last}
+              cols={cols}
+              nameW={nameW}
+              now={now}
+            />
+          ),
+        )
       )}
     </Panel>
   );

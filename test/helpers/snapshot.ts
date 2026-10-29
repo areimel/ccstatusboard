@@ -1,4 +1,10 @@
-import { emptyWindowTotals, ZERO_TOKENS, type SessionView, type Snapshot } from '../../src/domain/types.js';
+import {
+  emptySystemHistory,
+  emptyWindowTotals,
+  ZERO_TOKENS,
+  type SessionView,
+  type Snapshot,
+} from '../../src/domain/types.js';
 
 export const NOW = Date.parse('2026-10-11T14:32:07Z');
 
@@ -10,6 +16,7 @@ export function makeSession(over: Partial<SessionView> = {}): SessionView {
     status: 'idle',
     activeAgents: 0,
     agentNames: [],
+    subagents: [],
     name: 'proj',
     cwd: '/work/proj',
     gitBranch: 'main',
@@ -52,6 +59,8 @@ export function makeSnapshot(over: Partial<Snapshot> = {}): Snapshot {
     scan: { done: true, filesDone: 10, filesTotal: 10 },
     sessions: [makeSession()],
     warnings: [],
+    systemHistory: emptySystemHistory(),
+    burn: {},
     ...over,
   };
 }
