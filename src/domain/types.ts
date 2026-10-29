@@ -115,6 +115,14 @@ export interface ScanProgress {
 
 export type DisplayStatus = 'waiting' | 'busy' | 'idle' | 'ended';
 
+/** An active subagent of a live session. */
+export interface SubagentView {
+  id: string;
+  /** agent type, e.g. 'Explore' */
+  name: string;
+  lastActivity: number;
+}
+
 export interface SessionView {
   sessionId: string;
   pid?: number;
@@ -125,8 +133,12 @@ export interface SessionView {
   waitingFor?: string;
   activeAgents: number;
   agentNames: string[];
+  /** Active subagents of a live session (empty otherwise). */
+  subagents: SubagentView[];
   name: string;
   cwd?: string;
+  /** Git repo name (or cwd basename) the session runs in. */
+  project?: string;
   gitBranch?: string;
   model?: string;
   contextTokens?: number;
@@ -239,6 +251,7 @@ export const THEME_NAMES = [
 export type ThemeName = (typeof THEME_NAMES)[number];
 export const COLUMN_KEYS = [
   'status',
+  'project',
   'name',
   'model',
   'branch',
@@ -250,14 +263,17 @@ export const COLUMN_KEYS = [
   'uptime',
 ] as const;
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
-export const SORT_KEYS = ['status', 'activity', 'cost', 'ctx', 'name'] as const;
+export const SORT_KEYS = ['project', 'status', 'activity', 'cost', 'ctx', 'name'] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
 export interface Config {
   theme: ThemeName;
   refreshMs: number;
   usagePollSeconds: number;
+  /** Hours an exited session stays listed; 0 removes it on exit. */
   endedWindowHours: number;
+  /** Live sessions idle longer than this are dimmed. */
+  idleCutoffMinutes: number;
   columns: ColumnKey[];
   sort: SortKey;
   showDetail: boolean;

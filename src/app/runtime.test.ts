@@ -101,7 +101,7 @@ describe('createRuntime', () => {
     const session = liveSession([assistantLine({ id: 'm1', requestId: 'r1', ts: iso(60_000), usage })]);
     fx = await makeClaudeDir([session]);
     rt = createRuntime({
-      config: { ...DEFAULT_CONFIG, refreshMs: 250 },
+      config: { ...DEFAULT_CONFIG, refreshMs: 250, endedWindowHours: 24 },
       claudeDir: fx.claudeDir,
       cacheDir: fx.cacheDir,
       version: '0.1.0-test',

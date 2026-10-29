@@ -66,8 +66,8 @@ describe('OptionsMenu', () => {
     const { press, frame, onChange } = setup();
     await delay();
     await press(DOWN, DOWN, RIGHT);
-    expect(onChange).toHaveBeenCalledWith({ sort: 'activity' });
-    expect(frame()).toContain('activity');
+    expect(onChange).toHaveBeenCalledWith({ sort: 'status' });
+    expect(frame()).toContain('status');
   });
   it('Enter on subscription, type 200, Enter', async () => {
     const { press, frame, onChange } = setup();

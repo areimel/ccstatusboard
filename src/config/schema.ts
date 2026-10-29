@@ -1,15 +1,16 @@
 import { z } from 'zod';
-import { COLUMN_KEYS, SORT_KEYS, THEME_NAMES, type Config } from '../domain/types.js';
+import { COLUMN_KEYS, SORT_KEYS, THEME_NAMES, type ColumnKey, type Config } from '../domain/types.js';
 
-const ALL_COLUMNS = COLUMN_KEYS;
+const DEFAULT_COLUMNS: ColumnKey[] = COLUMN_KEYS.filter((c) => c !== 'branch');
 
 export const DEFAULT_CONFIG: Config = Object.freeze({
   theme: 'default',
   refreshMs: 1000,
   usagePollSeconds: 60,
-  endedWindowHours: 24,
-  columns: [...ALL_COLUMNS],
-  sort: 'status',
+  endedWindowHours: 0,
+  idleCutoffMinutes: 60,
+  columns: [...DEFAULT_COLUMNS],
+  sort: 'project',
   showDetail: true,
   claudeDir: null,
   usageApi: true,
@@ -23,10 +24,11 @@ export const configSchema = z.strictObject({
   refreshMs: z.number().int().min(250).max(60_000).default(DEFAULT_CONFIG.refreshMs),
   usagePollSeconds: z.number().int().min(30).max(86_400).default(DEFAULT_CONFIG.usagePollSeconds),
   endedWindowHours: z.number().min(0).default(DEFAULT_CONFIG.endedWindowHours),
+  idleCutoffMinutes: z.number().int().min(1).max(10_080).default(DEFAULT_CONFIG.idleCutoffMinutes),
   columns: z
     .array(z.enum(COLUMN_KEYS))
     .min(1)
-    .default(() => [...ALL_COLUMNS]),
+    .default(() => [...DEFAULT_COLUMNS]),
   sort: z.enum(SORT_KEYS).default(DEFAULT_CONFIG.sort),
   showDetail: z.boolean().default(DEFAULT_CONFIG.showDetail),
   claudeDir: z.string().nullable().default(DEFAULT_CONFIG.claudeDir),

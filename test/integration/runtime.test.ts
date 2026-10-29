@@ -45,7 +45,7 @@ async function boot(
 ) {
   fx = await makeClaudeDir(sessions, { credentials: o.credentials, createClaudeDir: o.createClaudeDir });
   rt = createRuntime({
-    config: { ...DEFAULT_CONFIG, refreshMs: 250, ...o.config },
+    config: { ...DEFAULT_CONFIG, refreshMs: 250, endedWindowHours: 24, ...o.config },
     claudeDir: fx.claudeDir,
     cacheDir: fx.cacheDir,
     version: '0.1.0-test',

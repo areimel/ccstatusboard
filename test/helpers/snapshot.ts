@@ -16,6 +16,7 @@ export function makeSession(over: Partial<SessionView> = {}): SessionView {
     status: 'idle',
     activeAgents: 0,
     agentNames: [],
+    subagents: [],
     name: 'proj',
     cwd: '/work/proj',
     gitBranch: 'main',

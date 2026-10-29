@@ -42,14 +42,14 @@ describe('uiReducer', () => {
     expect(uiReducer(base, { type: 'bottom' }, 0).selectedIndex).toBe(0);
     expect(uiReducer(base, { type: 'down' }, 0).selectedIndex).toBe(0);
   });
-  it('cycleSort walks status→activity→cost→ctx→name→status and resets selection', () => {
+  it('cycleSort walks project→status→activity→cost→ctx→name→project and resets selection', () => {
     let s: UiState = { ...base, selectedIndex: 2 };
     const seen: string[] = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       s = uiReducer(s, { type: 'cycleSort' }, 3);
       seen.push(s.config.sort);
     }
-    expect(seen).toEqual(['activity', 'cost', 'ctx', 'name', 'status']);
+    expect(seen).toEqual(['status', 'activity', 'cost', 'ctx', 'name', 'project']);
     expect(s.selectedIndex).toBe(0);
   });
   it('toggleFilter flips all/live and resets selection', () => {
@@ -96,8 +96,8 @@ function twoSessions(): Snapshot {
   });
 }
 
-function renderApp(snap: Snapshot, size = BIG, onQuit = vi.fn()) {
-  const r = render(<App store={fakeStore(snap)} config={DEFAULT_CONFIG} onQuit={onQuit} size={size} />);
+function renderApp(snap: Snapshot, size = BIG, onQuit = vi.fn(), config = DEFAULT_CONFIG) {
+  const r = render(<App store={fakeStore(snap)} config={config} onQuit={onQuit} size={size} />);
   return { ...r, onQuit };
 }
 
@@ -122,9 +122,12 @@ describe('App rendering', () => {
   });
 
   it('renders the empty states', () => {
-    expect(renderApp(makeSnapshot({ sessions: [] })).lastFrame()).toContain(
-      'No Claude Code sessions in the last 24h',
-    );
+    expect(
+      renderApp(makeSnapshot({ sessions: [] }), BIG, vi.fn(), {
+        ...DEFAULT_CONFIG,
+        endedWindowHours: 24,
+      }).lastFrame(),
+    ).toContain('No Claude Code sessions in the last 24h');
     expect(
       renderApp(makeSnapshot({ sessions: [], claudeDirFound: false, claudeDir: '/nope' })).lastFrame(),
     ).toContain('Claude Code data not found at /nope');

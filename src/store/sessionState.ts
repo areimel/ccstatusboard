@@ -139,6 +139,7 @@ export function buildSessionView(s: SessionState, lookup: PriceLookup | null): S
     waitingFor: status === 'waiting' ? sanitizeOptional(s.registry?.waitingFor) : undefined,
     activeAgents: s.live ? s.agents.activeCount : 0,
     agentNames: s.live ? s.agents.names.map(sanitizeText) : [],
+    subagents: [],
     name: displayName(s),
     cwd: sanitizeOptional(s.registry?.cwd ?? s.meta.cwd),
     gitBranch: sanitizeOptional(s.meta.gitBranch),

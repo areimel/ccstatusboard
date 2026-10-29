@@ -11,9 +11,10 @@ describe('configSchema', () => {
       theme: 'default',
       refreshMs: 1000,
       usagePollSeconds: 60,
-      endedWindowHours: 24,
-      columns: ['status', 'name', 'model', 'branch', 'ctx', 'cpu', 'mem', 'cost', 'last', 'uptime'],
-      sort: 'status',
+      endedWindowHours: 0,
+      idleCutoffMinutes: 60,
+      columns: ['status', 'project', 'name', 'model', 'ctx', 'cpu', 'mem', 'cost', 'last', 'uptime'],
+      sort: 'project',
       showDetail: true,
       claudeDir: null,
       usageApi: true,
@@ -26,6 +27,23 @@ describe('configSchema', () => {
     const a = configSchema.parse({});
     a.columns.push('name');
     expect(configSchema.parse({}).columns).toHaveLength(10);
+  });
+
+  it('defaults include project column, exclude branch, and sort by project', () => {
+    const cfg = configSchema.parse({});
+    expect(cfg.sort).toBe('project');
+    expect(cfg.columns).toContain('project');
+    expect(cfg.columns).not.toContain('branch');
+    expect(cfg.idleCutoffMinutes).toBe(60);
+    expect(cfg.endedWindowHours).toBe(0);
+  });
+
+  it('rejects idleCutoffMinutes of 0, non-integers, and out-of-range values', () => {
+    expect(configSchema.safeParse({ idleCutoffMinutes: 0 }).success).toBe(false);
+    expect(configSchema.safeParse({ idleCutoffMinutes: 1.5 }).success).toBe(false);
+    expect(configSchema.safeParse({ idleCutoffMinutes: 10_081 }).success).toBe(false);
+    expect(configSchema.safeParse({ idleCutoffMinutes: 1 }).success).toBe(true);
+    expect(configSchema.safeParse({ idleCutoffMinutes: 10_080 }).success).toBe(true);
   });
 
   it('enforces minimums and enums', () => {

@@ -25,6 +25,7 @@ export {
 
 const HEADERS: Record<ColumnKey, string> = {
   status: 'ST',
+  project: 'PROJECT',
   name: 'NAME',
   model: 'MODEL',
   branch: 'BRANCH',
@@ -62,6 +63,8 @@ function cellText(col: ColumnKey, s: SessionView, now: number, nameW: number): s
       return s.activeAgents > 0 && s.status !== 'ended'
         ? `${GLYPHS[s.status]} ${s.activeAgents}`
         : GLYPHS[s.status];
+    case 'project':
+      return truncate(s.project ?? '—', COLUMN_WIDTHS.project);
     case 'name':
       return truncate(s.name, nameW);
     case 'model':

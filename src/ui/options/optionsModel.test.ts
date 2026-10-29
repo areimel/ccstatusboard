@@ -26,10 +26,10 @@ describe('optionsModel', () => {
     expect(formatValue(DEFAULT_CONFIG, d('showDetail'))).toBe('on');
     expect(formatValue(DEFAULT_CONFIG, d('refreshMs'))).toBe('1000 ms');
     expect(formatValue(DEFAULT_CONFIG, d('claudeDir'))).toBe('auto');
-    expect(formatValue(DEFAULT_CONFIG, d('columns'))).toBe('10/10 shown');
+    expect(formatValue(DEFAULT_CONFIG, d('columns'))).toBe('10/11 shown');
   });
   it('cycles enums both ways and toggles bools', () => {
-    expect(adjust(DEFAULT_CONFIG, 'sort', 1)).toEqual({ sort: 'activity' });
+    expect(adjust(DEFAULT_CONFIG, 'sort', 1)).toEqual({ sort: 'status' });
     expect(adjust(DEFAULT_CONFIG, 'sort', -1)).toEqual({ sort: 'name' });
     expect(adjust(DEFAULT_CONFIG, 'showSystem', 1)).toEqual({ showSystem: false });
   });

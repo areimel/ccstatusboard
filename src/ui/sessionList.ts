@@ -2,6 +2,7 @@ import type { ColumnKey, DisplayStatus, SessionView, SortKey } from '../domain/t
 
 export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
   status: 5,
+  project: 14,
   name: 12, // minimum; grows into spare width
   model: 10,
   branch: 12,
@@ -49,6 +50,13 @@ const desc = (a: number | null | undefined, b: number | null | undefined) => {
 export function sortSessions(sessions: SessionView[], sort: SortKey): SessionView[] {
   const out = [...sessions];
   switch (sort) {
+    case 'project':
+      return out.sort(
+        (a, b) =>
+          (a.project ?? '').localeCompare(b.project ?? '') ||
+          STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
+          byActivity(a, b),
+      );
     case 'status':
       return out.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byActivity(a, b));
     case 'activity':
