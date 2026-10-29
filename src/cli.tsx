@@ -143,7 +143,10 @@ async function main(argv: string[]): Promise<number | undefined> {
       store={runtime.store}
       config={config}
       onQuit={() => shutdown(0)}
-      onThemeChange={(name) => saveConfig({ theme: name })}
+      onConfigChange={(patch) => {
+        saveConfig(patch);
+        runtime.applyConfig(patch);
+      }}
     />,
     {
       exitOnCtrlC: false,

@@ -24,6 +24,9 @@ const helpKeys: ModeHandler = (input, _key, { dispatch, onQuit }) => {
   dispatch({ type: 'toggleHelp' });
 };
 
+// OptionsMenu owns its own useInput; Ctrl-C is handled globally in useKeymap.
+const optionsKeys: ModeHandler = () => {};
+
 const normalKeys: ModeHandler = (input, key, { ui, dispatch, onQuit }) => {
   if (input === 'q') return onQuit();
   if (key.upArrow || input === 'k') dispatch({ type: 'up' });
@@ -37,7 +40,7 @@ const normalKeys: ModeHandler = (input, key, { ui, dispatch, onQuit }) => {
   else if (input === 'T') dispatch({ type: 'prevTheme' });
   else if (input === '/') dispatch({ type: 'startSearch' });
   else if (input === '?' || isF1(input)) dispatch({ type: 'toggleHelp' });
-  else if (key.escape && ui.search) dispatch({ type: 'clearSearch' });
+  else if (key.escape) dispatch(ui.search ? { type: 'clearSearch' } : { type: 'openOptions' });
 };
 
 /** One handler per mode: adding a mode is a one-entry change. */
@@ -45,6 +48,7 @@ export const MODE_KEYMAPS: Record<UiMode, ModeHandler> = {
   normal: normalKeys,
   search: searchKeys,
   help: helpKeys,
+  options: optionsKeys,
 };
 
 export function useKeymap(deps: KeymapDeps): void {

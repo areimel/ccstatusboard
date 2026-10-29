@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
-import type { Config, ThemeName } from '../domain/types.js';
+import type { Config } from '../domain/types.js';
 import type { Store } from '../store/store.js';
 import { useSnapshot } from '../store/useSnapshot.js';
 import { ThemeProvider } from '@inkjs/ui';
-import { THEMES, ThemeContext, inkUiTheme } from './theme.js';
+import { THEMES, ThemeContext, cycleTheme, inkUiTheme } from './theme.js';
 import { Panel } from './Panel.js';
 import { Header, headerWarnings } from './Header.js';
 import { UsagePanel, usagePanelRows } from './UsagePanel.js';
@@ -12,9 +12,11 @@ import { Footer } from './Footer.js';
 import { SessionTable, filterSessions, sortSessions } from './SessionTable.js';
 import { DetailPane } from './DetailPane.js';
 import { HelpOverlay } from './HelpOverlay.js';
+import { OptionsMenu } from './options/OptionsMenu.js';
+import { SystemPanel, systemPanelRows } from './SystemPanel.js';
 import { clamp, initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 import { useKeymap } from './useKeymap.js';
-import { SPARE_ROWS, computeLayout, useTerminalSize } from './layout.js';
+import { SPARE_ROWS, SYSTEM_MIN_ROWS, computeLayout, useTerminalSize } from './layout.js';
 
 export { initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 export { MIN_COLUMNS, MIN_ROWS, DETAIL_MIN_ROWS } from './layout.js';
@@ -23,46 +25,56 @@ export interface AppProps {
   store: Pick<Store, 'subscribe' | 'getSnapshot'>;
   config: Config;
   onQuit: () => void;
-  /** Called when the user switches theme (not on mount); the caller persists it. */
-  onThemeChange?: (name: ThemeName) => void;
+  /** Called with a config patch to persist/apply: Options edits and t/T theme switches (never on mount). */
+  onConfigChange?: (patch: Partial<Config>) => void;
   /** Test-only terminal size override; defaults to live stdout size. */
   size?: { columns: number; rows: number };
 }
-export function App({ store, config, onQuit, onThemeChange, size }: AppProps): React.JSX.Element {
+export function App({ store, config, onQuit, onConfigChange, size }: AppProps): React.JSX.Element {
   const snapshot = useSnapshot(store);
   const { columns, rows } = useTerminalSize(size);
   const [ui, setUi] = useState<UiState>(() => initialUiState(config));
 
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    onThemeChange?.(ui.theme);
-  }, [ui.theme]);
-  const theme = THEMES[ui.theme];
+  const cfg = ui.config;
+  const theme = THEMES[cfg.theme];
   const inkTheme = useMemo(() => inkUiTheme(theme), [theme]);
 
   const visible = useMemo(
-    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), ui.sort),
-    [snapshot.sessions, ui.filter, ui.search, ui.sort],
+    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), cfg.sort),
+    [snapshot.sessions, ui.filter, ui.search, cfg.sort],
   );
   const selected = clamp(ui.selectedIndex, visible.length);
   // Re-clamp against the current list so a stale index never leaks into the reducer.
-  const dispatch = (a: UiAction) =>
+  const reduce = (a: UiAction) =>
     setUi((s) =>
       uiReducer({ ...s, selectedIndex: clamp(s.selectedIndex, visible.length) }, a, visible.length),
     );
+  const dispatch = (a: UiAction) => {
+    reduce(a);
+    // Only the theme is persisted when changed via hotkeys; sort/detail persist via Options only.
+    if (a.type === 'nextTheme' || a.type === 'prevTheme') {
+      onConfigChange?.({ theme: cycleTheme(cfg.theme, a.type === 'nextTheme' ? 1 : -1) });
+    }
+  };
+  const changeConfig = (patch: Partial<Config>) => {
+    reduce({ type: 'applyConfig', patch });
+    onConfigChange?.(patch);
+  };
 
   useKeymap({ ui, dispatch, onQuit });
 
   const headerRows = 1 + (headerWarnings(snapshot).length > 0 ? 1 : 0);
+  const overlay = ui.mode === 'help' || ui.mode === 'options';
+  const systemShown = cfg.showSystem && rows >= SYSTEM_MIN_ROWS && !overlay;
   const { tooSmall, detailShown, maxRows } = computeLayout({
     rows,
     columns,
-    showDetail: ui.showDetail,
-    panels: [{ rows: headerRows }, { rows: usagePanelRows(snapshot) }],
+    showDetail: cfg.showDetail,
+    panels: [
+      { rows: headerRows },
+      { rows: usagePanelRows(snapshot, cfg.subscriptionUSD) },
+      ...(systemShown ? [{ rows: systemPanelRows(snapshot) }] : []),
+    ],
   });
   if (tooSmall) {
     return <Text>Terminal too small</Text>;
@@ -71,6 +83,15 @@ export function App({ store, config, onQuit, onThemeChange, size }: AppProps): R
   let body: React.JSX.Element;
   if (ui.mode === 'help') {
     body = <HelpOverlay width={Math.min(64, columns)} />;
+  } else if (ui.mode === 'options') {
+    body = (
+      <OptionsMenu
+        config={cfg}
+        width={Math.min(64, columns)}
+        onChange={changeConfig}
+        onClose={() => reduce({ type: 'closeOptions' })}
+      />
+    );
   } else if (!snapshot.claudeDirFound) {
     body = (
       <Panel title="Sessions" width={columns}>
@@ -82,7 +103,7 @@ export function App({ store, config, onQuit, onThemeChange, size }: AppProps): R
       <Panel title="Sessions" width={columns}>
         <Text>
           {snapshot.sessions.length === 0
-            ? `No Claude Code sessions in the last ${config.endedWindowHours}h`
+            ? `No Claude Code sessions in the last ${cfg.endedWindowHours}h`
             : 'No sessions match'}
         </Text>
       </Panel>
@@ -93,13 +114,13 @@ export function App({ store, config, onQuit, onThemeChange, size }: AppProps): R
         <SessionTable
           sessions={visible}
           selectedIndex={selected}
-          columns={config.columns}
+          columns={cfg.columns}
           width={columns}
           maxRows={maxRows}
           now={snapshot.now}
-          sort={ui.sort}
+          sort={cfg.sort}
           filter={ui.filter}
-          emptyMessage={`No Claude Code sessions in the last ${config.endedWindowHours}h`}
+          emptyMessage={`No Claude Code sessions in the last ${cfg.endedWindowHours}h`}
         />
         {detailShown && <DetailPane session={visible[selected]} now={snapshot.now} width={columns} />}
       </>
@@ -112,7 +133,10 @@ export function App({ store, config, onQuit, onThemeChange, size }: AppProps): R
         {/* Backstop: never draw taller than the budget even if a child miscounts its rows. */}
         <Box flexDirection="column" width={columns} maxHeight={rows - SPARE_ROWS} overflow="hidden">
           <Header snapshot={snapshot} />
-          {ui.mode !== 'help' && <UsagePanel snapshot={snapshot} width={columns} />}
+          {!overlay && (
+            <UsagePanel snapshot={snapshot} width={columns} subscriptionUSD={cfg.subscriptionUSD} />
+          )}
+          {systemShown && <SystemPanel snapshot={snapshot} width={columns} />}
           {body}
           <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} width={columns} />
         </Box>

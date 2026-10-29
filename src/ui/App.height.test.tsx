@@ -3,7 +3,7 @@ import { App } from './App.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { makeOverflowSnapshot, makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { renderSized, type SizedRender } from '../../test/helpers/renderSized.js';
-import type { Snapshot } from '../domain/types.js';
+import type { Config, Snapshot, SystemStats } from '../domain/types.js';
 
 // Laid out in a fake TTY whose columns/rows match `size` (ink-testing-library is fixed at 100 columns).
 const mounted: SizedRender[] = [];
@@ -11,11 +11,12 @@ afterEach(() => mounted.splice(0).forEach((r) => r.unmount()));
 
 const fakeStore = (snap: Snapshot) => ({ subscribe: () => () => {}, getSnapshot: () => snap });
 
-async function frameAt(snap: Snapshot, size: { columns: number; rows: number }): Promise<string[]> {
-  const r = renderSized(
-    <App store={fakeStore(snap)} config={DEFAULT_CONFIG} onQuit={vi.fn()} size={size} />,
-    size,
-  );
+async function frameAt(
+  snap: Snapshot,
+  size: { columns: number; rows: number },
+  config: Config = DEFAULT_CONFIG,
+): Promise<string[]> {
+  const r = renderSized(<App store={fakeStore(snap)} config={config} onQuit={vi.fn()} size={size} />, size);
   mounted.push(r);
   await vi.waitFor(() => expect(r.lastFrame()).toContain('Sessions'));
   return r.lastFrame().split('\n');
@@ -128,5 +129,43 @@ describe('App help overlay at minimum width', () => {
     const lines = r.lastFrame().split('\n');
     for (const l of lines) expect(l.length).toBeLessThanOrEqual(60);
     expect(lines.find((l) => l.includes('Help'))).toMatch(/^╭.*╮$/);
+  });
+});
+
+describe('App system panel', () => {
+  const GB = 1024 ** 3;
+  const system: SystemStats = {
+    sampledAt: NOW,
+    cpu: { total: 42, perCore: [10, 20, 30, 40, 50, 60, 70, 80] },
+    mem: { used: 8 * GB, total: 16 * GB },
+    swap: { used: GB, total: 4 * GB },
+    disk: { used: 100 * GB, total: 500 * GB, mount: '/' },
+    net: { rxPerSec: 2048, txPerSec: 1024 },
+    load: [1.1, 0.9, 0.7],
+  };
+  const history = { cpu: [10, 40, 80, 20], rx: [1, 5, 2, 8], tx: [2, 2, 3, 1] };
+  const withSystem = (over: Partial<Snapshot> = {}): Snapshot =>
+    makeSnapshot({ system, systemHistory: history, ...over });
+
+  for (const size of [
+    { columns: 60, rows: 16 },
+    { columns: 100, rows: 30 },
+    { columns: 160, rows: 50 },
+  ]) {
+    it(`fits ${size.columns}x${size.rows}`, async () => {
+      expectFits(await frameAt(withSystem(), size), size);
+      expectFits(await frameAt({ ...makeOverflowSnapshot(), system, systemHistory: history }, size), size);
+    });
+  }
+
+  it('is shown at 100x40, hidden at 100x24 and when showSystem is false', async () => {
+    const shown = (await frameAt(withSystem(), { columns: 100, rows: 40 })).join('\n');
+    expect(shown).toContain('System');
+    const small = (await frameAt(withSystem(), { columns: 100, rows: 24 })).join('\n');
+    expect(small).not.toContain('System');
+    const off = (
+      await frameAt(withSystem(), { columns: 100, rows: 40 }, { ...DEFAULT_CONFIG, showSystem: false })
+    ).join('\n');
+    expect(off).not.toContain('System');
   });
 });

@@ -4,6 +4,7 @@ import { useStdout } from 'ink';
 export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 export const DETAIL_MIN_ROWS = 24;
+export const SYSTEM_MIN_ROWS = 30;
 export const DETAIL_ROWS = 6;
 export const TABLE_CHROME_ROWS = 3;
 export const FOOTER_ROWS = 1;

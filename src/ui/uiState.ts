@@ -1,18 +1,17 @@
-import type { Config, SortKey, ThemeName } from '../domain/types.js';
+import type { Config } from '../domain/types.js';
 import { SORT_KEYS } from '../domain/types.js';
 import { cycle } from '../domain/cycle.js';
 import { cycleTheme } from './theme.js';
 
-export type UiMode = 'normal' | 'search' | 'help';
+export type UiMode = 'normal' | 'search' | 'help' | 'options';
 
 export interface UiState {
   selectedIndex: number;
-  sort: SortKey;
   filter: 'all' | 'live';
   search: string;
   mode: UiMode;
-  showDetail: boolean;
-  theme: ThemeName;
+  /** Live config; theme, sort and showDetail are read from here (single source of truth). */
+  config: Config;
 }
 
 export type UiAction =
@@ -29,21 +28,22 @@ export type UiAction =
         | 'endSearch'
         | 'clearSearch'
         | 'toggleHelp'
+        | 'openOptions'
+        | 'closeOptions'
         | 'nextTheme'
         | 'prevTheme';
     }
   | { type: 'searchInput'; char: string }
-  | { type: 'searchBackspace' };
+  | { type: 'searchBackspace' }
+  | { type: 'applyConfig'; patch: Partial<Config> };
 
 export function initialUiState(config: Config): UiState {
   return {
     selectedIndex: 0,
-    sort: config.sort,
     filter: 'all',
     search: '',
     mode: 'normal',
-    showDetail: config.showDetail,
-    theme: config.theme,
+    config,
   };
 }
 
@@ -63,9 +63,9 @@ export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
     case 'bottom':
       return { ...s, selectedIndex: clamp(rowCount - 1, rowCount) };
     case 'toggleDetail':
-      return { ...s, showDetail: !s.showDetail };
+      return { ...s, config: { ...s.config, showDetail: !s.config.showDetail } };
     case 'cycleSort': {
-      return { ...s, sort: cycle(SORT_KEYS, s.sort, 1), selectedIndex: 0 };
+      return { ...s, config: { ...s.config, sort: cycle(SORT_KEYS, s.config.sort, 1) }, selectedIndex: 0 };
     }
     case 'toggleFilter':
       return { ...s, filter: s.filter === 'all' ? 'live' : 'all', selectedIndex: 0 };
@@ -77,10 +77,16 @@ export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
       return { ...s, mode: 'normal', search: '', selectedIndex: 0 };
     case 'toggleHelp':
       return { ...s, mode: s.mode === 'help' ? 'normal' : 'help' };
+    case 'openOptions':
+      return { ...s, mode: 'options' };
+    case 'closeOptions':
+      return { ...s, mode: 'normal' };
+    case 'applyConfig':
+      return { ...s, config: { ...s.config, ...a.patch } };
     case 'nextTheme':
-      return { ...s, theme: cycleTheme(s.theme, 1) };
+      return { ...s, config: { ...s.config, theme: cycleTheme(s.config.theme, 1) } };
     case 'prevTheme':
-      return { ...s, theme: cycleTheme(s.theme, -1) };
+      return { ...s, config: { ...s.config, theme: cycleTheme(s.config.theme, -1) } };
     case 'searchInput':
       return { ...s, search: s.search + a.char, selectedIndex: 0 };
     case 'searchBackspace':
