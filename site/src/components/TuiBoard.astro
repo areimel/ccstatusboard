@@ -1,0 +1,301 @@
+---
+/**
+ * Animated HTML/CSS replica of the ccstatusboard TUI (illustrative sample data).
+ * Renders only the board; the Hero supplies the plate / caption around it.
+ * Props: `static` freezes the board (no boot, no ticking) for screenshots or OG use.
+ * Text values come from scripts/tui-board.ts so the server frame and the live
+ * ticks always agree.
+ */
+import { createState, view, GROUPS } from '../scripts/tui-board';
+
+interface Props {
+  static?: boolean;
+}
+const { static: isStatic = false } = Astro.props;
+
+const st = createState();
+const v = view(st);
+const t = v.t;
+const a = v.a;
+
+const label =
+  'Illustrative demo with sample data: a replica of the ccstatusboard terminal UI. ' +
+  'A header shows 5 live and 3 ended Claude Code sessions. The Usage panel shows the 5-hour limit at 58 percent and the weekly limit at 31 percent, ' +
+  'burn-rate projections of under the limit and near the limit, a spend of 4 dollars 10 per hour, and block, today, week and month cost estimates. ' +
+  'A System panel shows CPU and memory meters. The Sessions panel groups sessions by project (ccstatusboard, power-tools, api-gateway, dotfiles) ' +
+  'with status, model, context usage, cost and last activity, plus subagent rows. A footer lists the keyboard shortcuts.';
+
+const meterRows = [
+  { id: 'm5', label: '5h' },
+  { id: 'mw', label: 'Week' },
+];
+const costRows = [
+  ['block', 'c.block'],
+  ['week', 'c.week'],
+  ['today', 'c.today'],
+  ['month', 'c.month'],
+];
+const burnRows = [
+  { id: 'b5', label: '5h' },
+  { id: 'bw', label: 'Week' },
+];
+const keys = [
+  ['↑↓', 'move'],
+  ['enter', 'detail'],
+  ['s', 'sort'],
+  ['t', 'theme'],
+  ['/', 'search'],
+  ['?', 'help'],
+  ['q', 'quit'],
+];
+let i = 0;
+const ln = () => `--i:${i++}`;
+---
+
+<div class="tb-wrap">
+  <div class="tb" role="img" aria-label={label} data-static={isStatic ? '' : undefined}>
+    <div class="tb-panel tb-head" data-p="head"><div class="tb-ln tb-pre" style={ln()}><b class="tb-name tb-hot">ccstatusboard</b><span class="tb-dim"> · </span><span data-t="live">{t.live}</span> live / <span data-t="ended">{t.ended}</span> ended<span class="tb-dim"> · </span><span data-t="clock">{t.clock}</span></div></div>
+
+    <section class="tb-panel tb-box" data-g="usage" data-p="usage">
+      <h3 class="tb-title tb-hot">Usage</h3>
+      <div class="tb-usage">
+        <div class="tb-left">
+          {meterRows.map((m) => (
+            <div class="tb-ln tb-pre" style={ln()}><b class="tb-lbl">{m.label}</b><span class="tb-m" data-a={`${m.id}.lv`} data-v={a[`${m.id}.lv`]}><span class="tb-br">[</span><span class="tb-fill tb-hot" data-t={`${m.id}.f`}>{t[`${m.id}.f`]}</span><span data-t={`${m.id}.s`}>{t[`${m.id}.s`]}</span><b data-t={`${m.id}.p`}>{t[`${m.id}.p`]}</b><span class="tb-br">]</span></span><span class="tb-dim tb-sfx" data-t={`${m.id}.r`}>{t[`${m.id}.r`]}</span></div>
+          ))}
+          <div class="tb-ln tb-acc" style={ln()}><b>Burn Rate</b></div>
+          {burnRows.map((r) => (
+            <div class="tb-ln tb-pre" style={ln()}><span class="tb-dim tb-lbl">{r.label}</span><span class="tb-b" data-a={`${r.id}.lv`} data-v={a[`${r.id}.lv`]}><span class="tb-proj" data-t={`${r.id}.p`}>{t[`${r.id}.p`]}</span><b class="tb-band" data-t={`${r.id}.b`}>{t[`${r.id}.b`]}</b></span><span>hits n/a</span></div>
+          ))}
+          <div class="tb-ln tb-pre" style={ln()}><span>burn <span data-t="burn">{t.burn}</span></span><span class="tb-dim"> 24h </span><span class="tb-spark" data-t="spark">{t.spark}</span></div>
+        </div>
+        <div class="tb-right">
+          {costRows.map(([name, key]) => (
+            <div class="tb-ln tb-kv" style={ln()}><span class="tb-dim">{name}</span><span data-t={key}>{t[key]}</span></div>
+          ))}
+          <div class="tb-ln tb-kv" style={ln()}><span class="tb-dim">plan</span><span class="tb-okc" data-t="c.plan">{t['c.plan']}</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tb-panel tb-box" data-g="system" data-p="system">
+      <h3 class="tb-title tb-hot">System</h3>
+      <div class="tb-sys">
+        {[
+          { id: 'cpu', label: 'CPU' },
+          { id: 'mem', label: 'Mem' },
+        ].map((m) => (
+          <div class="tb-ln tb-pre" style={ln()}><b class="tb-lbl">{m.label}</b><span class="tb-m" data-a={`${m.id}.lv`} data-v={a[`${m.id}.lv`]}><span class="tb-br">[</span><span class="tb-fill tb-hot" data-t={`${m.id}.f`}>{t[`${m.id}.f`]}</span><span data-t={`${m.id}.s`}>{t[`${m.id}.s`]}</span><b data-t={`${m.id}.p`}>{t[`${m.id}.p`]}</b><span class="tb-br">]</span></span><span class="tb-dim tb-sfx" data-t={`${m.id}.r`}>{t[`${m.id}.r`]}</span></div>
+        ))}
+      </div>
+    </section>
+
+    <section class="tb-panel tb-box" data-g="sessions" data-p="sessions">
+      <h3 class="tb-title tb-hot">Sessions</h3>
+      <div class="tb-cols tb-ln tb-dim" style={ln()}><span></span><span>NAME</span><span class="tb-md">MODEL</span><span>CTX</span><span class="tb-r">COST</span><span class="tb-la">LAST</span></div>
+      {GROUPS.map((g) => (
+        <div class="tb-group">
+          <div class="tb-ln tb-grp tb-dim" style={ln()}><span>{`── ${t[`g.${g}`]} `}</span><i></i></div>
+          {st.sessions.filter((s) => s.group === g).map((s) => (
+            <>
+              <div class="tb-ln tb-srow" data-a={`${s.id}.row`} data-v={a[`${s.id}.row`]} style={ln()}><span class="tb-st" data-t={`${s.id}.st`}>{t[`${s.id}.st`]}</span><span class="tb-nm">{s.name}</span><span class="tb-md tb-dim">{s.model}</span><span class="tb-ctx" data-a={`${s.id}.lv`} data-v={a[`${s.id}.lv`]}><span class="tb-cf" data-t={`${s.id}.cf`}>{t[`${s.id}.cf`]}</span><span class="tb-ce" data-t={`${s.id}.ce`}>{t[`${s.id}.ce`]}</span><span data-t={`${s.id}.cp`}>{t[`${s.id}.cp`]}</span></span><span class="tb-co tb-r" data-t={`${s.id}.cost`}>{t[`${s.id}.cost`]}</span><span class="tb-la tb-dim" data-t={`${s.id}.last`}>{t[`${s.id}.last`]}</span></div>
+              {s.id === 's1' && (
+                <div class="tb-ln tb-srow tb-sub tb-dim" style={ln()}><span></span><span class="tb-pre">{' └─ Explore'}</span><span class="tb-md"></span><span class="tb-ctx"></span><span class="tb-co"></span><span class="tb-la" data-t="sa1.t">{t['sa1.t']}</span></div>
+              )}
+              {s.id === 's5' && (
+                <>
+                  <div class="tb-ln tb-srow tb-sub tb-dim" style={ln()}><span></span><span class="tb-pre">{' ├─ general-purpose'}</span><span class="tb-md"></span><span class="tb-ctx"></span><span class="tb-co"></span><span class="tb-la" data-t="sa2.t">{t['sa2.t']}</span></div>
+                  <div class="tb-ln tb-srow tb-sub tb-dim" data-a="sa3" data-v={a.sa3} style={ln()}><span></span><span class="tb-pre">{' '}<span data-t="sa2.c">└─</span>{' code-reviewer'}</span><span class="tb-md"></span><span class="tb-ctx"></span><span class="tb-co"></span><span class="tb-la" data-t="sa3.t">{t['sa3.t']}</span></div>
+                </>
+              )}
+            </>
+          ))}
+        </div>
+      ))}
+    </section>
+
+    <div class="tb-panel tb-foot" data-p="foot">
+      <div class="tb-ln tb-keys" style={ln()}>{keys.map(([k, l]) => <span><b class="tb-key">{k}</b> {l}</span>)}</div>
+    </div>
+  </div>
+  <script is:inline>
+    (function () {
+      var b = document.currentScript.previousElementSibling;
+      if (!b || b.hasAttribute('data-static')) return;
+      try {
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      } catch (e) {
+        return;
+      }
+      b.setAttribute('data-boot', 'pre');
+    })();
+  </script>
+</div>
+
+<script>
+  import { initBoards } from '../scripts/tui-board';
+  initBoards();
+</script>
+
+<style>
+  .tb-wrap {
+    container: tb / inline-size;
+    width: 100%;
+  }
+  .tb {
+    --tb-line: color-mix(in srgb, var(--border) 55%, var(--tui-dim));
+    position: relative;
+    box-sizing: border-box;
+    width: 88ch;
+    margin-inline: auto;
+    padding: 1.1em 2ch 1.2em;
+    font-family: var(--font-mono), 'DejaVu Sans Mono', 'Noto Sans Symbols 2', 'Segoe UI Symbol', monospace;
+    font-size: clamp(7px, 1.8cqi, 17px);
+    line-height: 1.45;
+    font-variant-ligatures: none;
+    font-weight: 400;
+    background: var(--tui-bg);
+    color: var(--foreground);
+    cursor: default;
+    user-select: none;
+    overflow: hidden;
+  }
+  /* Faint scanlines, dark palette only. */
+  :global(html.dark) .tb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.12) 2px 3px);
+    opacity: 0.35;
+  }
+  :global(html.dark) .tb-hot {
+    text-shadow: 0 0 0.75em color-mix(in srgb, currentColor 38%, transparent);
+  }
+
+  .tb b { font-weight: 700; }
+  .tb h3 { margin: 0; font: inherit; letter-spacing: 0; text-transform: none; }
+  .tb-pre { white-space: pre; }
+  .tb-dim { color: var(--tui-dim); }
+  .tb-acc { color: var(--tui-accent); }
+  .tb-r { text-align: right; }
+  .tb-okc { color: var(--tui-ok); }
+
+  /* Panels: CSS borders with a titled legend, standing in for ╭─ Title ─╮ */
+  .tb-box {
+    position: relative;
+    margin-top: 1.05em;
+    padding: 0.6em 1ch 0.55em;
+    border: 1px solid var(--tb-line);
+    border-radius: 0.55ch;
+  }
+  .tb-title {
+    position: absolute;
+    top: -0.82em;
+    left: 1.2ch;
+    padding: 0 0.9ch;
+    background: var(--tui-bg);
+    color: var(--tui-accent);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .tb-head { padding-inline: 1ch; }
+  .tb-name {
+    background: linear-gradient(90deg, var(--tui-accent), var(--tui-warn));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+  }
+  .tb-foot { margin-top: 1.05em; padding-inline: 1ch; color: var(--tui-dim); }
+  .tb-keys { display: flex; flex-wrap: wrap; gap: 0 2ch; white-space: pre; }
+  .tb-key { color: var(--tui-accent); }
+
+  /* Usage */
+  .tb-usage { display: grid; grid-template-columns: minmax(0, 1fr) 20ch; column-gap: 2ch; }
+  .tb-left, .tb-right { min-width: 0; }
+  .tb-lbl { display: inline-block; width: 5ch; margin-right: 1ch; color: var(--tui-accent); font-weight: 700; }
+  .tb-dim.tb-lbl { color: var(--tui-dim); font-weight: 400; margin-right: 0; }
+  .tb-sfx { margin-left: 1ch; }
+  .tb-m .tb-br { color: var(--tui-dim); }
+  .tb-m[data-v='ok'] .tb-fill { color: var(--tui-ok); }
+  .tb-m[data-v='warn'] .tb-fill { color: var(--tui-warn); }
+  .tb-m[data-v='danger'] .tb-fill { color: var(--tui-danger); }
+  .tb-proj { display: inline-block; width: 10ch; }
+  .tb-band { display: inline-block; width: 11ch; }
+  .tb-b[data-v='ok'] > * { color: var(--tui-ok); }
+  .tb-b[data-v='warn'] > * { color: var(--tui-warn); }
+  .tb-b[data-v='danger'] > * { color: var(--tui-danger); }
+  .tb-spark { color: var(--tui-accent); letter-spacing: 0; }
+  .tb-kv { display: flex; justify-content: space-between; white-space: pre; }
+  .tb-kv > span:first-child { width: 7ch; }
+  .tb-kv > span:last-child { flex: 1; text-align: right; }
+
+  /* System */
+
+  /* Sessions */
+  .tb-cols, .tb-srow {
+    display: grid;
+    grid-template-columns: 2ch 24ch 11ch 15ch 9ch minmax(0, 1fr);
+    column-gap: 1ch;
+    white-space: pre;
+  }
+  .tb-cols { margin-bottom: 0.1em; }
+  .tb-srow { margin-inline: -0.5ch; padding-inline: 0.5ch; }
+  .tb-srow > span { min-width: 0; overflow: hidden; }
+  .tb-srow > .tb-st { overflow: visible; }
+  .tb-cols > .tb-la, .tb-srow > .tb-la { padding-left: 1ch; }
+  .tb-group { margin-top: 0.35em; }
+  .tb-group:first-of-type { margin-top: 0.15em; }
+  .tb-grp { display: flex; align-items: center; white-space: pre; }
+  .tb-grp i { flex: 1; height: 1px; background: var(--tb-line); opacity: 0.8; }
+  .tb-srow[data-v~='sel'] {
+    background: color-mix(in srgb, var(--tui-accent) 17%, transparent);
+    box-shadow: inset 2px 0 var(--tui-accent);
+  }
+  .tb-srow[data-v~='busy'] .tb-st { color: var(--tui-ok); }
+  .tb-srow[data-v~='waiting'] .tb-st { color: var(--tui-warn); }
+  .tb-srow[data-v~='idle'] .tb-st, .tb-srow[data-v~='ended'] .tb-st { color: var(--tui-dim); }
+  .tb-srow[data-v~='ended'] { color: var(--tui-dim); }
+  .tb-srow[data-v~='idle'] .tb-nm { color: color-mix(in srgb, var(--foreground) 78%, var(--tui-dim)); }
+  .tb-nm { font-weight: 700; }
+  .tb-srow[data-v~='ended'] .tb-nm { font-weight: 400; }
+  .tb-ctx[data-v='ok'] .tb-cf { color: var(--tui-ok); }
+  .tb-ctx[data-v='warn'] .tb-cf { color: var(--tui-warn); }
+  .tb-ctx[data-v='danger'] .tb-cf { color: var(--tui-danger); }
+  .tb-ce { color: color-mix(in srgb, var(--tui-dim) 55%, transparent); }
+  .tb-srow[data-v~='ended'] .tb-cf { color: var(--tui-dim); }
+  .tb-sub { font-weight: 400; }
+  .tb-sub[data-v='off'] { visibility: hidden; }
+
+  /* Boot sequence (JS sets data-boot; absent under reduced motion / static). */
+  .tb[data-boot='pre'] .tb-panel,
+  .tb[data-boot='armed'] .tb-panel,
+  .tb[data-boot='run'] .tb-panel { opacity: 0; }
+  .tb[data-boot='pre'] .tb-panel { animation: tb-failsafe 0s 8s forwards; }
+  .tb[data-boot='run'] .tb-panel.is-on { opacity: 1; animation: tb-power 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .tb[data-boot='run'] .tb-panel.is-on .tb-ln { animation: tb-type 0.45s steps(18, end) both; animation-delay: calc(var(--i, 0) * 28ms); }
+  @keyframes tb-failsafe { to { opacity: 1; } }
+  @keyframes tb-power {
+    from { clip-path: inset(-1em 100% -1em -1em); border-color: var(--tui-accent); }
+    60% { border-color: var(--tui-accent); }
+    to { clip-path: inset(-1em -1em -1em -1em); }
+  }
+  @keyframes tb-type {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0 0 0 0); }
+  }
+
+  /* Compact layout for narrow containers: fewer columns, same glyph grid. */
+  @container tb (max-width: 599px) {
+    .tb { width: 62ch; font-size: clamp(7px, 2.6cqi, 13px); }
+    .tb-usage { grid-template-columns: minmax(0, 1fr); }
+    .tb-right { display: none; }
+    .tb-cols, .tb-srow { grid-template-columns: 2ch minmax(0, 1fr) 15ch 9ch; }
+    .tb-md, .tb-la { display: none; }
+  }
+
+  @media print {
+    .tb { clip-path: none; }
+  }
+</style>
