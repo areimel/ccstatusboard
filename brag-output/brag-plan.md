@@ -58,3 +58,8 @@ Sound: one generated track, 120 BPM, A minor, synthwave/chiptune; kick/bass/arp 
 ## Verification
 - `npm test && npm run typecheck && npm run lint` still pass (no src changes expected).
 - Stills reviewed for every scene + transition; `ffprobe brag.mp4` → 1920×1080, 30fps, ~24.0s, audio present; frame 0 matches `brag.jpg`; watch full render once.
+
+## Build notes (as built)
+- vhs was not installed, so the "real TUI" footage is the real Ink `App` rendered against in-memory fixtures (`tui-export/export.tsx`), converted ANSI→HTML. All names and paths are fictional sample data mirroring the landing page.
+- The wireframe-portal-title block (WebGL) stalls the full-video renderer at its first frame, so it's pre-rendered standalone from `work/portal-proj` and mounted as `composition/assets/portal.mp4`. To change it: edit `compositions/wireframe-portal-title/wireframe-portal-title.html`, copy it to `work/portal-proj/index.html`, re-render with the variables in `index.html`'s comment.
+- Rebuild: `node tui-export/build-board.mjs && node tui-export/build-outro.mjs`, then `cd composition && npx hyperframes@0.8.224 render -f 30 -q delivery -o ../work/render.mp4`, then bake `brag.jpg` (t=20.8s) as frame 0.
