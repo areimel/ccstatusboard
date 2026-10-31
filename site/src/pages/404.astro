@@ -1,0 +1,69 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Not found · ccstatusboard"
+  description="This page does not exist. Return to the ccstatusboard home page."
+>
+  <main class="page" id="main">
+    <div class="panel">
+      <p class="status">ERR 404 · no session at this path</p>
+      <h1>Signal lost.</h1>
+      <p class="body">This page doesn't exist. It may have moved, or the link may be mistyped.</p>
+      <a class="back" href={import.meta.env.BASE_URL}>&larr; Back to ccstatusboard</a>
+    </div>
+  </main>
+</Base>
+
+<style>
+  .page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  .panel {
+    width: min(100%, 36rem);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    background: var(--card);
+    padding: clamp(1.25rem, 4vw, 2rem);
+  }
+
+  .status {
+    margin: 0 0 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.05em;
+    color: var(--muted-foreground);
+  }
+
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1.05;
+    color: var(--foreground);
+  }
+
+  .body {
+    margin: 0 0 1.5rem;
+    color: var(--muted-foreground);
+  }
+
+  .back {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--kojima-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .back:hover {
+    color: var(--foreground);
+  }
+</style>
