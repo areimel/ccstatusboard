@@ -1,0 +1,157 @@
+/* Landing-page primitives derived from the Kojima template's home styles:
+   plates (framed figures), captions, index labels, system strip, grid texture.
+   All colors come from tokens so both palettes work. */
+
+.page-wrap {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: 40px;
+}
+@media (max-width: 1100px) { .page-wrap { padding-inline: 24px; } }
+@media (max-width: 640px) { .page-wrap { padding-inline: 18px; } }
+
+/* Mono micro-labels (eyebrows, captions, index notes). */
+.plate-label,
+.plate-caption,
+.index-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* A framed figure: hairline border, optional header/caption rows. */
+.plate {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+.plate-pad { padding: clamp(1rem, 3vw, 2rem); }
+.plate-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.plate-body { min-width: 0; }
+/* Scrolls inside the plate so the page itself never scrolls horizontally. */
+.plate-scroll { overflow-x: auto; max-width: 100%; }
+.plate svg { display: block; width: 100%; height: auto; }
+
+/* Caption under a plate: "FIG. 01 / BOARD". */
+.plate-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 10px;
+}
+.plate-caption strong { color: var(--foreground); font-weight: 500; }
+.plate-caption i,
+.index-label i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--primary);
+}
+
+/* Section index row: "FIG. 03 ..... INSTRUMENTS". */
+.index-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.index-label > span:first-child { display: inline-flex; align-items: center; gap: 9px; }
+
+/* Row of mono status chips across the page, e.g. footer or hero strip. */
+.system-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 28px;
+  padding: 18px 0;
+  border-block: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Equal-column grid with shared hairlines (no gaps). */
+.plate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  border: 1px solid var(--border);
+}
+.plate-grid > * { min-width: 0; padding: 28px; border-left: 1px solid var(--border); border-top: 1px solid var(--border); margin: -1px 0 0 -1px; }
+
+/* Squared grid texture behind a plate or section. */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+/* Small tag (e.g. DEMO / EST.) */
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Terminal content: use on the board replica, commands, flags. */
+.tui {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.35;
+  background: var(--tui-bg);
+  color: var(--foreground);
+  font-variant-ligatures: none;
+}
+.tui-ok { color: var(--tui-ok); }
+.tui-warn { color: var(--tui-warn); }
+.tui-danger { color: var(--tui-danger); }
+.tui-dim { color: var(--tui-dim); }
+.tui-accent { color: var(--tui-accent); }
+
+.keycap {
+  display: inline-block;
+  min-width: 1.75em;
+  padding: 1px 6px;
+  border: 1px solid var(--input);
+  border-bottom-width: 2px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -4rem;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.skip-link:focus { top: 8px; }

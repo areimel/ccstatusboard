@@ -1,0 +1,157 @@
+@import "tailwindcss";
+@import "./kojima.css";
+@import "./kojima-home.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Fonts are bundled by Vite (relative URLs get the /ccstatusboard base). */
+@font-face {
+  font-family: "DM Sans";
+  src: url("../assets/fonts/DMSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../assets/fonts/DMSans-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../assets/fonts/DMSans-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("../assets/fonts/DMSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* JetBrains Mono (OFL), latin subset, from @fontsource/jetbrains-mono. */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fallback tokens; the kojima theme in kojima.css overrides all of these. */
+:root {
+  --background: #141310;
+  --foreground: #efebe0;
+  --card: #1c1b17;
+  --card-foreground: #efebe0;
+  --popover: #1c1b17;
+  --popover-foreground: #efebe0;
+  --primary: #ff4d00;
+  --primary-foreground: #141310;
+  --secondary: #292720;
+  --secondary-foreground: #efebe0;
+  --muted: #292720;
+  --muted-foreground: #aaa596;
+  --accent: #363229;
+  --accent-foreground: #efebe0;
+  --destructive: #b52d24;
+  --border: #3f3b31;
+  --input: #827b6b;
+  --ring: #ff4d00;
+  --radius: 0px;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-accent-ink: var(--kojima-accent-ink);
+  --color-tui-bg: var(--tui-bg);
+  --color-tui-ok: var(--tui-ok);
+  --color-tui-warn: var(--tui-warn);
+  --color-tui-danger: var(--tui-danger);
+  --color-tui-dim: var(--tui-dim);
+  --color-tui-accent: var(--tui-accent);
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: var(--radius);
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1400px;
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--display-family);
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  @media (width >= 1400px) {
+    max-width: 1220px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+  body {
+    @apply bg-background text-foreground;
+    position: relative;
+  }
+  button {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  .font-display {
+    font-family: var(--display-family);
+    font-weight: var(--display-weight);
+    font-feature-settings: "ss02" on, "ss03" on, "ss04" on; /* DM Sans alternates */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

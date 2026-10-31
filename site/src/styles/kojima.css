@@ -1,0 +1,215 @@
+/* Opt in with <html data-theme="kojima">; the shell owns the .dark toggle.
+   Unlayered skin rules intentionally override shadcn's utility defaults. */
+html[data-theme="kojima"] {
+  color-scheme: light;
+  --background: #efebe0;
+  --foreground: #141310;
+  --card: #f8f5ed;
+  --card-foreground: var(--foreground);
+  --popover: #f8f5ed;
+  --popover-foreground: var(--foreground);
+  --primary: #ff4d00;
+  --primary-foreground: #141310;
+  --secondary: #e1dccf;
+  --secondary-foreground: var(--foreground);
+  --muted: #e1dccf;
+  --muted-foreground: #625e53;
+  --accent: #dad4c5;
+  --accent-foreground: var(--foreground);
+  --destructive: #ad2921;
+  --destructive-foreground: #ffffff;
+  --border: #c4beaf;
+  --input: #817b6c;
+  --ring: #b83200;
+  --chart-1: #b83200;
+  --chart-2: #52664b;
+  --chart-3: #3e6674;
+  --chart-4: #806222;
+  --chart-5: #775870;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --kojima-orange: #ff4d00;
+  --kojima-accent-ink: #b83200;
+  /* TUI status colors. AA (>=4.5:1) against --background and --card, checked with WCAG 2.x. */
+  --tui-bg: var(--card);
+  --tui-ok: #2d6a27;
+  --tui-warn: #855600;
+  --tui-danger: #ad2921;
+  --tui-dim: #625e53;
+  --tui-accent: #b83200;
+  --radius: 0px;
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --display-family: var(--font-sans);
+  --text-family: var(--font-sans);
+  --display-weight: 700;
+  --text-weight: 400;
+}
+
+html[data-theme="kojima"].dark {
+  color-scheme: dark;
+  --background: #141310;
+  --foreground: #efebe0;
+  --card: #1c1b17;
+  --popover: #1c1b17;
+  --secondary: #292720;
+  --muted: #292720;
+  --muted-foreground: #aaa596;
+  --accent: #363229;
+  --destructive: #b52d24;
+  --border: #3f3b31;
+  --input: #827b6b;
+  --ring: #ff4d00;
+  --chart-1: #ff4d00;
+  --chart-2: #a4b58a;
+  --chart-3: #8eafb9;
+  --chart-4: #d8b971;
+  --chart-5: #c3a0b7;
+  --kojima-accent-ink: #ff4d00;
+  --tui-ok: #7fc97a;
+  --tui-warn: #e8b04a;
+  --tui-danger: #ff6b5e;
+  --tui-dim: #aaa596;
+  --tui-accent: #ff4d00;
+}
+
+html[data-theme="kojima"] body {
+  font-family: var(--text-family);
+  line-height: 1.6;
+}
+
+html[data-theme="kojima"] ::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Button does not expose data-variant; use its existing semantic classes. */
+html[data-theme="kojima"] .text-primary {
+  color: var(--kojima-accent-ink);
+}
+
+html[data-theme="kojima"] .hover\:text-primary:hover {
+  color: var(--kojima-accent-ink);
+}
+
+html[data-theme="kojima"] :where(input, textarea)::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+html[data-theme="kojima"] :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+html[data-theme="kojima"] :where(button, [role="button"]):disabled {
+  cursor: not-allowed;
+}
+
+html[data-theme="kojima"] .kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+html[data-theme="kojima"] .kicker::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  background: var(--kojima-orange);
+}
+
+html[data-theme="kojima"] .technical-panel {
+  position: relative;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+html[data-theme="kojima"] .section-heading {
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 1.05;
+}
+
+html[data-theme="kojima"] .technical-label {
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+/* Decorative only: use aria-hidden="true" on the empty mark element. */
+html[data-theme="kojima"] .registration-mark {
+  position: relative;
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+html[data-theme="kojima"] .registration-mark::before,
+html[data-theme="kojima"] .registration-mark::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+
+html[data-theme="kojima"] .registration-mark::before {
+  inset: calc(50% - 0.5px) 0 auto;
+  height: 1px;
+}
+
+html[data-theme="kojima"] .registration-mark::after {
+  inset: 0 auto 0 calc(50% - 0.5px);
+  width: 1px;
+}
+
+html[data-theme="kojima"] .technical-grid {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+html[data-theme="kojima"] :where(h1, h2, h3, h4, .section-heading) {
+  font-family: var(--display-family);
+  font-weight: var(--display-weight);
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+html[data-theme="kojima"] :where(.kicker, .technical-label) {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+html[data-theme="kojima"] .technical-panel {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="kojima"],
+  html[data-theme="kojima"] body {
+    scroll-behavior: auto;
+  }
+}
