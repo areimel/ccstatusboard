@@ -1,0 +1,92 @@
+<template>
+  <style>
+    @font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+    @font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+    @font-face { font-family: "Board Symbols"; src: url("assets/fonts/board-symbols.woff2") format("woff2"); }
+    @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Bold.ttf"); font-weight: 700; }
+    #root { position: absolute; inset: 0; background: #0c0c0a; overflow: hidden; }
+    #board-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #board-screen { position: absolute; left: __OX__px; top: __OY__px; width: calc(150 * __CW__px); height: calc(42 * __LH__px); background: #0c0c0a; }
+    #board-screen .frame {
+      position: absolute; left: 0; top: 0; margin: 0;
+      font-family: "JetBrains Mono", "Board Symbols", monospace;
+      font-size: __FS__px; line-height: __LH__px; white-space: pre; color: #c0caf5;
+      font-variant-ligatures: none;
+      text-shadow: 0 0 5px rgba(157, 255, 176, 0.22);
+    }
+    .hb {
+      position: absolute; border: 3px solid #ff4d00; border-radius: 6px; opacity: 0;
+      box-shadow: 0 0 14px rgba(255, 77, 0, 0.55), inset 0 0 10px rgba(255, 77, 0, 0.18);
+      pointer-events: none;
+    }
+    #hb-label {
+      position: absolute; opacity: 0; font: 700 15px "JetBrains Mono", monospace; color: #ff4d00;
+      background: #0c0c0a; border: 1px solid #ff4d00; border-radius: 4px; padding: 0 7px; line-height: 20px; letter-spacing: 0.5px;
+    }
+    #board-scan { position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.16) 3px, rgba(0,0,0,0) 4px); }
+    #board-vig { position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%); }
+    .cap { position: absolute; left: 0; right: 0; bottom: 118px; display: flex; justify-content: center; }
+    .cap span {
+      font: 700 56px/1.15 "DM Sans", sans-serif; color: #efebe0; white-space: nowrap;
+      background: rgba(12, 12, 10, 0.92); border: 2px solid #ff4d00; border-radius: 14px; padding: 16px 34px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    }
+    .cap em { font-style: normal; color: #ff4d00; }
+  </style>
+  <div id="root" data-composition-id="board" data-width="1920" data-height="1080">
+    <div id="board-cam">
+      <div id="board-screen">
+<!--__FRAMES__-->
+<!--__BOXES__-->
+      </div>
+    </div>
+    <div id="board-scan" data-layout-ignore></div>
+    <div id="board-vig" data-layout-ignore></div>
+    <div id="cap1" class="clip cap" data-start="0.2" data-duration="3.6" data-track-index="2"><span id="cap1-t">How much of your <em>5-hour</em> and <em>weekly</em> limit is gone.</span></div>
+    <div id="cap2" class="clip cap" data-start="4.3" data-duration="3.5" data-track-index="2"><span id="cap2-t">How full each chat's <em>memory</em> is — before it forgets.</span></div>
+    <div id="cap3" class="clip cap" data-start="8.3" data-duration="3.3" data-track-index="2"><span id="cap3-t">What it's costing you — <em>estimated</em>, in real time.</span></div>
+  </div>
+  <script>
+    /*__GEOM__*/
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const px = (c) => G.OX + c * G.CW, py = (r) => G.OY + r * G.LH;
+    const cam = (c, r, sx, sy, s) => ({ x: sx - s * px(c), y: sy - s * py(r), scale: s });
+    const E = "power3.inOut";
+    const C = "#board-cam";
+    const A = cam(42, 5.5, 960, 400, 1.7), A2 = cam(42, 5.5, 960, 400, 1.85);
+    const B = cam(43, 22.5, 960, 470, 1.8);
+    const D = cam(134.5, 4, 1180, 420, 2.5);
+    const D2 = cam(36, 8, 960, 440, 2.2);
+    const F = cam(75, 21, 960, 540, 1.0);
+
+    tl.fromTo(C, A, { ...A2, duration: 3.5, ease: "sine.inOut" }, 0);
+    tl.fromTo(C, A2, { ...B, duration: 0.6, ease: E, immediateRender: false }, 4.0);
+    tl.fromTo(C, B, { ...D, duration: 0.6, ease: E, immediateRender: false }, 8.0);
+    tl.fromTo(C, D, { ...D2, duration: 0.5, ease: E, immediateRender: false }, 10.0);
+    tl.fromTo(C, D2, { ...F, duration: 0.5, ease: E, immediateRender: false }, 11.5);
+
+    const draw = (id, at, dur = 0.4) => {
+      tl.fromTo(id, { opacity: 0, clipPath: "inset(-20px 100% -20px -20px)" }, { opacity: 1, clipPath: "inset(-20px -20px -20px -20px)", duration: dur, ease: "power2.out", immediateRender: false }, at);
+    };
+    const undraw = (id, at, dur = 0.25) => tl.to(id, { opacity: 0, duration: dur, ease: "power1.in" }, at);
+    draw("#hb-meter", 2.5); draw("#hb-proj", 2.5);
+    undraw("#hb-meter", 3.8); undraw("#hb-proj", 3.8);
+    draw("#hb-ctx", 4.5); tl.fromTo("#hb-label", { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power2.out", immediateRender: false }, 4.5);
+    undraw("#hb-ctx", 6.0); draw("#hb-power", 6.0);
+    undraw("#hb-power", 7.7); undraw("#hb-label", 7.7);
+    draw("#hb-cost", 8.6);
+    undraw("#hb-cost", 10.0); draw("#hb-burn", 10.5);
+    undraw("#hb-burn", 11.3);
+
+    const capIn = (id, at) => tl.fromTo(id, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out", immediateRender: false }, at);
+    const capOut = (id, at) => tl.to(id, { opacity: 0, duration: 0.19, ease: "power1.in" }, at);
+    tl.set(["#cap1-t", "#cap2-t", "#cap3-t"], { opacity: 0 }, 0);
+    capIn("#cap1-t", 0.2); capOut("#cap1-t", 3.6);
+    capIn("#cap2-t", 4.3); capOut("#cap2-t", 7.6);
+    capIn("#cap3-t", 8.3); capOut("#cap3-t", 11.4);
+    window.__timelines["board"] = tl;
+  </script>
+</template>

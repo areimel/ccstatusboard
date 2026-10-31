@@ -7,10 +7,10 @@
     <style>
       @font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
       @font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
-      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Regular.ttf"); font-weight: 400; }
-      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Medium.ttf"); font-weight: 500; }
-      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-SemiBold.ttf"); font-weight: 600; }
-      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Bold.ttf"); font-weight: 700; }
+      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Regular.ttf") format("truetype"); font-weight: 400; }
+      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Medium.ttf") format("truetype"); font-weight: 500; }
+      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-SemiBold.ttf") format("truetype"); font-weight: 600; }
+      @font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Bold.ttf") format("truetype"); font-weight: 700; }
       :root {
         --ground: #0c0c0a;
         --ink: #efebe0;
@@ -31,12 +31,14 @@
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="24" data-width="1920" data-height="1080">
+      <!-- Scene 2 portal block (root-level: it can't render nested) -->
+      <div id="wireframe-portal-title" class="clip" data-composition-id="wireframe-portal-title" data-composition-src="compositions/wireframe-portal-title/wireframe-portal-title.html" data-variable-values='{"title":"ccstatusboard","replacementPhrase":"ccstatusboard","subtitle":" ","accent":"#ff4d00","burstChaos":1,"settleGlitch":0.2,"phraseDuration":0.65}' data-start="4" data-duration="4" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
       <!-- Scenes 1–2: hook (0–4) + reveal (4–8) -->
-      <div id="intro" class="clip scene" data-composition-src="compositions/intro.html" data-start="0" data-duration="8" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="intro" data-composition-id="intro" class="clip scene" data-composition-src="compositions/intro.html" data-start="0" data-duration="8" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
       <!-- Scenes 3–5: real TUI highlights (8–20) -->
-      <div id="board" class="clip scene" data-composition-src="compositions/board.html" data-start="8" data-duration="12" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="board" data-composition-id="board" class="clip scene" data-composition-src="compositions/board.html" data-start="8" data-duration="12" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
       <!-- Scenes 6–7: payoff (20–22) + outro (22–24) -->
-      <div id="outro" class="clip scene" data-composition-src="compositions/outro.html" data-start="20" data-duration="4" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="outro" data-composition-id="outro" class="clip scene" data-composition-src="compositions/outro.html" data-start="20" data-duration="4" data-track-index="0" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
       <audio id="music" class="clip" src="assets/music.wav" data-start="0" data-duration="24" data-track-index="1"></audio>
     </div>
     <script>

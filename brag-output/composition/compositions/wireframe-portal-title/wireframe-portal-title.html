@@ -70,8 +70,8 @@
       #wpt-card {
         position: absolute;
         inset: 0;
-        background: #e8e8e8;
-        color: #0a0a0a;
+        background: #0c0c0a;
+        color: #efebe0;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -82,7 +82,8 @@
         font-size: 22px;
         letter-spacing: 0;
         text-indent: 0;
-        color: #1f1f1f;
+        color: #aaa596;
+        visibility: hidden;
         margin-bottom: 34px;
         display: flex;
         align-items: center;
@@ -94,7 +95,7 @@
         line-height: 1;
         letter-spacing: 0.03em;
         white-space: nowrap;
-        color: #0a0a0a;
+        color: #efebe0;
       }
       #wpt-headline span {
         display: inline-block;
@@ -132,7 +133,7 @@
       id="root"
       data-composition-id="wireframe-portal-title"
       data-start="0"
-      data-duration="8"
+      data-duration="4"
       data-width="1920"
       data-height="1080"
     >
@@ -141,7 +142,7 @@
         id="wpt-scene"
         class="clip"
         data-start="0"
-        data-duration="8"
+        data-duration="4"
         data-track-index="1"
       >
         <div data-hf-id="hf-6av1" id="wpt-under"></div>
@@ -258,22 +259,15 @@
       // warp dots: burst through the transition, settle to a slow stream in the hold
       tl.to(S, { warp: 1, duration: 1.0, ease: "sine.in" }, 0.45);
       tl.to(S, { warp: 0.28, duration: 1.2, ease: "sine.out" }, 1.5);
-      tl.to(S, { warp: 0.85, duration: 0.8, ease: "power1.in" }, 6.0);
-      tl.to(S, { travel: 16, duration: 2.05, ease: "sine.inOut" }, 0.45);
+            tl.to(S, { travel: 16, duration: 2.05, ease: "sine.inOut" }, 0.45);
       tl.to(S, { travel: 22, duration: 3.5, ease: "none" }, 2.5);
-      tl.to(S, { travel: 38, duration: 2.0, ease: "power2.in" }, 6.0);
-
+      
       // faint glitch ticks on two beats
       tl.to(S, { glitch: 0.55, duration: 0.09, ease: "power1.in" }, 3.8);
       tl.to(S, { glitch: 0, duration: 0.24, ease: "power2.out" }, 3.89);
-      tl.to(S, { glitch: 0.55, duration: 0.09, ease: "power1.in" }, 5.2);
-      tl.to(S, { glitch: 0, duration: 0.24, ease: "power2.out" }, 5.29);
-
+            
       // OUT — camera pushes through and past the letterforms, frame lifts to white
-      tl.to(S, { push: 1, duration: 1.6, ease: "power2.in" }, 6.0);
-      tl.to(S, { exitFx: 1, duration: 1.6, ease: "power2.in" }, 6.4);
-      tl.to("#wpt-white", { opacity: 1, duration: 0.95, ease: "sine.inOut" }, 6.9);
-      // The white plate is intentionally empty and fully opaque for the last hold.
+                        // The white plate is intentionally empty and fully opaque for the last hold.
       tl.addLabel("light-card", 0.8);
       tl.addLabel("portal-alignment", 1.47);
       tl.addLabel(
@@ -281,8 +275,7 @@
         window.__wptTransition.start + window.__wptTransition.duration * 0.6,
       );
       tl.addLabel("phrase-hold", window.__wptTransition.start + window.__wptTransition.duration);
-      tl.addLabel("white-empty", 7.9);
-
+      
       tl.eventCallback("onUpdate", function () {
         if (window.__wptRender) window.__wptRender(tl.time());
       });
@@ -359,7 +352,7 @@
         transSaturation: 0,
         cameraDistance: 22,
         initialFOV: 100,
-        cameraDistance3D: 66, // pulled back from the experiment's 48.5 so the full word composes in-frame at 1920x1080
+        cameraDistance3D: 72, // pulled back from the experiment's 48.5 so the full word composes in-frame at 1920x1080
         finalFOV: 72,
         contentZOffset: 30,
         vignetteIntensity: 1.7,
@@ -817,8 +810,8 @@
       // Shrink the DOM headline if a long title overflows, BEFORE measuring spans
       for (const id of ["wpt-headline"]) {
         const el = document.getElementById(id);
-        if (el.scrollWidth > 1760) {
-          el.style.fontSize = Math.floor(176 * (1760 / el.scrollWidth)) + "px";
+        if (el.scrollWidth > 1440) {
+          el.style.fontSize = Math.floor(176 * (1440 / el.scrollWidth)) + "px";
         }
       }
 
