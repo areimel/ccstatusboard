@@ -74,6 +74,8 @@ const statusClass: Record<string, string> = {
 <style>
   .usage { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
   .usage__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
+  .usage__p a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .usage__p a:hover { color: var(--kojima-accent-ink); }
   .usage__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 14px; }
   .usage__synopsis { display: inline-block; max-width: 100%; overflow-x: auto; margin: 0; padding: 12px 14px; border: 1px solid var(--border); background: var(--tui-bg); font-family: var(--font-mono); font-size: 14px; font-variant-ligatures: none; }
   .block { margin-top: 48px; min-width: 0; }
