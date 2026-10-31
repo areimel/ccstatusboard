@@ -1,0 +1,1 @@
+Vibe coding with Claude Code and keep slamming into "usage limit reached"? ccstatusboard is a free terminal dashboard that shows your 5-hour and weekly limits, how full each chat's context is, and what it's all costing, for every session at once. One command: npx ccstatusboard → github.com/areimel/ccstatusboard
