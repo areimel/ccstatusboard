@@ -22,7 +22,7 @@ This restriction is intended solely to prevent grifters from reselling this temp
 
 ## DM Sans
 
-SIL Open Font License 1.1 (Google Fonts, The DM Sans Project Authors).
+SIL Open Font License 1.1, Copyright 2014 The DM Sans Project Authors. See `src/assets/fonts/DMSans-OFL.txt`.
 
 ## JetBrains Mono
 
@@ -30,4 +30,4 @@ SIL Open Font License 1.1, Copyright 2020 The JetBrains Mono Project Authors. La
 
 ## DejaVu Sans Mono (glyph subset)
 
-`src/assets/fonts/board-symbols.woff2` is a subset of DejaVu Sans Mono (status and block glyphs only). DejaVu fonts are based on Bitstream Vera; Bitstream Vera and DejaVu changes are in the public domain or under the Bitstream Vera Fonts license, which permits redistribution and modification. See https://dejavu-fonts.github.io/License.html.
+`src/assets/fonts/board-symbols.woff2` is a subset of DejaVu Sans Mono (status and block glyphs only). DejaVu fonts are based on Bitstream Vera; Bitstream Vera and DejaVu changes are in the public domain or under the Bitstream Vera Fonts license, which permits redistribution and modification. Full text in `src/assets/fonts/DejaVu-LICENSE.txt`.

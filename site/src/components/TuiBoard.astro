@@ -272,7 +272,10 @@ const ln = () => `--i:${i++}`;
   .tb[data-boot='pre'] .tb-panel,
   .tb[data-boot='armed'] .tb-panel,
   .tb[data-boot='run'] .tb-panel { opacity: 0; }
-  .tb[data-boot='pre'] .tb-panel { animation: tb-failsafe 0s 8s forwards; }
+  /* Failsafe: if boot never runs (script error, observer never fires), reveal anyway. */
+  .tb[data-boot='pre'] .tb-panel,
+  .tb[data-boot='armed'] .tb-panel { animation: tb-failsafe 0s 8s forwards; }
+  @media print { .tb[data-boot] .tb-panel { opacity: 1; animation: none; } }
   .tb[data-boot='run'] .tb-panel.is-on { opacity: 1; animation: tb-power 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
   .tb[data-boot='run'] .tb-panel.is-on .tb-ln { animation: tb-type 0.45s steps(18, end) both; animation-delay: calc(var(--i, 0) * 28ms); }
   @keyframes tb-failsafe { to { opacity: 1; } }

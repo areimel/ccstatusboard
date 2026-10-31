@@ -115,8 +115,9 @@ function meter(id: string, pct: number, f: number, t: Record<string, string>, a:
   a[`${id}.lv`] = level(pct);
 }
 
-const band = (p: number) => (p >= 100 ? 'OVER' : p >= 85 ? 'NEAR LIMIT' : 'UNDER');
-const bandLevel = (p: number): Level => (p >= 100 ? 'danger' : p >= 85 ? 'warn' : 'ok');
+// Bands match README "Burn rate": UNDER <85, NEAR LIMIT 85-100 inclusive, OVER >100-125, CRITICAL >125.
+const band = (p: number) => (p > 125 ? 'CRITICAL' : p > 100 ? 'OVER' : p >= 85 ? 'NEAR LIMIT' : 'UNDER');
+const bandLevel = (p: number): Level => (p > 100 ? 'danger' : p >= 85 ? 'warn' : 'ok');
 
 export interface View {
   t: Record<string, string>;
@@ -207,8 +208,10 @@ export function step(st: State, rand: () => number): void {
   st.n++;
   st.clock++;
   st.blockReset = Math.max(0, st.blockReset - 1);
-  st.block = Math.min(98, st.block + 0.03);
-  st.week = Math.min(98, st.week + 0.006);
+  // Caps keep both projections (block x1.22, week x3.03) at or below 100%, so the
+  // hardcoded "hits n/a" stays truthful however long the tab is open.
+  st.block = Math.min(81, st.block + 0.03);
+  st.week = Math.min(33, st.week + 0.006);
   st.burn = clamp(st.burn + (rand() - 0.5) * 0.05, 3.9, 4.4);
   st.cpu = clamp(st.cpu + (rand() - 0.5) * 9, 9, 62);
   st.mem = Math.min(80, st.mem + 0.01);
