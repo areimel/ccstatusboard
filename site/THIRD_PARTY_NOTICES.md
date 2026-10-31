@@ -27,3 +27,7 @@ SIL Open Font License 1.1 (Google Fonts, The DM Sans Project Authors).
 ## JetBrains Mono
 
 SIL Open Font License 1.1, Copyright 2020 The JetBrains Mono Project Authors. Latin woff2 files via @fontsource/jetbrains-mono. See `src/assets/fonts/JetBrainsMono-OFL.txt`.
+
+## DejaVu Sans Mono (glyph subset)
+
+`src/assets/fonts/board-symbols.woff2` is a subset of DejaVu Sans Mono (status and block glyphs only). DejaVu fonts are based on Bitstream Vera; Bitstream Vera and DejaVu changes are in the public domain or under the Bitstream Vera Fonts license, which permits redistribution and modification. See https://dejavu-fonts.github.io/License.html.

@@ -53,7 +53,7 @@ html[data-theme="kojima"] {
   --shadow-xl: 0 0 #0000;
   --shadow-2xl: 0 0 #0000;
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "JetBrains Mono", "Board Symbols", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --display-family: var(--font-sans);
   --text-family: var(--font-sans);
   --display-weight: 700;

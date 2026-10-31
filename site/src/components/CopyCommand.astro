@@ -17,9 +17,10 @@ const { cmd, label = 'Copy command', prompt = true, class: className = '' } = As
   <code class="copy-cmd__code">
     {prompt && <span class="copy-cmd__prompt" aria-hidden="true">$ </span>}<span class="copy-cmd__text">{cmd}</span>
   </code>
-  <button type="button" class="copy-cmd__btn" data-copy={cmd} data-label={label} hidden>
-    <span class="copy-cmd__status" aria-live="polite">{label}</span>
+  <button type="button" class="copy-cmd__btn" data-copy={cmd} aria-label={label} hidden>
+    <span class="copy-cmd__status" aria-hidden="true">Copy</span>
   </button>
+  <span class="copy-cmd__live sr-only" aria-live="polite"></span>
 </div>
 
 <style>
@@ -49,6 +50,7 @@ const { cmd, label = 'Copy command', prompt = true, class: className = '' } = As
   }
   .copy-cmd__btn {
     flex: 0 0 auto;
+    min-width: 5.5rem;
     padding: 0 14px;
     border: 0;
     border-left: 1px solid var(--border);
@@ -80,18 +82,22 @@ const { cmd, label = 'Copy command', prompt = true, class: className = '' } = As
     if (!navigator.clipboard) return;
     btn.hidden = false;
     const status = btn.querySelector('.copy-cmd__status');
+    const live = btn.parentElement?.querySelector('.copy-cmd__live');
     let timer: number | undefined;
     btn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(btn.dataset.copy ?? '');
         if (status) status.textContent = 'Copied';
+        if (live) live.textContent = 'Copied to clipboard';
         btn.dataset.copied = '';
       } catch {
-        if (status) status.textContent = 'Copy failed: select the text instead';
+        if (status) status.textContent = 'Select to copy';
+        if (live) live.textContent = 'Copy failed. Select the command text and copy it instead.';
       }
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        if (status) status.textContent = btn.dataset.label ?? 'Copy command';
+        if (status) status.textContent = 'Copy';
+        if (live) live.textContent = '';
         delete btn.dataset.copied;
       }, 2000);
     });

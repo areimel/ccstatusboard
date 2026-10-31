@@ -114,22 +114,9 @@ import {
   </div>
 </section>
 
-<style is:global>
-  /* Shared doc primitives for Install and Usage sections. */
-  .doc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .doc-table th, .doc-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-  .doc-table thead th { font-weight: 500; color: var(--muted-foreground); font-size: 13px; border-bottom-color: var(--input); }
-  .doc-table tbody th { font-weight: 400; }
-  .doc-table code { font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; font-variant-ligatures: none; }
-  .doc-table tbody tr:last-child > * { border-bottom: 0; }
-  .table-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--border); }
-  .table-scroll:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-  .tui-inline { font-family: var(--font-mono); font-size: 0.92em; font-variant-ligatures: none; overflow-wrap: anywhere; }
-</style>
-
 <style>
-  .install { padding-block: clamp(3rem, 8vw, 6rem); }
-  .install__h { margin: 28px 0 8px; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.15; font-weight: 500; }
+  .install { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+  .install__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
   .install__lede, .step__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 12px; }
   .steps { list-style: none; padding: 0; margin: 32px 0; display: grid; gap: 32px; counter-reset: step; max-width: 56rem; }
   .step { position: relative; padding-left: 48px; min-width: 0; counter-increment: step; }

@@ -49,6 +49,17 @@
   font-display: swap;
 }
 
+/* Status and block glyphs (● ◐ ○ ▁-█ ░) missing from the JetBrains Mono subset.
+   Subset of DejaVu Sans Mono; unicode-range keeps it to these code points only. */
+@font-face {
+  font-family: "Board Symbols";
+  src: url("../assets/fonts/board-symbols.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2580-259F, U+25CB, U+25CF-25D1, U+25D6-25D7;
+}
+
 /* Fallback tokens; the kojima theme in kojima.css overrides all of these. */
 :root {
   --background: #141310;
@@ -71,7 +82,7 @@
   --ring: #ff4d00;
   --radius: 0px;
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "JetBrains Mono", "Board Symbols", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @theme inline {

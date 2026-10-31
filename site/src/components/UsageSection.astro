@@ -1,6 +1,5 @@
 ---
 import SectionIndex from './SectionIndex.astro';
-import CopyCommand from './CopyCommand.astro';
 import KeyGrid from './KeyGrid.astro';
 import FlagTable from './FlagTable.astro';
 import { STATUS_LEGEND, THEMES, OPTIONS, CONFIG_PATH } from '../content/usage';
@@ -17,7 +16,7 @@ const statusClass: Record<string, string> = {
   <SectionIndex fig="06" name="Usage" />
   <h2 id="usage-h" class="usage__h">Usage</h2>
   <p class="usage__p">Run it with no arguments, or pass any of these flags.</p>
-  <CopyCommand cmd="ccstatusboard [options]" label="Copy usage line" class="usage__cmd" />
+  <pre class="usage__cmd usage__synopsis"><code><span class="tui-dim" aria-hidden="true">$ </span>ccstatusboard [options]</code></pre>
 
   <div class="block">
     <h3>Flags</h3>
@@ -73,10 +72,10 @@ const statusClass: Record<string, string> = {
 </section>
 
 <style>
-  .usage { padding-block: clamp(3rem, 8vw, 6rem); }
-  .usage__h { margin: 28px 0 8px; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.15; font-weight: 500; }
+  .usage { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+  .usage__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
   .usage__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 14px; }
-  .usage :global(.usage__cmd) { max-width: 28rem; }
+  .usage__synopsis { display: inline-block; max-width: 100%; overflow-x: auto; margin: 0; padding: 12px 14px; border: 1px solid var(--border); background: var(--tui-bg); font-family: var(--font-mono); font-size: 14px; font-variant-ligatures: none; }
   .block { margin-top: 48px; min-width: 0; }
   .block h3 { margin: 0 0 12px; font-size: 1.125rem; font-weight: 500; }
   .block--split { display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr); gap: 32px 48px; }
