@@ -40,7 +40,8 @@ if ! [[ "$VERSION" =~ $SEMVER_RE ]]; then
 fi
 TAG="v$VERSION"
 NPM_TAG="latest"
-case "$VERSION" in *-*) NPM_TAG="next" ;; esac
+GH_PRERELEASE=""
+case "$VERSION" in *-*) NPM_TAG="next"; GH_PRERELEASE="--prerelease" ;; esac
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -87,8 +88,9 @@ echo "preflight ok"
 
 # --------------------------------------------------- restore trap (pre-commit)
 restore_files() {
-  git checkout -- package.json 2>/dev/null || true
-  [ -f package-lock.json ] && git checkout -- package-lock.json 2>/dev/null || true
+  # Restore from HEAD (not the index): package files may already be staged.
+  git checkout HEAD -- package.json 2>/dev/null || true
+  [ -f package-lock.json ] && git checkout HEAD -- package-lock.json 2>/dev/null || true
 }
 RESTORE_ARMED=1
 on_exit() {
@@ -152,7 +154,7 @@ A real run of 'npm run release -- $VERSION' would now:
   - create annotated tag $TAG
   - npm publish --tag $NPM_TAG
   - git push origin main --follow-tags
-  - gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes
+  - gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes $GH_PRERELEASE
 Nothing was committed, tagged, published or pushed.
 SUMMARY
   exit 0   # EXIT trap restores package files
@@ -179,12 +181,12 @@ RESUME
     "npm publish")
       echo "  npm publish --tag $NPM_TAG" >&2
       echo "  git push origin main --follow-tags" >&2
-      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes" >&2 ;;
+      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes $GH_PRERELEASE" >&2 ;;
     "git push")
       echo "  git push origin main --follow-tags" >&2
-      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes" >&2 ;;
+      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes $GH_PRERELEASE" >&2 ;;
     *)
-      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes" >&2 ;;
+      echo "  gh release create $TAG release/ccstatusboard-* release/SHA256SUMS --title $TAG --generate-notes $GH_PRERELEASE" >&2 ;;
   esac
   exit "$rc"
 }
@@ -192,7 +194,7 @@ trap resume ERR
 
 STAGE="npm publish";    npm publish --tag "$NPM_TAG"
 STAGE="git push";       git push origin main --follow-tags
-STAGE="gh release";     gh release create "$TAG" release/ccstatusboard-* release/SHA256SUMS --title "$TAG" --generate-notes
+STAGE="gh release";     gh release create "$TAG" release/ccstatusboard-* release/SHA256SUMS --title "$TAG" --generate-notes $GH_PRERELEASE
 trap - ERR
 
 step "Released $TAG"

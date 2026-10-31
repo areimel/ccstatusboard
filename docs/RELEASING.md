@@ -47,7 +47,7 @@ The script prints the exact resume commands on failure. Manually, with `<v>` the
 - Publish succeeded, push failed:
   ```sh
   git push origin main --follow-tags
-  gh release create v<v> release/ccstatusboard-* release/SHA256SUMS --title v<v> --generate-notes
+  gh release create v<v> release/ccstatusboard-* release/SHA256SUMS --title v<v> --generate-notes  # add --prerelease for x.y.z-rc.N
   ```
 - Push succeeded, `gh release create` failed: run only the `gh release create` line (the `release/` directory must still exist; otherwise run `npm run build:bin` from the tagged commit).
 - Publish itself failed: `npm publish` again (add `--tag next` for prereleases). Nothing is public yet; the local commit and tag can be reused.
