@@ -1,0 +1,105 @@
+---
+import ThemeToggle from './ThemeToggle.astro';
+import { REPO_URL } from '../content/site';
+
+const links = [
+  { href: '#features', label: 'Features' },
+  { href: '#install', label: 'Install' },
+  { href: '#usage', label: 'Usage' },
+];
+---
+
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="page-wrap site-header__bar">
+    <a class="wordmark" href="#top" aria-label="ccstatusboard, back to top">
+      <span class="wordmark__mark" aria-hidden="true"></span>
+      <span class="wordmark__name">ccstatusboard</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <ul>
+        {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+        <li><a href={REPO_URL}>GitHub</a></li>
+      </ul>
+    </nav>
+    <div class="site-header__toggle"><ThemeToggle /></div>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+  @media (min-width: 640px) {
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+  }
+  .site-header__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 20px;
+    min-height: 64px;
+  }
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    margin-right: auto;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .wordmark__mark {
+    width: 10px;
+    height: 10px;
+    background: var(--primary);
+    flex: none;
+  }
+  .wordmark__name {
+    font-family: var(--font-display, var(--font-sans));
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.03em;
+  }
+  .site-nav { order: 2; }
+  .site-header__toggle { order: 1; }
+  .site-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .site-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .site-nav a:hover { color: var(--foreground); }
+  /* Narrow: nav drops to its own row under the wordmark and toggle. */
+  @media (max-width: 639px) {
+    .site-nav {
+      order: 3;
+      flex: 1 0 100%;
+      margin-inline: -10px;
+      padding-bottom: 4px;
+    }
+  }
+  @media (min-width: 640px) {
+    .site-nav { order: 1; }
+    .site-header__toggle { order: 2; }
+    .wordmark { margin-right: 0; }
+    .site-header__bar { gap: 0 8px; }
+    .site-nav { margin-left: auto; }
+  }
+</style>

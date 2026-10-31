@@ -1,0 +1,100 @@
+---
+// A shell command in a mono box with a copy button. The button is hidden until
+// JS runs (progressive enhancement); without JS the command is still selectable.
+interface Props {
+  cmd: string;
+  /** Accessible label for the button, e.g. "Copy install command". */
+  label?: string;
+  /** Show a "$" prompt before the command (not copied). */
+  prompt?: boolean;
+  class?: string;
+}
+
+const { cmd, label = 'Copy command', prompt = true, class: className = '' } = Astro.props;
+---
+
+<div class:list={['copy-cmd', className]}>
+  <code class="copy-cmd__code">
+    {prompt && <span class="copy-cmd__prompt" aria-hidden="true">$ </span>}<span class="copy-cmd__text">{cmd}</span>
+  </code>
+  <button type="button" class="copy-cmd__btn" data-copy={cmd} data-label={label} hidden>
+    <span class="copy-cmd__status" aria-live="polite">{label}</span>
+  </button>
+</div>
+
+<style>
+  .copy-cmd {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    background: var(--tui-bg);
+  }
+  .copy-cmd__code {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 12px 14px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre;
+    color: var(--foreground);
+    font-variant-ligatures: none;
+  }
+  .copy-cmd__prompt {
+    color: var(--tui-dim);
+    user-select: none;
+  }
+  .copy-cmd__btn {
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border: 0;
+    border-left: 1px solid var(--border);
+    background: transparent;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .copy-cmd__btn:hover {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .copy-cmd__btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+  .copy-cmd__btn[data-copied] {
+    color: var(--tui-ok);
+  }
+  .copy-cmd__btn[data-copied]:hover {
+    color: var(--primary-foreground);
+  }
+</style>
+
+<script>
+  function wire(btn: HTMLButtonElement) {
+    if (!navigator.clipboard) return;
+    btn.hidden = false;
+    const status = btn.querySelector('.copy-cmd__status');
+    let timer: number | undefined;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy ?? '');
+        if (status) status.textContent = 'Copied';
+        btn.dataset.copied = '';
+      } catch {
+        if (status) status.textContent = 'Copy failed: select the text instead';
+      }
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (status) status.textContent = btn.dataset.label ?? 'Copy command';
+        delete btn.dataset.copied;
+      }, 2000);
+    });
+  }
+  document.querySelectorAll<HTMLButtonElement>('button[data-copy]').forEach(wire);
+</script>

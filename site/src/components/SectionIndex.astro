@@ -1,0 +1,17 @@
+---
+// Kojima-style section index row: "▪ FIG. 03 ........ INSTRUMENTS".
+// FIG numbers index the page's sections in nav order; keep them in sync with index.astro.
+interface Props {
+  fig: string; // e.g. "03"
+  name: string; // e.g. "Instruments" (rendered uppercase by the class)
+  /** Optional right-aligned note, e.g. "6 panels". */
+  note?: string;
+}
+
+const { fig, name, note } = Astro.props;
+---
+
+<div class="index-label">
+  <span><i aria-hidden="true"></i>Fig. {fig} / {name}</span>
+  {note && <span>{note}</span>}
+</div>
