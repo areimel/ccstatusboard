@@ -1,0 +1,55 @@
+---
+import SectionIndex from './SectionIndex.astro';
+import FeaturePlate from './FeaturePlate.astro';
+import { FEATURES } from '../content/features';
+
+// Asymmetric 6-column layout on wide screens; spans per feature id.
+const spans: Record<string, string> = {
+  limits: 'span-2',
+  'burn-rate': 'span-4',
+  sessions: 'span-4',
+  cost: 'span-2',
+  system: 'span-3',
+  'detail-pane': 'span-3',
+};
+---
+
+<section id="features" class="page-wrap features" aria-labelledby="features-title">
+  <SectionIndex fig="03" name="Instruments" note={`${FEATURES.length} panels`} />
+  <div class="intro">
+    <h2 id="features-title">Everything the board shows</h2>
+    <p>
+      Six panels, all read from your local Claude Code files. The excerpts below are illustrative; the real layout
+      adapts to your terminal size and theme.
+    </p>
+  </div>
+  <div class="grid">
+    {FEATURES.map((f) => <FeaturePlate feature={f} class={spans[f.id] ?? 'span-3'} />)}
+  </div>
+</section>
+
+<style>
+  .features { padding-block: clamp(3rem, 8vw, 6rem); }
+  .intro { margin: clamp(1.5rem, 3vw, 2.5rem) 0 clamp(1.5rem, 3vw, 2.25rem); }
+  h2 {
+    font-size: clamp(1.625rem, 3.2vw, 2.25rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.75rem;
+  }
+  .intro p { margin: 0; max-width: 62ch; line-height: 1.6; color: var(--muted-foreground); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--border); background: var(--card); }
+  .grid > :global(*) {
+    min-width: 0;
+    padding: clamp(1.1rem, 3vw, 1.75rem);
+    border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    margin: -1px 0 0 -1px;
+  }
+  @media (min-width: 900px) {
+    .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .grid > :global(.span-2) { grid-column: span 2; }
+    .grid > :global(.span-3) { grid-column: span 3; }
+    .grid > :global(.span-4) { grid-column: span 4; }
+  }
+</style>

@@ -1,0 +1,106 @@
+---
+import SectionIndex from './SectionIndex.astro';
+import { SAFETY, DATA_SOURCES } from '../content/features';
+
+// Cost caveat comes from the README's Privacy and safety section.
+const items = [
+  ...SAFETY,
+  {
+    title: 'Costs are estimates',
+    body: 'Costs are based on API list prices. On a Pro/Max subscription you are not billed these amounts.',
+  },
+];
+---
+
+<section id="safety" class="page-wrap safety" aria-labelledby="safety-title">
+  <SectionIndex fig="04" name="Safety" />
+  <div class="layout">
+    <div class="lead">
+      <h2 id="safety-title">It reads your Claude Code data and changes none of it</h2>
+      <p>
+        ccstatusboard runs locally. It makes two kinds of network request, and you can switch the usage one off with
+        <code class="tui">--no-usage-api</code>.
+      </p>
+      <ul class="hosts tui" aria-label="Hosts contacted">
+        <li>api.anthropic.com <span class="tui-dim">usage</span></li>
+        <li>raw.githubusercontent.com <span class="tui-dim">LiteLLM prices</span></li>
+      </ul>
+    </div>
+
+    <dl class="items">
+      {items.map((it) => (
+        <div>
+          <dt>{it.title}</dt>
+          <dd>{it.body}</dd>
+        </div>
+      ))}
+    </dl>
+  </div>
+
+  <details class="sources">
+    <summary>Where the data comes from</summary>
+    <div class="table-scroll" tabindex="0" role="group" aria-label="Data sources table">
+      <table>
+        <thead>
+          <tr><th scope="col">Data</th><th scope="col">Source</th></tr>
+        </thead>
+        <tbody>
+          {DATA_SOURCES.map((d) => (
+            <tr><th scope="row">{d.data}</th><td>{d.source}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<style>
+  .safety { padding-block: clamp(3rem, 8vw, 6rem); }
+  .layout {
+    display: grid;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+  }
+  @media (min-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+    .lead { position: sticky; top: 5.5rem; }
+  }
+  h2 {
+    font-size: clamp(1.625rem, 3.2vw, 2.25rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    max-width: 20ch;
+    margin: 0 0 1rem;
+  }
+  .lead p { margin: 0; max-width: 56ch; line-height: 1.6; color: var(--muted-foreground); }
+  code { padding: 1px 5px; border: 1px solid var(--border); font-size: 0.85em; color: var(--foreground); }
+  .hosts {
+    list-style: none;
+    margin: 1.25rem 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    overflow-x: auto;
+    max-width: 100%;
+    width: fit-content;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+  .items { margin: 0; border-top: 1px solid var(--border); }
+  .items > div { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+  dt { font-weight: 600; margin-bottom: 0.3rem; }
+  dd { margin: 0; max-width: 62ch; line-height: 1.55; color: var(--muted-foreground); overflow-wrap: anywhere; }
+
+  .sources { margin-top: clamp(2rem, 4vw, 3rem); border: 1px solid var(--border); background: var(--card); }
+  summary { cursor: pointer; padding: 0.85rem 1rem; font-weight: 500; }
+  summary:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  .table-scroll { overflow-x: auto; border-top: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; min-width: 34rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); line-height: 1.5; }
+  tbody tr:last-child > * { border-bottom: 0; }
+  thead th { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 400; }
+  tbody th { font-weight: 500; width: 13rem; }
+  td { font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); }
+</style>

@@ -1,0 +1,89 @@
+---
+import type { Feature } from '../content/features';
+
+interface Props {
+  feature: Feature;
+  class?: string;
+}
+
+type Seg = readonly [cls: string, text: string];
+
+// Tiny illustrative excerpts per feature id. Facts follow README.md.
+const EXCERPTS: Record<string, readonly (readonly Seg[])[]> = {
+  limits: [
+    [['tui-dim', '5h    '], ['', '[||||||||||||        ] 58%  resets 2h14m']],
+    [['tui-dim', 'Week  '], ['', '[||||||              ] 31%  resets Thu 09:00']],
+  ],
+  'burn-rate': [
+    [['tui-dim', '5h    '], ['tui-warn', 'NEAR LIMIT'], ['', '  92% at reset  hits n/a']],
+    [['tui-dim', 'Week  '], ['tui-danger', 'OVER'], ['', '        108% at reset  hits Wed']],
+  ],
+  cost: [
+    [['tui-dim', 'block '], ['', '$12.40  '], ['tui-dim', 'week '], ['', '$96.10  '], ['tui-dim', 'month '], ['', '$412.75']],
+    [['tui-dim', 'burn  '], ['', '$4.10/h  '], ['tui-dim', '24h '], ['tui-accent', '▁▂▃▅▇▆▅▃▂▃▅▆▇▅▃▂▁▁▂▃▅▆▇▆']],
+  ],
+  sessions: [
+    [['tui-dim', '── ccstatusboard (1) ──────────────────']],
+    [['tui-ok', '◐'], ['', '  ccstatusboard  opus-5.5  '], ['tui-ok', '███████'], ['tui-dim', '░░░'], ['', ' 61%  $4.20  now']],
+    [['tui-dim', '  ├─ '], ['', 'Explore'], ['tui-dim', '                          12s']],
+    [['tui-dim', '○  power-tools     sonnet    ██░░░░░░░░ 22%  $1.10  3m']],
+  ],
+  system: [
+    [['tui-dim', 'cpu '], ['', '[|||||||             ] 34%  '], ['tui-dim', 'mem '], ['', '[||||||||||          ] 52%']],
+    [['tui-dim', 'net '], ['tui-accent', '▁▂▃▅▂▁▁▃▅▇▅▃'], ['tui-dim', ' down  '], ['tui-accent', '▁▁▂▁▁▂▁▃▁▁▂▁'], ['tui-dim', ' up']],
+  ],
+  'detail-pane': [
+    [['tui-dim', 'tokens '], ['', 'in 182k  out 41k  cache 1.9M']],
+    [['tui-dim', 'cost   '], ['', 'opus-5.5 $4.20']],
+    [['tui-dim', 'agents '], ['', 'Explore  '], ['tui-dim', 'cwd '], ['', '~/code/ccstatusboard']],
+  ],
+};
+
+const { feature, class: className } = Astro.props;
+const lines = EXCERPTS[feature.id] ?? [];
+---
+
+<article class:list={['feature', className]} aria-labelledby={`feature-${feature.id}`}>
+  <h3 id={`feature-${feature.id}`}>{feature.title}</h3>
+  <p class="summary">{feature.summary}</p>
+  <pre class="tui excerpt" tabindex="0" role="group" aria-label={`Example: ${feature.title}`}>{lines.map((segs, i) => (
+    <Fragment>{i > 0 && '\n'}{segs.map(([cls, text]) => (cls ? <span class={cls}>{text}</span> : text))}</Fragment>
+  ))}</pre>
+  <ul class="details">
+    {feature.details.map((d) => <li>{d}</li>)}
+  </ul>
+</article>
+
+<style>
+  .feature { display: flex; flex-direction: column; gap: 0.9rem; }
+  h3 { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+  .summary { margin: 0; max-width: 56ch; line-height: 1.55; color: var(--foreground); }
+  .excerpt {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+    max-width: 100%;
+  }
+  .details { list-style: none; margin: 0; padding: 0; max-width: 62ch; }
+  .details li {
+    position: relative;
+    padding: 0.4rem 0 0.4rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
+  .details li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.95em;
+    width: 5px;
+    height: 5px;
+    background: var(--input);
+  }
+</style>
