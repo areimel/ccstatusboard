@@ -25,7 +25,7 @@ Steps, in order (everything that can fail locally happens before the first irrev
 1. Preflight: clean tree, on `main`, HEAD equals `origin/main`, tag `v<version>` absent locally and on origin, `npm whoami`, `gh auth status`, bun or npx available, version not on npm.
 2. `npm version --no-git-tag-version`, then typecheck, lint, test, build.
 3. `npm run build:bin`, checksum verification, `--version` smoke test of the host binary, `npm pack --dry-run`.
-4. Commit `chore(release): v<version>`, annotated tag, `npm publish`, `git push origin main --follow-tags`, `gh release create`.
+4. Commit `chore(release): v<version>` (skipped when `package.json` is already at that version, e.g. the first `0.1.0` release, in which case HEAD is tagged as-is), annotated tag, `npm publish`, `git push origin main --follow-tags`, `gh release create`.
 
 If a step fails before the release commit, the package files are restored automatically.
 
