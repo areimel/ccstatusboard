@@ -151,6 +151,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   cat <<SUMMARY
 A real run of 'npm run release -- $VERSION' would now:
   - commit package.json + package-lock.json as "chore(release): $TAG"
+    (skipped if package.json is already at $VERSION; HEAD is tagged as-is)
   - create annotated tag $TAG
   - npm publish --tag $NPM_TAG
   - git push origin main --follow-tags
@@ -164,8 +165,13 @@ fi
 step "5/5 Commit, tag, publish, push, GitHub release"
 git add package.json
 [ -f package-lock.json ] && git add package-lock.json
-git commit -m "chore(release): $TAG"
-RESTORE_ARMED=0   # release commit exists; do not revert files anymore
+if git diff --cached --quiet; then
+  # Releasing the version already in package.json (e.g. the first 0.1.0): no bump to commit.
+  echo "package.json already at $VERSION; tagging current HEAD without a release commit"
+else
+  git commit -m "chore(release): $TAG"
+fi
+RESTORE_ARMED=0   # release commit (or HEAD) is final; do not revert files anymore
 git tag -a "$TAG" -m "$TAG"
 
 STAGE="npm publish"
