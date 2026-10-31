@@ -24,13 +24,41 @@ An htop-style terminal dashboard for **all** your Claude Code sessions: usage li
 
 ## Install
 
-Requires Node.js 22+ on Linux or macOS. Windows is not supported.
+ccstatusboard runs on Linux or macOS. Windows is not supported.
+
+### With npm (Node.js 22+)
 
 ```bash
-npx ccstatusboard          # run once
+npx ccstatusboard          # run once, no install
 npm i -g ccstatusboard     # or install globally
 ccstatusboard
 ```
+
+### Without Node.js (standalone binary)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh
+```
+
+Supported platforms: Linux x64, macOS Apple Silicon (arm64), and macOS Intel (x64). The script downloads the matching binary from the latest GitHub Release, verifies its SHA-256 checksum, and installs it to `~/.local/bin/ccstatusboard`. If the script warns that `~/.local/bin` is not on your `PATH`, add it to your shell profile. Linux arm64 users should install with npm instead.
+
+### Options
+
+Set these environment variables before `sh`, for example `curl -fsSL ... | CCSTATUSBOARD_VERSION=v0.2.0 sh`.
+
+| Variable                    | Meaning                                       | Default        |
+| --------------------------- | --------------------------------------------- | -------------- |
+| `CCSTATUSBOARD_VERSION`     | Release tag to install (for example `v0.2.0`) | latest release |
+| `CCSTATUSBOARD_INSTALL_DIR` | Directory to install the binary into          | `~/.local/bin` |
+
+### Updating
+
+For npm, run `npm i -g ccstatusboard@latest`. For the standalone binary, re-run the same `curl` command.
+
+### Uninstall
+
+- npm: `npm rm -g ccstatusboard`
+- Standalone binary: `curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh -s -- --uninstall` (respects `CCSTATUSBOARD_INSTALL_DIR`), or just delete the file.
 
 ## What it shows
 
