@@ -1,0 +1,207 @@
+---
+import SectionIndex from './SectionIndex.astro';
+import CopyCommand from './CopyCommand.astro';
+import {
+  NPM_COMMANDS,
+  CURL_INSTALL,
+  PLATFORMS,
+  INSTALL_ENV_VARS,
+  UPDATE,
+  UNINSTALL,
+  REQUIREMENTS,
+} from '../content/install';
+---
+
+<section id="install" class="page-wrap install" aria-labelledby="install-h">
+  <SectionIndex fig="05" name="Install" />
+  <h2 id="install-h" class="install__h">Install</h2>
+  <p class="install__lede">Pick npm or a standalone binary. Both give you the same <code class="tui-inline">ccstatusboard</code> command.</p>
+
+  <ol class="steps">
+    <li class="step">
+      <h3 class="step__h">Pick a method</h3>
+      <p class="step__p">Use npm if you have Node 22 or newer. Otherwise use the standalone binary, which needs no Node.</p>
+      <div class="tabs" role="tablist" aria-label="Install method" hidden data-tablist>
+        <button type="button" role="tab" id="tab-npm" aria-controls="panel-npm" aria-selected="true" tabindex="0">npm ({REQUIREMENTS.replace(' for npm', '')})</button>
+        <button type="button" role="tab" id="tab-bin" aria-controls="panel-bin" aria-selected="false" tabindex="-1">Standalone binary</button>
+      </div>
+    </li>
+
+    <li class="step">
+      <h3 class="step__h">Run it</h3>
+      <div class="panel" role="tabpanel" id="panel-npm" aria-labelledby="tab-npm" tabindex="0">
+        <h4 class="panel__title">npm ({REQUIREMENTS.replace(' for npm', '')})</h4>
+        <ul class="cmds">
+          {NPM_COMMANDS.map((c) => (
+            <li>
+              <CopyCommand cmd={c.cmd} label={`Copy ${c.cmd}`} />
+              <p class="cmds__note">{c.note}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-bin" aria-labelledby="tab-bin" tabindex="0">
+        <h4 class="panel__title">Standalone binary</h4>
+        <CopyCommand cmd={CURL_INSTALL} label="Copy install command" />
+        <p class="step__p">
+          The script downloads the binary for your platform from the latest GitHub Release, verifies its SHA-256 checksum,
+          and installs it to <code class="tui-inline">~/.local/bin</code>. Make sure that directory is on your <code class="tui-inline">PATH</code>.
+        </p>
+        <p class="step__p">Override the defaults with environment variables:</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Install environment variables">
+          <table class="doc-table">
+            <thead><tr><th scope="col">Variable</th><th scope="col">Meaning</th><th scope="col">Default</th></tr></thead>
+            <tbody>
+              {INSTALL_ENV_VARS.map((v) => (
+                <tr>
+                  <th scope="row"><code>{v.name}</code></th>
+                  <td>{v.meaning}</td>
+                  <td>{v.default}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="step__p">Example:</p>
+        <CopyCommand
+          cmd={`curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | CCSTATUSBOARD_INSTALL_DIR=$HOME/bin sh`}
+          label="Copy example with custom install directory"
+        />
+      </div>
+    </li>
+
+    <li class="step">
+      <h3 class="step__h">Launch it</h3>
+      <p class="step__p">Run <code class="tui-inline">ccstatusboard</code> in any terminal. To start with a different theme, add <code class="tui-inline">--theme</code>:</p>
+      <CopyCommand cmd="ccstatusboard --theme nord" label="Copy launch command with theme" />
+    </li>
+  </ol>
+
+  <div class="platforms plate plate-pad">
+    <h3 class="step__h">Platforms</h3>
+    <ul class="plain">
+      {PLATFORMS.supported.map((p) => <li>{p}</li>)}
+    </ul>
+    <ul class="plain plain--notes">
+      {PLATFORMS.notes.map((n) => <li>{n}</li>)}
+    </ul>
+  </div>
+
+  <div class="more">
+    <details>
+      <summary>Update</summary>
+      <div class="more__body">
+        {UPDATE.map((u) => (
+          <>
+            <p class="step__p">{u.method}</p>
+            <CopyCommand cmd={u.cmd} label={`Copy update command for ${u.method.split(' (')[0]}`} />
+          </>
+        ))}
+      </div>
+    </details>
+    <details>
+      <summary>Uninstall</summary>
+      <div class="more__body">
+        {UNINSTALL.map((u) => (
+          <>
+            <p class="step__p">{u.method}</p>
+            <CopyCommand cmd={u.cmd} label={`Copy uninstall command for ${u.method.split(' (')[0]}`} />
+          </>
+        ))}
+      </div>
+    </details>
+  </div>
+</section>
+
+<style is:global>
+  /* Shared doc primitives for Install and Usage sections. */
+  .doc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .doc-table th, .doc-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  .doc-table thead th { font-weight: 500; color: var(--muted-foreground); font-size: 13px; border-bottom-color: var(--input); }
+  .doc-table tbody th { font-weight: 400; }
+  .doc-table code { font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; font-variant-ligatures: none; }
+  .doc-table tbody tr:last-child > * { border-bottom: 0; }
+  .table-scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--border); }
+  .table-scroll:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .tui-inline { font-family: var(--font-mono); font-size: 0.92em; font-variant-ligatures: none; overflow-wrap: anywhere; }
+</style>
+
+<style>
+  .install { padding-block: clamp(3rem, 8vw, 6rem); }
+  .install__h { margin: 28px 0 8px; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.15; font-weight: 500; }
+  .install__lede, .step__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 12px; }
+  .steps { list-style: none; padding: 0; margin: 32px 0; display: grid; gap: 32px; counter-reset: step; max-width: 56rem; }
+  .step { position: relative; padding-left: 48px; min-width: 0; counter-increment: step; }
+  .step::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 32px; height: 32px; display: grid; place-items: center;
+    border: 1px solid var(--input); font-family: var(--font-mono); font-size: 13px; color: var(--foreground);
+  }
+  .step__h { margin: 4px 0 4px; font-size: 1.125rem; font-weight: 500; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 0; margin-top: 12px; border-bottom: 1px solid var(--border); }
+  .tabs[hidden] { display: none; }
+  .tabs [role='tab'] {
+    padding: 10px 16px; border: 1px solid transparent; border-bottom: 0; margin-bottom: -1px;
+    background: transparent; color: var(--muted-foreground); font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .tabs [role='tab'][aria-selected='true'] { color: var(--foreground); border-color: var(--border); background: var(--card); box-shadow: inset 0 2px 0 var(--primary); }
+  .tabs [role='tab']:hover { color: var(--foreground); }
+  .tabs [role='tab']:focus-visible, .panel:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .panel { margin-top: 12px; min-width: 0; display: grid; gap: 4px; }
+  .panel + .panel { margin-top: 28px; }
+  .panel__title { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--muted-foreground); }
+  .js-tabs .panel__title { display: none; }
+  .js-tabs .panel + .panel { margin-top: 12px; }
+  .cmds { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .cmds__note { margin: 6px 0 0; font-size: 14px; color: var(--muted-foreground); }
+  .platforms { max-width: 56rem; }
+  .plain { margin: 8px 0 0; padding-left: 1.1rem; line-height: 1.7; }
+  .plain--notes { color: var(--muted-foreground); }
+  .more { margin-top: 24px; max-width: 56rem; border-top: 1px solid var(--border); }
+  details { border-bottom: 1px solid var(--border); }
+  summary { cursor: pointer; padding: 14px 4px; font-weight: 500; }
+  summary:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  .more__body { padding: 0 4px 18px; display: grid; gap: 6px; }
+  .more__body .step__p { margin-bottom: 2px; }
+  @media (max-width: 480px) { .step { padding-left: 0; padding-top: 44px; } }
+</style>
+
+<script>
+  const roots = document.querySelectorAll<HTMLElement>('#install');
+  roots.forEach((root) => {
+    const list = root.querySelector<HTMLElement>('[data-tablist]');
+    if (!list) return;
+    const tabs = Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const panels = tabs.map((t) => document.getElementById(t.getAttribute('aria-controls') ?? '') as HTMLElement);
+    if (panels.some((p) => !p)) return;
+    root.classList.add('js-tabs');
+    list.hidden = false;
+    const select = (i: number, focus = false) => {
+      tabs.forEach((t, j) => {
+        const on = i === j;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        panels[j].hidden = !on;
+      });
+      if (focus) tabs[i].focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(i));
+      t.addEventListener('keydown', (e) => {
+        const n = tabs.length;
+        let next = -1;
+        if (e.key === 'ArrowRight') next = (i + 1) % n;
+        else if (e.key === 'ArrowLeft') next = (i - 1 + n) % n;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = n - 1;
+        if (next >= 0) {
+          e.preventDefault();
+          select(next, true);
+        }
+      });
+    });
+    select(0);
+  });
+</script>

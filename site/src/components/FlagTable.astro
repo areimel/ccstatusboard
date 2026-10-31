@@ -1,0 +1,19 @@
+---
+import { FLAGS } from '../content/usage';
+---
+
+<div class="table-scroll" tabindex="0" role="region" aria-label="Command-line flags">
+  <table class="doc-table">
+    <thead><tr><th scope="col">Flag</th><th scope="col">What it does</th></tr></thead>
+    <tbody>
+      {FLAGS.map((f) => (
+        <tr><th scope="row"><code>{f.flag}</code></th><td>{f.meaning}</td></tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .doc-table tbody th { white-space: nowrap; }
+  @media (max-width: 560px) { .doc-table tbody th { white-space: normal; } }
+</style>
