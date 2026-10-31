@@ -7,3 +7,4 @@ Standalone htop-style Ink TUI monitoring all Claude Code sessions. Spec: docs/su
 - Collectors do IO and emit events; `store/` aggregates; `ui/` renders only (no IO in components).
 - Never write under the Claude config dir, never open `*.key` files, never refresh OAuth tokens.
 - Inject `now`, fs, fetch and exec for testability; tests use fixtures from `test/helpers/`.
+- Landing page lives in `site/`, a separate Astro project (`cd site && npm run dev|build`), deployed to GitHub Pages by `.github/workflows/pages.yml`; root lint and prettier ignore it.

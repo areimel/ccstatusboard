@@ -2,6 +2,8 @@
 
 An htop-style terminal dashboard for **all** your Claude Code sessions: usage limits, estimated costs, and what every session is doing right now.
 
+Website: https://areimel.github.io/ccstatusboard/
+
 [ccstatusline](https://github.com/sirmalloc/ccstatusline) shows a statusline _inside_ one Claude Code session. ccstatusboard runs in its own terminal window and watches every session on the machine.
 
 ```

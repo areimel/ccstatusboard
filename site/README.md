@@ -12,9 +12,13 @@ Run inside `site/` (Node 22):
 - `npm run preview` - serve the build
 - `npm run check` - `astro check`
 
+Local preview of the production build: `npm run build && npm run preview` → http://localhost:4321/ccstatusboard/
+
 ## Deployment
 
 GitHub Pages via `.github/workflows/pages.yml` (builds `site/`, publishes `site/dist`). Served from `https://areimel.github.io/ccstatusboard`, so use `import.meta.env.BASE_URL` for internal URLs.
+
+One-time repo setting: Settings → Pages → Source: "GitHub Actions". Without it the deploy job fails.
 
 ## Credits
 
