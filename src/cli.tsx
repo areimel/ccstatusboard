@@ -1,5 +1,4 @@
 import React from 'react';
-import { readFileSync } from 'node:fs';
 import { render, type Instance } from 'ink';
 import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './config/load.js';
 import { createConfigSaver } from './config/save.js';
@@ -8,11 +7,7 @@ import { cacheDir, resolveClaudeDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
 import { superviseInk } from './app/supervise.js';
 import { App } from './ui/App.js';
-
-// dist/cli.js (bundled) and src/cli.tsx are both one level below package.json.
-const VERSION = (
-  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
-).version;
+import { VERSION } from './version.js';
 
 const SAVE_FLUSH_MS = 500;
 

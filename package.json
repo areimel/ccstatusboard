@@ -36,7 +36,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "build:bin": "bash scripts/build-binaries.sh",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "@inkjs/ui": "2.0.0",
@@ -66,5 +68,13 @@
       "react": "$react",
       "typescript": "$typescript"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/areimel/ccstatusboard.git"
+  },
+  "homepage": "https://github.com/areimel/ccstatusboard#readme",
+  "bugs": {
+    "url": "https://github.com/areimel/ccstatusboard/issues"
   }
 }
