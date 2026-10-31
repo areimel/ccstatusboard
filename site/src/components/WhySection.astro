@@ -1,0 +1,138 @@
+---
+import SectionIndex from './SectionIndex.astro';
+import { CCSTATUSLINE_URL } from '../content/site';
+
+// Each tile: [glyph, tui class, project, state label for assistive text]
+const tiles = [
+  ['◐', 'tui-ok', 'ccstatusboard', 'working'],
+  ['●', 'tui-warn', 'api-gateway', 'waiting'],
+  ['○', 'tui-dim', 'power-tools', 'idle'],
+  ['◐', 'tui-ok', 'docs-site', 'working'],
+  ['○', 'tui-dim', 'dotfiles', 'idle'],
+] as const;
+const summary = tiles.map(([, , name, state]) => `${name} ${state}`).join(', ');
+---
+
+<section id="why" class="page-wrap why" aria-labelledby="why-title">
+  <SectionIndex fig="02" name="Field of view" />
+  <div class="why-grid">
+    <div class="why-copy">
+      <h2 id="why-title">One statusline per session, or one board for all of them</h2>
+      <p>
+        <a href={CCSTATUSLINE_URL} rel="noreferrer">ccstatusline</a> shows a statusline inside one Claude Code
+        session. ccstatusboard runs in its own terminal window and watches every session on the machine.
+      </p>
+      <dl class="compare">
+        <div>
+          <dt>ccstatusline</dt>
+          <dd>Lives inside a session. You see the session you are looking at.</dd>
+        </div>
+        <div>
+          <dt>ccstatusboard</dt>
+          <dd>Lives in its own window. You see every session, plus your usage limits and estimated cost.</dd>
+        </div>
+      </dl>
+    </div>
+
+    <figure class="plate plate-pad diagram">
+      <div
+        class="diagram-body"
+        role="img"
+        aria-label={`Diagram: five Claude Code sessions (${summary}) each feed into one ccstatusboard window.`}
+      >
+        <ul class="tiles" aria-hidden="true">
+          {tiles.map(([glyph, cls, name]) => (
+            <li>
+              <span class="tile tui">
+                <span class={cls}>{glyph}</span> {name}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <svg class="wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          {[10, 30, 50, 70, 90].map((y) => (
+            <polyline points={`0,${y} 45,${y} 55,50 100,50`} />
+          ))}
+        </svg>
+        <div class="board tui" aria-hidden="true">
+          <div class="board-title">ccstatusboard</div>
+          <div><span class="tui-dim">5h  </span>[<span class="tui-accent">||||||</span>    ] 58%</div>
+          <div><span class="tui-ok">◐ 2</span> <span class="tui-warn">● 1</span> <span class="tui-dim">○ 2</span></div>
+          <div class="tui-dim">est. cost</div>
+        </div>
+      </div>
+      <figcaption class="plate-caption">
+        <span><strong>Sessions</strong> feed one board</span>
+        <span>Illustrative</span>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .why { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+  .why-grid {
+    display: grid;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin-top: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+  }
+  @media (min-width: 900px) {
+    .why-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  }
+  h2 {
+    font-size: clamp(1.625rem, 3.2vw, 2.25rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    max-width: 22ch;
+    margin: 0 0 1rem;
+  }
+  p { max-width: 62ch; line-height: 1.6; color: var(--muted-foreground); margin: 0; }
+  p a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  p a:hover { color: var(--accent-ink, var(--kojima-accent-ink)); }
+  .compare { margin: 1.75rem 0 0; max-width: 62ch; border-top: 1px solid var(--border); }
+  .compare > div {
+    display: grid;
+    gap: 2px 1.25rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  @media (min-width: 480px) { .compare > div { grid-template-columns: 8.5rem 1fr; } }
+  dt { font-family: var(--font-mono); font-size: 13px; color: var(--foreground); }
+  dd { margin: 0; line-height: 1.5; color: var(--muted-foreground); }
+
+  .diagram { margin: 0; }
+  .diagram-body {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(1.25rem, 1fr) minmax(0, auto);
+    align-items: stretch;
+    color: var(--muted-foreground);
+  }
+  .tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-rows: repeat(5, 3rem); }
+  .tiles li { display: flex; align-items: center; padding-block: 4px; min-width: 0; }
+  .tile {
+    display: block;
+    width: 100%;
+    padding: 6px 9px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .wires { height: 100%; min-height: 15rem; color: var(--input); }
+  .wires polyline { fill: none; stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .board {
+    align-self: center;
+    padding: 10px 12px;
+    border: 1px solid var(--foreground);
+    background: var(--background);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .board-title { color: var(--foreground); border-bottom: 1px solid var(--border); margin-bottom: 4px; padding-bottom: 2px; }
+  @media (max-width: 400px) {
+    .tile { font-size: 11px; padding-inline: 6px; }
+    .board { font-size: 11px; padding-inline: 8px; }
+  }
+</style>

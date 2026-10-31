@@ -1,0 +1,53 @@
+---
+import { AUTHOR, ISSUES_URL, LICENSE, NPM_URL, RELEASES_URL, REPO_URL } from '../content/site';
+
+const links = [
+  { href: REPO_URL, label: 'GitHub' },
+  { href: ISSUES_URL, label: 'Issues' },
+  { href: RELEASES_URL, label: 'Releases' },
+  { href: NPM_URL, label: 'npm' },
+];
+---
+
+<footer class="site-footer">
+  <div class="page-wrap">
+    <div class="system-strip" role="list">
+      <span role="listitem">Read-only toward Claude Code</span>
+      <span role="listitem">Linux · macOS</span>
+      <span role="listitem">Runs locally</span>
+      <span role="listitem">{LICENSE} licensed</span>
+    </div>
+    <div class="site-footer__row">
+      <p class="site-footer__meta">
+        {LICENSE} license. Made by {AUTHOR}.
+        Built on the <a href="https://github.com/areimel/kojima-astro-template">Kojima template</a>. <a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/third-party-notices.txt`}>Third-party notices</a>.
+      </p>
+      <nav aria-label="Project links">
+        <ul>
+          {links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer { padding-bottom: 32px; }
+  .site-footer__row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 32px;
+    padding-top: 20px;
+    font-size: 14px;
+    color: var(--muted-foreground);
+  }
+  .site-footer__meta { margin: 0; max-width: 60ch; }
+  .site-footer a { color: var(--foreground); text-underline-offset: 4px; }
+  .site-footer__meta a { text-decoration: underline; }
+  .site-footer a:hover { color: var(--kojima-accent-ink); }
+  .site-footer a:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  .site-footer ul { display: flex; flex-wrap: wrap; gap: 0 20px; margin: 0; padding: 0; list-style: none; }
+  .site-footer nav a { display: inline-flex; align-items: center; min-height: 44px; }
+</style>

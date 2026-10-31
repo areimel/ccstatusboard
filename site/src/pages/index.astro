@@ -1,0 +1,31 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import TuiBoard from '../components/TuiBoard.astro';
+import WhySection from '../components/WhySection.astro';
+import FeatureSection from '../components/FeatureSection.astro';
+import SafetySection from '../components/SafetySection.astro';
+import InstallSection from '../components/InstallSection.astro';
+import UsageSection from '../components/UsageSection.astro';
+import Cta from '../components/Cta.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Base
+  title="ccstatusboard: every Claude Code session, one board"
+  description="An htop-style terminal dashboard for all your Claude Code sessions: usage limits, estimated costs, and what every session is doing right now."
+>
+  <Header />
+  <main id="main">
+    <!-- Section FIG numbers follow page order: 01 board, 02 why, 03 features, 04 safety, 05 install, 06 usage. -->
+    <Hero><TuiBoard /></Hero>
+    <WhySection />
+    <FeatureSection />
+    <SafetySection />
+    <InstallSection />
+    <UsageSection />
+    <Cta />
+  </main>
+  <Footer />
+</Base>

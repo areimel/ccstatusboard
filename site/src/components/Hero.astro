@@ -1,0 +1,84 @@
+---
+import CopyCommand from './CopyCommand.astro';
+import { REPO_URL, TAGLINE } from '../content/site';
+---
+
+<section id="top" class="hero page-wrap" aria-labelledby="hero-title">
+  <div class="hero__copy">
+    <h1 id="hero-title" class="hero__title">Every Claude Code session. One board.</h1>
+    <p class="hero__pitch">{TAGLINE}</p>
+    <div class="hero__actions">
+      <CopyCommand cmd="npx ccstatusboard" label="Copy install command" class="hero__cmd" />
+      <a class="btn btn--secondary" href={REPO_URL}>View on GitHub</a>
+    </div>
+    <p class="hero__facts">Linux and macOS · MIT licensed · Node 22+ or a standalone binary</p>
+  </div>
+
+  <figure class="plate hero__figure">
+    <div class="plate-header">
+      <span class="plate-label">ccstatusboard — live board</span>
+      <span class="tag">Demo data</span>
+    </div>
+    <div class="plate-scroll"><slot /></div>
+  </figure>
+  <p class="plate-caption hero__caption">
+    <i aria-hidden="true"></i><strong>Fig. 01</strong> One terminal window watching every session on the machine.
+  </p>
+</section>
+
+<style>
+  .hero {
+    padding-top: clamp(40px, 8vw, 96px);
+    padding-bottom: clamp(40px, 6vw, 72px);
+  }
+  .hero__copy { max-width: 62rem; }
+  .hero__title {
+    margin: 0;
+    font-size: clamp(2.5rem, 8.5vw, 6.5rem);
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+  .hero__pitch {
+    max-width: 60ch;
+    margin: clamp(20px, 3vw, 32px) 0 0;
+    font-size: clamp(1.0625rem, 2vw, 1.25rem);
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .hero__actions :global(.hero__cmd) {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--input);
+    color: var(--foreground);
+    background: transparent;
+  }
+  .btn--secondary:hover { background: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  .hero__facts {
+    margin: 16px 0 0;
+    font-size: 14px;
+    color: var(--muted-foreground);
+  }
+  .hero__figure { margin: clamp(32px, 5vw, 56px) 0 0; }
+  .hero__caption { margin-top: 10px; }
+</style>

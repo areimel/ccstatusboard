@@ -1,0 +1,91 @@
+---
+import SectionIndex from './SectionIndex.astro';
+import KeyGrid from './KeyGrid.astro';
+import FlagTable from './FlagTable.astro';
+import { STATUS_LEGEND, THEMES, OPTIONS, CONFIG_PATH } from '../content/usage';
+
+const statusClass: Record<string, string> = {
+  waiting: 'tui-warn',
+  busy: 'tui-ok',
+  idle: 'tui-dim',
+  ended: 'tui-dim',
+};
+---
+
+<section id="usage" class="page-wrap usage" aria-labelledby="usage-h">
+  <SectionIndex fig="06" name="Usage" />
+  <h2 id="usage-h" class="usage__h">Usage</h2>
+  <p class="usage__p">Run it with no arguments, or pass any of these flags.</p>
+  <pre class="usage__cmd usage__synopsis"><code><span class="tui-dim" aria-hidden="true">$ </span>ccstatusboard [options]</code></pre>
+
+  <div class="block">
+    <h3>Flags</h3>
+    <FlagTable />
+  </div>
+
+  <div class="block">
+    <h3>Keys</h3>
+    <KeyGrid />
+  </div>
+
+  <div class="block block--split">
+    <div>
+      <h3>Status glyphs</h3>
+      <ul class="legend tui plate plate-pad">
+        {STATUS_LEGEND.map((s) => (
+          <li><span class={`legend__glyph ${statusClass[s.label]}`} aria-hidden="true">{s.glyph}</span> {s.label}</li>
+        ))}
+      </ul>
+    </div>
+    <div>
+      <h3>Themes</h3>
+      <p class="usage__p">Press <kbd class="keycap">t</kbd> or <kbd class="keycap">T</kbd> to cycle themes. Your choice is saved to the config file. Or start with <code class="tui-inline">--theme &lt;name&gt;</code>.</p>
+      <ul class="themes">
+        {THEMES.map((t) => <li class="tui">{t}</li>)}
+      </ul>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>Options menu</h3>
+    <p class="usage__p">
+      Press <kbd class="keycap">Esc</kbd> outside search to open it. Use <kbd class="keycap">↑</kbd> <kbd class="keycap">↓</kbd> to move,
+      <kbd class="keycap">←</kbd> <kbd class="keycap">→</kbd> to change a value, <kbd class="keycap">Enter</kbd> to edit numbers and column visibility,
+      and <kbd class="keycap">Esc</kbd> to close. Changes apply immediately and are written to
+      <code class="tui-inline">{CONFIG_PATH}</code>.
+    </p>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Options and defaults">
+      <table class="doc-table">
+        <thead><tr><th scope="col">Option</th><th scope="col">Config key</th><th scope="col">Default</th></tr></thead>
+        <tbody>
+          {OPTIONS.map((o) => (
+            <tr><th scope="row">{o.label}</th><td><code>{o.key}</code></td><td>{o.default}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="usage__p">
+      The full config reference is in the
+      <a href="https://github.com/areimel/ccstatusboard#config-file">README on GitHub</a>.
+    </p>
+  </div>
+</section>
+
+<style>
+  .usage { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+  .usage__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
+  .usage__p a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+  .usage__p a:hover { color: var(--kojima-accent-ink); }
+  .usage__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 14px; }
+  .usage__synopsis { display: inline-block; max-width: 100%; overflow-x: auto; margin: 0; padding: 12px 14px; border: 1px solid var(--border); background: var(--tui-bg); font-family: var(--font-mono); font-size: 14px; font-variant-ligatures: none; }
+  .block { margin-top: 48px; min-width: 0; }
+  .block h3 { margin: 0 0 12px; font-size: 1.125rem; font-weight: 500; }
+  .block--split { display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr); gap: 32px 48px; }
+  @media (max-width: 760px) { .block--split { grid-template-columns: minmax(0, 1fr); } }
+  .legend { list-style: none; margin: 0; display: grid; gap: 8px; font-size: 14px; }
+  .legend__glyph { display: inline-block; width: 1.5em; font-size: 16px; }
+  .themes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .themes li { padding: 4px 10px; border: 1px solid var(--border); font-size: 13px; }
+  a { color: var(--kojima-accent-ink, var(--primary)); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+</style>

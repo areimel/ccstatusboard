@@ -1,0 +1,33 @@
+---
+import { KEYS } from '../content/usage';
+---
+
+<ul class="keygrid">
+  {KEYS.map((k) => (
+    <li class="keygrid__item">
+      <span class="keygrid__keys">
+        {k.keys.map((key, i) => (
+          <>{i > 0 && <span class="keygrid__sep" aria-hidden="true"> </span>}<kbd class="keycap">{key}</kbd></>
+        ))}
+      </span>
+      <span class="keygrid__action">{k.action}</span>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .keygrid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    border: 1px solid var(--border); background: var(--card);
+  }
+  .keygrid__item {
+    display: grid; grid-template-columns: minmax(7.5rem, 9rem) 1fr; align-items: center; gap: 16px;
+    min-width: 0; padding: 14px 18px; margin: -1px 0 0 -1px;
+    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+  }
+  .keygrid__keys { display: flex; flex-wrap: wrap; gap: 6px; }
+  .keygrid :global(.keycap) { font-size: 13px; padding: 3px 9px; }
+  .keygrid__action { font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+  @media (max-width: 400px) { .keygrid__item { grid-template-columns: 1fr; gap: 8px; } }
+</style>

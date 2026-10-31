@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <title>ccstatusboard: every Claude Code session, one board</title>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#1f1e1a" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Canvas: charcoal background (#141310, the dark theme background) with a faint technical grid -->
+  <rect width="1200" height="630" fill="#141310"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Hairline instrument-plate frame -->
+  <rect x="40" y="40" width="1120" height="550" fill="none" stroke="#3f3b31" stroke-width="1"/>
+
+  <!-- Top caption row -->
+  <rect x="64" y="62" width="14" height="14" fill="#ff4d00"/>
+  <text x="92" y="74" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="16" letter-spacing="3" fill="#aaa596">FIG. 01 / BOARD</text>
+  <!-- Registration mark, top right -->
+  <g fill="none" stroke="#817b6c" stroke-width="1">
+    <circle cx="1120" cy="70" r="7"/>
+    <line x1="1106" y1="70" x2="1134" y2="70"/>
+    <line x1="1120" y1="56" x2="1120" y2="84"/>
+  </g>
+
+  <!-- Headline -->
+  <g font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="72" letter-spacing="-2.5">
+    <text x="64" y="200" fill="#efebe0">Every Claude</text>
+    <text x="64" y="272" fill="#efebe0">Code session.</text>
+    <text x="64" y="344" fill="#ff4d00">One board.</text>
+  </g>
+
+  <!-- Subline -->
+  <g font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif" font-size="24" fill="#aaa596">
+    <text x="64" y="410">Usage limits, cost and live status</text>
+    <text x="64" y="442">for every session on this machine.</text>
+  </g>
+
+  <!-- Board excerpt panel -->
+  <rect x="690" y="128" width="446" height="344" fill="#1c1b17" stroke="#3f3b31" stroke-width="1"/>
+  <g font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="15" fill="#efebe0">
+    <text x="712" y="160">5 live / 3 ended</text>
+    <text x="1114" y="160" text-anchor="end" fill="#aaa596">14:32:07</text>
+  </g>
+  <line x1="712" y1="174" x2="1114" y2="174" stroke="#3f3b31" stroke-width="1"/>
+
+  <!-- Usage meters -->
+  <text x="712" y="196" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="12" letter-spacing="2" fill="#aaa596">USAGE</text>
+  <g font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="15" fill="#efebe0">
+    <text x="712" y="223">5h</text>
+    <rect x="772" y="210" width="216" height="14" fill="#292720"/>
+    <rect x="772" y="210" width="125" height="14" fill="#ff4d00"/>
+    <text x="1000" y="223">58%</text>
+
+    <text x="712" y="251">Week</text>
+    <rect x="772" y="238" width="216" height="14" fill="#292720"/>
+    <rect x="772" y="238" width="67" height="14" fill="#e8b04a"/>
+    <text x="1000" y="251">31%</text>
+
+    <text x="712" y="279" fill="#aaa596">burn $4.10/h</text>
+  </g>
+
+  <line x1="712" y1="294" x2="1114" y2="294" stroke="#3f3b31" stroke-width="1"/>
+  <text x="712" y="316" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="12" letter-spacing="2" fill="#aaa596">SESSIONS</text>
+
+  <!-- Session rows: status glyphs are drawn shapes, not font characters -->
+  <!-- busy (half-filled) -->
+  <circle cx="722" cy="339" r="7" fill="none" stroke="#ff4d00" stroke-width="2"/>
+  <path d="M722 332 A7 7 0 0 1 722 346 Z" fill="#ff4d00"/>
+  <!-- waiting (filled) -->
+  <circle cx="722" cy="367" r="7" fill="#e8b04a"/>
+  <!-- idle (hollow, dim) -->
+  <circle cx="722" cy="419" r="6.5" fill="none" stroke="#aaa596" stroke-width="2"/>
+
+  <g font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="15" fill="#efebe0">
+    <text x="740" y="344">ccstatusboard</text>
+    <text x="880" y="344" fill="#aaa596">opus</text>
+    <rect x="960" y="332" width="110" height="12" fill="#292720"/>
+    <rect x="960" y="332" width="67" height="12" fill="#ff4d00"/>
+    <text x="1080" y="344">61%</text>
+
+    <text x="740" y="372">power-tools</text>
+    <text x="880" y="372" fill="#aaa596">sonnet</text>
+    <rect x="960" y="360" width="110" height="12" fill="#292720"/>
+    <rect x="960" y="360" width="24" height="12" fill="#ff4d00"/>
+    <text x="1080" y="372">22%</text>
+
+    <text x="740" y="424" fill="#aaa596">dotfiles</text>
+    <text x="880" y="424" fill="#aaa596">haiku</text>
+    <rect x="960" y="412" width="110" height="12" fill="#292720"/>
+    <rect x="960" y="412" width="10" height="12" fill="#aaa596"/>
+    <text x="1080" y="424" fill="#aaa596">9%</text>
+  </g>
+
+  <text x="740" y="398" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="14" fill="#aaa596">├─ Explore            12s</text>
+
+  <!-- Footer row -->
+  <line x1="64" y1="536" x2="1136" y2="536" stroke="#3f3b31" stroke-width="1"/>
+  <rect x="64" y="558" width="16" height="16" fill="#ff4d00"/>
+  <text x="92" y="573" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" font-weight="700" fill="#efebe0">ccstatusboard</text>
+  <text x="1136" y="572" text-anchor="end" font-family="'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="14" letter-spacing="2" fill="#aaa596">LINUX / MACOS  ·  NO. 001</text>
+</svg>
