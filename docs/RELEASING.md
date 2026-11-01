@@ -31,7 +31,7 @@ If a step fails before the release commit, the package files are restored automa
 
 ## What gets published where
 
-- npm: package `ccstatusboard` (`npm install -g ccstatusboard`).
+- npm: package `ccstatusboard` (`sudo npm install -g ccstatusboard`).
 - GitHub Release `v<version>`: `ccstatusboard-linux-x64`, `ccstatusboard-darwin-arm64`, `ccstatusboard-darwin-x64` and `SHA256SUMS`. These are what the installer downloads:
 
   ```sh

@@ -22,9 +22,12 @@ export interface Platforms {
 }
 
 export const NPM_COMMANDS: readonly NpmCommand[] = [
-  { cmd: "npx ccstatusboard", note: "run once, no install" },
-  { cmd: "npm i -g ccstatusboard", note: "or install globally" },
+  {
+    cmd: "sudo npm i -g ccstatusboard",
+    note: "install globally. If your Node comes from nvm, fnm, Volta or Homebrew, leave out sudo: your global directory is already user-owned, and sudo may not find npm.",
+  },
   { cmd: "ccstatusboard", note: "after a global install" },
+  { cmd: "npx ccstatusboard", note: "or try it without installing" },
 ];
 
 export const CURL_INSTALL: string =
@@ -52,7 +55,7 @@ export const INSTALL_ENV_VARS: readonly EnvVar[] = [
 ];
 
 export const UPDATE: readonly MethodCommand[] = [
-  { method: "npm", cmd: "npm i -g ccstatusboard@latest" },
+  { method: "npm", cmd: "sudo npm i -g ccstatusboard@latest" },
   {
     method: "standalone binary (re-run the same curl command)",
     cmd: "curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh",
@@ -60,7 +63,7 @@ export const UPDATE: readonly MethodCommand[] = [
 ];
 
 export const UNINSTALL: readonly MethodCommand[] = [
-  { method: "npm", cmd: "npm rm -g ccstatusboard" },
+  { method: "npm", cmd: "sudo npm rm -g ccstatusboard" },
   {
     method: "standalone binary (respects CCSTATUSBOARD_INSTALL_DIR; or just delete the file)",
     cmd: "curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh -s -- --uninstall",

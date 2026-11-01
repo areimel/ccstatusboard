@@ -47,7 +47,7 @@ cleanup() {
 }
 
 npm_hint() {
-  say "Alternative: npm i -g ccstatusboard (requires Node 22+)"
+  say "Alternative: sudo npm i -g ccstatusboard (requires Node 22+)"
 }
 
 install_dir() {

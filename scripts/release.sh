@@ -205,6 +205,6 @@ trap - ERR
 
 step "Released $TAG"
 cat <<DONE
-npm:    npm install -g ccstatusboard@$VERSION
+npm:    sudo npm install -g ccstatusboard@$VERSION
 binary: curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh
 DONE
