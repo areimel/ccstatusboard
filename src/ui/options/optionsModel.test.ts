@@ -21,6 +21,7 @@ describe('optionsModel', () => {
       'sort',
       'showDetail',
       'showSystem',
+      'systemMetrics',
       'columns',
       'idleCutoffMinutes',
       'endedWindowHours',
@@ -46,6 +47,10 @@ describe('optionsModel', () => {
     expect(formatValue(DEFAULT_CONFIG, d('refreshMs'))).toBe('1000 ms');
     expect(formatValue(DEFAULT_CONFIG, d('claudeDir'))).toBe('auto');
     expect(formatValue(DEFAULT_CONFIG, d('columns'))).toBe('10/11 shown');
+    expect(formatValue(DEFAULT_CONFIG, d('systemMetrics'))).toBe('5/5 shown');
+    expect(formatValue({ ...DEFAULT_CONFIG, systemMetrics: ['temps'] }, d('systemMetrics'))).toBe(
+      '1/5 shown',
+    );
     expect(formatValue(DEFAULT_CONFIG, d('idleCutoffMinutes'))).toBe('1h');
     expect(formatValue({ ...DEFAULT_CONFIG, idleCutoffMinutes: 90 }, d('idleCutoffMinutes'))).toBe('1h 30m');
   });
@@ -88,6 +93,7 @@ describe('optionsModel', () => {
   it('ignores readonly and columns', () => {
     expect(adjust(DEFAULT_CONFIG, 'usageApi', 1)).toEqual({});
     expect(adjust(DEFAULT_CONFIG, 'columns', 1)).toEqual({});
+    expect(adjust(DEFAULT_CONFIG, 'systemMetrics', 1)).toEqual({});
   });
   it('parses number input with schema limits', () => {
     expect(parseNumberInput(d('subscriptionUSD'), '200')).toBe(200);

@@ -16,7 +16,15 @@ import { OptionsMenu } from './options/OptionsMenu.js';
 import { SystemPanel, systemPanelRows } from './SystemPanel.js';
 import { clamp, initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 import { useKeymap } from './useKeymap.js';
-import { FOOTER_ROWS, SPARE_ROWS, SYSTEM_MIN_ROWS, computeLayout, useTerminalSize } from './layout.js';
+import {
+  FOOTER_ROWS,
+  SPARE_ROWS,
+  SYSTEM_MIN_ROWS,
+  computeLayout,
+  systemPanelBudget,
+  useTerminalSize,
+} from './layout.js';
+import { visibleSystemGroups } from './systemMetrics.js';
 
 export { initialUiState, uiReducer, type UiAction, type UiState } from './uiState.js';
 export { MIN_COLUMNS, MIN_ROWS, DETAIL_MIN_ROWS } from './layout.js';
@@ -66,14 +74,24 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   const headerRows = 1 + (headerWarnings(snapshot).length > 0 ? 1 : 0);
   const overlay = ui.mode === 'help' || ui.mode === 'options';
   const systemShown = cfg.showSystem && rows >= SYSTEM_MIN_ROWS && !overlay;
+  const usageRows = usagePanelRows(snapshot, cfg.subscriptionUSD);
+  const systemGroups =
+    systemShown && snapshot.system
+      ? visibleSystemGroups(
+          snapshot.system,
+          cfg.systemMetrics,
+          columns,
+          systemPanelBudget(rows, headerRows + usageRows, cfg.showDetail),
+        )
+      : [];
   const { tooSmall, detailShown, maxRows } = computeLayout({
     rows,
     columns,
     showDetail: cfg.showDetail,
     panels: [
       { rows: headerRows },
-      { rows: usagePanelRows(snapshot, cfg.subscriptionUSD) },
-      ...(systemShown ? [{ rows: systemPanelRows(snapshot) }] : []),
+      { rows: usageRows },
+      ...(systemShown ? [{ rows: systemPanelRows(snapshot, columns, systemGroups) }] : []),
     ],
   });
   const emptyMessage =
@@ -138,7 +156,7 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
           {!overlay && (
             <UsagePanel snapshot={snapshot} width={columns} subscriptionUSD={cfg.subscriptionUSD} />
           )}
-          {systemShown && <SystemPanel snapshot={snapshot} width={columns} />}
+          {systemShown && <SystemPanel snapshot={snapshot} width={columns} groups={systemGroups} />}
           {body}
           <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} width={columns} />
         </Box>

@@ -3,7 +3,7 @@ import { App } from './App.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { makeOverflowSnapshot, makeSession, makeSnapshot, NOW } from '../../test/helpers/snapshot.js';
 import { renderSized, type SizedRender } from '../../test/helpers/renderSized.js';
-import { GB, makeSystemStats } from '../../test/helpers/system.js';
+import { GB, makeFullSystemStats, makeSystemStats } from '../../test/helpers/system.js';
 import type { Config, Snapshot, SystemStats } from '../domain/types.js';
 
 // Laid out in a fake TTY whose columns/rows match `size` (ink-testing-library is fixed at 100 columns).
@@ -167,5 +167,62 @@ describe('App system panel', () => {
       await frameAt(withSystem(), { columns: 100, rows: 40 }, { ...DEFAULT_CONFIG, showSystem: false })
     ).join('\n');
     expect(off).not.toContain('System');
+  });
+
+  describe('extra metrics', () => {
+    const full = makeFullSystemStats({ sampledAt: NOW });
+    const many = (): Snapshot => ({ ...makeOverflowSnapshot(), system: full, systemHistory: history });
+    const sessionRows = (lines: string[]): number => lines.filter((l) => /sess\d+/.test(l)).length;
+    const crowded = (over: Partial<SystemStats> = {}): Snapshot =>
+      makeSnapshot({
+        system: { ...full, ...over },
+        systemHistory: history,
+        sessions: Array.from({ length: 40 }, (_, i) =>
+          makeSession({ sessionId: `s${i}`, name: `sess${i}`, lastActivity: NOW - i * 1_000 }),
+        ),
+      });
+
+    for (const columns of [60, 80, 100, 160]) {
+      it(`fits ${columns}x30 with every metric on`, async () => {
+        const size = { columns, rows: 30 };
+        expectFits(await frameAt(crowded(), size), size);
+        expectFits(await frameAt(many(), size), size);
+      });
+    }
+
+    it('drops groups rather than sessions at 100x30, keeping temperatures', async () => {
+      const lines = await frameAt(crowded(), { columns: 100, rows: 30 });
+      const text = lines.join('\n');
+      expect(text).toContain('CPU 66°');
+      expect(text).toContain('up 1h9m');
+      expect(text).not.toContain('wlp2s0');
+      expect(sessionRows(lines)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('shows every group once the terminal is tall enough', async () => {
+      const text = (await frameAt(crowded(), { columns: 100, rows: 40 })).join('\n');
+      for (const needle of ['CPU 66°', 'up 1h9m', '4.17GHz', 'Press', 'wlp2s0']) {
+        expect(text).toContain(needle);
+      }
+    });
+
+    it('hides a group turned off in config', async () => {
+      const text = (
+        await frameAt(crowded(), { columns: 100, rows: 40 }, { ...DEFAULT_CONFIG, systemMetrics: ['temps'] })
+      ).join('\n');
+      expect(text).toContain('CPU 66°');
+      expect(text).not.toContain('wlp2s0');
+    });
+
+    it('keeps the same session row count as live values change', async () => {
+      const size = { columns: 100, rows: 34 };
+      const base = sessionRows(await frameAt(crowded(), size));
+      const changed = crowded({
+        battery: { percent: 41, status: 'Discharging', watts: 12.3, secondsLeft: 7200 },
+        gpu: { busyPercent: 100, clockHz: 1.8e9, watts: 45 },
+        link: {},
+      });
+      expect(sessionRows(await frameAt(changed, size))).toBe(base);
+    });
   });
 });

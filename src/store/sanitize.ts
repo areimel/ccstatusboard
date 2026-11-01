@@ -49,10 +49,57 @@ export function sanitizeWindowTotals(w: WindowTotals): WindowTotals {
 
 export const nonNeg = (n: number): number => (Number.isFinite(n) && n > 0 ? n : 0);
 
-/** Network-/OS-sourced numbers: finite and non-negative. */
+/** Optional OS-sourced number: non-negative, or undefined. Never a false 0 for a missing reading. */
+const optNonNeg = (n: number | undefined): number | undefined =>
+  n !== undefined && Number.isFinite(n) && n >= 0 ? n : undefined;
+const optFinite = (n: number | undefined): number | undefined =>
+  n !== undefined && Number.isFinite(n) ? n : undefined;
+
+/** Sanitizes a whole optional group; `fn` only runs when the group is present. */
+const opt = <T>(v: T | undefined, fn: (v: T) => T): T | undefined => (v === undefined ? undefined : fn(v));
+
+/** Network-/OS-sourced numbers: finite and non-negative. Strings from sysfs lose control characters. */
 export function sanitizeSystem(s: SystemStats): SystemStats {
   return {
     ...s,
+    temps: s.temps
+      ?.filter((t) => Number.isFinite(t.celsius))
+      .map((t) => ({
+        ...t,
+        label: sanitizeText(t.label),
+        warn: optFinite(t.warn),
+        crit: optFinite(t.crit),
+      })),
+    battery: opt(s.battery, (b) => ({
+      percent: Math.min(100, nonNeg(b.percent)),
+      status: sanitizeText(b.status),
+      watts: optNonNeg(b.watts),
+      secondsLeft: optNonNeg(b.secondsLeft),
+      healthPercent: optNonNeg(b.healthPercent),
+      cycles: optNonNeg(b.cycles),
+    })),
+    uptimeSec: optNonNeg(s.uptimeSec),
+    cpuFreq: opt(s.cpuFreq, (f) => ({ curHz: nonNeg(f.curHz), maxHz: optNonNeg(f.maxHz) })),
+    powerProfile: opt(s.powerProfile, sanitizeText),
+    gpu: opt(s.gpu, (g) => ({
+      busyPercent: optNonNeg(g.busyPercent),
+      vramUsed: optNonNeg(g.vramUsed),
+      clockHz: optNonNeg(g.clockHz),
+      watts: optNonNeg(g.watts),
+    })),
+    pressure: opt(s.pressure, (p) => ({
+      mem: optNonNeg(p.mem),
+      cpu: optNonNeg(p.cpu),
+      io: optNonNeg(p.io),
+    })),
+    diskIo: opt(s.diskIo, (d) => ({ readPerSec: nonNeg(d.readPerSec), writePerSec: nonNeg(d.writePerSec) })),
+    procs: opt(s.procs, (p) => ({ processes: optNonNeg(p.processes), threads: optNonNeg(p.threads) })),
+    link: opt(s.link, (l) => ({
+      iface: opt(l.iface, sanitizeText),
+      ip: opt(l.ip, sanitizeText),
+      signalDbm: optFinite(l.signalDbm),
+      vpn: opt(l.vpn, sanitizeText),
+    })),
     cpu: {
       total: Math.min(100, nonNeg(s.cpu.total)),
       perCore: s.cpu.perCore.map((c) => Math.min(100, nonNeg(c))),

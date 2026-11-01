@@ -1,6 +1,6 @@
 import { configSchema } from '../../config/schema.js';
 import { cycle } from '../../domain/cycle.js';
-import { COLUMN_KEYS, SORT_KEYS, THEME_NAMES, type Config } from '../../domain/types.js';
+import { COLUMN_KEYS, SORT_KEYS, SYSTEM_METRIC_KEYS, THEME_NAMES, type Config } from '../../domain/types.js';
 
 interface Base {
   key: keyof Config;
@@ -23,6 +23,7 @@ export type OptionDescriptor =
   /** Whole minutes, edited and displayed as e.g. `1h 30m`. */
   | (Base & { kind: 'duration'; min: number; step: number })
   | (Base & { kind: 'columns' })
+  | (Base & { kind: 'metrics' })
   | (Base & { kind: 'readonly' });
 
 export const OPTIONS: OptionDescriptor[] = [
@@ -40,6 +41,7 @@ export const OPTIONS: OptionDescriptor[] = [
   { key: 'sort', label: 'Sort', kind: 'enum', values: SORT_KEYS },
   { key: 'showDetail', label: 'Detail pane', kind: 'bool' },
   { key: 'showSystem', label: 'System panel', kind: 'bool' },
+  { key: 'systemMetrics', label: 'System metrics', kind: 'metrics' },
   { key: 'columns', label: 'Columns', kind: 'columns' },
   { key: 'idleCutoffMinutes', label: 'Dim idle after', kind: 'duration', min: 1, step: 15 },
   {
@@ -82,6 +84,8 @@ export function formatValue(config: Config, desc: OptionDescriptor): string {
       return v ? 'on' : 'off';
     case 'columns':
       return `${config.columns.length}/${COLUMN_KEYS.length} shown`;
+    case 'metrics':
+      return `${config.systemMetrics.length}/${SYSTEM_METRIC_KEYS.length} shown`;
     case 'duration':
       return formatMinutes(v as number);
     case 'number':

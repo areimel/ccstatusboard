@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { COLUMN_KEYS, SORT_KEYS, THEME_NAMES, type ColumnKey, type Config } from '../domain/types.js';
+import {
+  COLUMN_KEYS,
+  SORT_KEYS,
+  SYSTEM_METRIC_KEYS,
+  THEME_NAMES,
+  type ColumnKey,
+  type Config,
+} from '../domain/types.js';
 
 const DEFAULT_COLUMNS: ColumnKey[] = COLUMN_KEYS.filter((c) => c !== 'branch');
 
@@ -16,6 +23,7 @@ export const DEFAULT_CONFIG: Config = Object.freeze({
   usageApi: true,
   subscriptionUSD: null,
   showSystem: true,
+  systemMetrics: [...SYSTEM_METRIC_KEYS],
 }) as Config;
 
 export const configSchema = z.strictObject({
@@ -35,4 +43,5 @@ export const configSchema = z.strictObject({
   usageApi: z.boolean().default(DEFAULT_CONFIG.usageApi),
   subscriptionUSD: z.number().positive().nullable().default(DEFAULT_CONFIG.subscriptionUSD),
   showSystem: z.boolean().default(DEFAULT_CONFIG.showSystem),
+  systemMetrics: z.array(z.enum(SYSTEM_METRIC_KEYS)).default(() => [...SYSTEM_METRIC_KEYS]),
 }) satisfies z.ZodType<Config>;

@@ -1,7 +1,13 @@
 import { useState, type JSX } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Badge, MultiSelect, TextInput } from '@inkjs/ui';
-import { COLUMN_KEYS, type ColumnKey, type Config } from '../../domain/types.js';
+import {
+  COLUMN_KEYS,
+  SYSTEM_METRIC_KEYS,
+  type ColumnKey,
+  type Config,
+  type SystemMetricKey,
+} from '../../domain/types.js';
 import { Overlay } from '../Overlay.js';
 import { useTheme } from '../theme.js';
 import {
@@ -22,7 +28,14 @@ export interface OptionsMenuProps {
   onClose: () => void;
 }
 
-type Mode = 'nav' | 'number' | 'columns';
+type Mode = 'nav' | 'number' | 'columns' | 'metrics';
+const METRIC_LABELS: Record<SystemMetricKey, string> = {
+  temps: 'Temperatures',
+  power: 'Battery & uptime',
+  chips: 'CPU & GPU',
+  pressure: 'Pressure & disk',
+  network: 'Network',
+};
 const LABEL_W = 15;
 const CHROME_ROWS = 3; // 2 border rows + hint line
 const MIN_LIST_ROWS = 3;
@@ -51,6 +64,7 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
     } else if (key.return) {
       if (desc.kind === 'number' || desc.kind === 'duration') setMode('number');
       else if (desc.kind === 'columns') setMode('columns');
+      else if (desc.kind === 'metrics') setMode('metrics');
       else {
         const patch = adjust(config, desc.key, 1);
         if (Object.keys(patch).length > 0) onChange(patch);
@@ -84,6 +98,19 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
               onChange({ columns: [...kept, ...added] });
               setMode('nav');
             }
+          }}
+        />
+      );
+    }
+    if (mode === 'metrics') {
+      return (
+        <MultiSelect
+          options={SYSTEM_METRIC_KEYS.map((k) => ({ label: METRIC_LABELS[k], value: k }))}
+          defaultValue={config.systemMetrics}
+          visibleOptionCount={Math.min(SYSTEM_METRIC_KEYS.length, maxListRows)}
+          onSubmit={(v) => {
+            onChange({ systemMetrics: SYSTEM_METRIC_KEYS.filter((k) => v.includes(k)) });
+            setMode('nav');
           }}
         />
       );
@@ -129,7 +156,9 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
                 </Box>
               ) : null}
             </Box>
-            {editing && mode === 'columns' ? <Box marginLeft={2}>{editor()}</Box> : null}
+            {editing && (mode === 'columns' || mode === 'metrics') ? (
+              <Box marginLeft={2}>{editor()}</Box>
+            ) : null}
           </Box>
         );
       })}

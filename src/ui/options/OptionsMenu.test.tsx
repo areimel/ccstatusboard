@@ -79,7 +79,7 @@ describe('OptionsMenu', () => {
   it('invalid number input is ignored and Esc cancels the edit', async () => {
     const { press, onChange, onClose } = setup();
     await delay();
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', 'x', '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', 'x', '\r');
     expect(onChange).not.toHaveBeenCalled();
     await press('\u001B');
     expect(onClose).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe('OptionsMenu', () => {
   it('readonly row ignores right', async () => {
     const { press, onChange } = setup();
     await delay();
-    for (let i = 0; i < 10; i++) await press(DOWN);
+    for (let i = 0; i < 11; i++) await press(DOWN);
     await press(RIGHT, '\r');
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -95,14 +95,14 @@ describe('OptionsMenu', () => {
     const { press, frame, onChange } = setup();
     await delay();
     // Editor prefills the current value ("1h"); clear it before typing.
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\u007F', '\u007F', '2', 'h', '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\u007F', '\u007F', '2', 'h', '\r');
     expect(onChange).toHaveBeenCalledWith({ idleCutoffMinutes: 120 });
     expect(frame()).toContain('2h');
   });
   it('invalid duration input is rejected and Esc cancels the edit', async () => {
     const { press, onChange, onClose } = setup();
     await delay();
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '0', '.', '5', 'm', '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '0', '.', '5', 'm', '\r');
     expect(onChange).not.toHaveBeenCalled();
     await press('\u001B');
     expect(onClose).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe('OptionsMenu', () => {
   it('keep exited shows off at zero', async () => {
     const { press, frame } = setup();
     await delay();
-    for (let i = 0; i < 7; i++) await press(DOWN);
+    for (let i = 0; i < 8; i++) await press(DOWN);
     const row = frame()
       .split('\n')
       .find((l) => l.includes('Keep exited'));
@@ -120,22 +120,57 @@ describe('OptionsMenu', () => {
   it('columns editor: deselect one and submit', async () => {
     const { press, onChange } = setup();
     await delay();
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', ' ', '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', ' ', '\r');
     expect(onChange).toHaveBeenCalledWith({ columns: expect.not.arrayContaining(['status']) });
   });
 
   it('columns editor keeps the user order', async () => {
     const { press, onChange } = setup({ ...DEFAULT_CONFIG, columns: ['cost', 'name', 'status'] });
     await delay();
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r', '\r');
     expect(onChange).toHaveBeenCalledWith({ columns: ['cost', 'name', 'status'] });
   });
 
   it('columns editor fits a short overlay budget', async () => {
-    const maxHeight = 18;
+    const maxHeight = 19;
     const { press, frame } = setup(DEFAULT_CONFIG, maxHeight);
     await delay();
-    await press(DOWN, DOWN, DOWN, DOWN, DOWN, '\r');
+    await press(DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, '\r');
     expect(frame().split('\n').length).toBeLessThanOrEqual(maxHeight);
+  });
+
+  describe('System metrics picker', () => {
+    const open = [DOWN, DOWN, DOWN, DOWN, DOWN, '\r'];
+
+    it('lists the groups by readable name', async () => {
+      const { press, frame } = setup();
+      await delay();
+      await press(...open);
+      for (const label of ['Temperatures', 'Battery & uptime', 'CPU & GPU', 'Pressure & disk', 'Network']) {
+        expect(frame()).toContain(label);
+      }
+    });
+
+    it('turns a group off and shows the new count', async () => {
+      const { press, frame, onChange } = setup();
+      await delay();
+      await press(...open, ' ', '\r');
+      expect(onChange).toHaveBeenCalledWith({ systemMetrics: ['power', 'chips', 'pressure', 'network'] });
+      expect(frame()).toContain('4/5 shown');
+    });
+
+    it('allows every group to be turned off', async () => {
+      const { press, onChange } = setup({ ...DEFAULT_CONFIG, systemMetrics: ['temps'] });
+      await delay();
+      await press(...open, ' ', '\r');
+      expect(onChange).toHaveBeenCalledWith({ systemMetrics: [] });
+    });
+
+    it('saves in canonical order whatever order groups were enabled', async () => {
+      const { press, onChange } = setup({ ...DEFAULT_CONFIG, systemMetrics: ['network'] });
+      await delay();
+      await press(...open, ' ', '\r');
+      expect(onChange).toHaveBeenCalledWith({ systemMetrics: ['temps', 'network'] });
+    });
   });
 });

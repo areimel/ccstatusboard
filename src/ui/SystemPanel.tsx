@@ -2,13 +2,19 @@ import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import { Sparkline } from '@pppp606/ink-chart';
 import { formatPair, formatRate, ratioPercent } from '../domain/format.js';
-import type { Snapshot, SystemStats } from '../domain/types.js';
+import type { Snapshot, SystemMetricKey, SystemStats } from '../domain/types.js';
 import { MeterStack, type MeterRow } from './MeterStack.js';
 import { splitColumns } from './layout.js';
 import { Panel } from './Panel.js';
+import {
+  buildSystemLayout,
+  systemContentRows,
+  SYSTEM_MIDDLE_WIDTH as RIGHT_WIDTH,
+  type Row,
+  type Segment,
+} from './systemMetrics.js';
 import { levelColor, useTheme } from './theme.js';
 
-const RIGHT_WIDTH = 26;
 const RATE_WIDTH = 10; // '↑ 1023K/s' is the widest rate label
 const BLOCKS = '▁▂▃▄▅▆▇█';
 
@@ -38,12 +44,43 @@ function meterRows(s: SystemStats): MeterRow[] {
   return rows;
 }
 
-const RIGHT_ROWS = 3; // rx, tx, cores
-
-/** Exact rendered height of <SystemPanel>: 2 border rows + the taller of its two columns. */
-export function systemPanelRows(snapshot: Snapshot): number {
+/** Exact rendered height of <SystemPanel>: 2 border rows + its tallest column and stacked rows. */
+export function systemPanelRows(snapshot: Snapshot, width: number, groups: SystemMetricKey[]): number {
   const { system } = snapshot;
-  return 2 + (system ? Math.max(meterRows(system).length, RIGHT_ROWS) : 1);
+  return 2 + (system ? systemContentRows(system, groups, width) : 1);
+}
+
+function SegmentText({ segment }: { segment: Segment }) {
+  const theme = useTheme();
+  if (segment.title) {
+    return (
+      <Text color={theme.accent} bold>
+        {segment.value}
+      </Text>
+    );
+  }
+  const color = segment.heat ? levelColor(theme, segment.heat.value, segment.heat.thresholds) : theme.text;
+  return (
+    <>
+      {segment.label === undefined ? null : <Text color={theme.dim}>{`${segment.label} `}</Text>}
+      <Text color={color}>{segment.value}</Text>
+    </>
+  );
+}
+
+/** One fixed line; an empty row still takes its line so slots keep their height. */
+function MetricRow({ row }: { row: Row }) {
+  if (row.length === 0) return <Text> </Text>;
+  return (
+    <Text wrap="truncate-end">
+      {row.map((segment, i) => (
+        <Text key={i}>
+          {i > 0 ? '  ' : ''}
+          <SegmentText segment={segment} />
+        </Text>
+      ))}
+    </Text>
+  );
 }
 
 function coreBlocks(perCore: number[], max: number): string {
@@ -70,7 +107,15 @@ function NetRow({ arrow, rate, data }: { arrow: string; rate: number; data: numb
   );
 }
 
-function NetColumn({ system, history }: { system: SystemStats; history: Snapshot['systemHistory'] }) {
+function NetColumn({
+  system,
+  history,
+  extra,
+}: {
+  system: SystemStats;
+  history: Snapshot['systemHistory'];
+  extra: Row[];
+}) {
   const theme = useTheme();
   const { perCore } = system.cpu;
   const maxCore = perCore.length > 0 ? Math.max(...perCore) : 0;
@@ -82,11 +127,22 @@ function NetColumn({ system, history }: { system: SystemStats; history: Snapshot
         <Text color={theme.dim}>{'cores '}</Text>
         <Text color={levelColor(theme, maxCore)}>{coreBlocks(perCore, RIGHT_WIDTH - 6)}</Text>
       </Text>
+      {extra.map((row, i) => (
+        <MetricRow key={i} row={row} />
+      ))}
     </Box>
   );
 }
 
-export function SystemPanel({ snapshot, width }: { snapshot: Snapshot; width: number }): JSX.Element {
+export function SystemPanel({
+  snapshot,
+  width,
+  groups,
+}: {
+  snapshot: Snapshot;
+  width: number;
+  groups: SystemMetricKey[];
+}): JSX.Element {
   const theme = useTheme();
   const { system } = snapshot;
   if (!system) {
@@ -96,15 +152,34 @@ export function SystemPanel({ snapshot, width }: { snapshot: Snapshot; width: nu
       </Panel>
     );
   }
-  const { leftWidth } = splitColumns(width, RIGHT_WIDTH);
+  const layout = buildSystemLayout(system, groups, width);
+  const third = layout.thirdWidth > 0 ? layout.thirdWidth + 2 : 0;
+  const { leftWidth } = splitColumns(width, RIGHT_WIDTH + third);
   return (
     <Panel title="System" width={width}>
       <Box flexDirection="row" columnGap={2}>
         <Box flexDirection="column" width={leftWidth}>
-          <MeterStack rows={meterRows(system)} leftWidth={leftWidth} />
+          <MeterStack
+            rows={meterRows(system)}
+            leftWidth={leftWidth}
+            minLabelWidth={layout.left.length > 0 ? 'Press'.length : 0}
+          />
+          {layout.left.map((row, i) => (
+            <MetricRow key={i} row={row} />
+          ))}
         </Box>
-        <NetColumn system={system} history={snapshot.systemHistory} />
+        <NetColumn system={system} history={snapshot.systemHistory} extra={layout.middle} />
+        {layout.thirdWidth > 0 ? (
+          <Box flexDirection="column" width={layout.thirdWidth}>
+            {layout.right.map((row, i) => (
+              <MetricRow key={i} row={row} />
+            ))}
+          </Box>
+        ) : null}
       </Box>
+      {layout.below.map((row, i) => (
+        <MetricRow key={i} row={row} />
+      ))}
     </Panel>
   );
 }

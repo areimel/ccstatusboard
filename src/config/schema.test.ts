@@ -20,6 +20,7 @@ describe('configSchema', () => {
       usageApi: true,
       subscriptionUSD: null,
       showSystem: true,
+      systemMetrics: ['temps', 'power', 'chips', 'pressure', 'network'],
     });
   });
 
@@ -73,5 +74,27 @@ describe('configSchema', () => {
     expect(cfg.theme).toBe('dracula');
     expect(cfg.columns).toEqual(['name', 'ctx']);
     expect(cfg.claudeDir).toBe('/x');
+  });
+
+  describe('systemMetrics', () => {
+    it('defaults to every group when the key is missing from an old config', () => {
+      expect(configSchema.parse({}).systemMetrics).toEqual([
+        'temps',
+        'power',
+        'chips',
+        'pressure',
+        'network',
+      ]);
+    });
+    it('allows an empty list', () => {
+      expect(configSchema.parse({ systemMetrics: [] }).systemMetrics).toEqual([]);
+    });
+    it('rejects an unknown group', () => {
+      expect(configSchema.safeParse({ systemMetrics: ['fans'] }).success).toBe(false);
+    });
+    it('returns a fresh array each parse', () => {
+      configSchema.parse({}).systemMetrics.pop();
+      expect(configSchema.parse({}).systemMetrics).toHaveLength(5);
+    });
   });
 });

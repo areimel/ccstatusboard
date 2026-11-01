@@ -70,7 +70,7 @@ For npm, run `sudo npm i -g ccstatusboard@latest`. For the standalone binary, re
 - **Limits:** current 5-hour block %, weekly %, per-model weekly %, with reset countdowns. Same source as Claude Code's `/usage`.
 - **Burn rate:** a projection under each limit: the pace you are on, where it lands at reset, and when (if ever) you hit 100%. See [Burn rate](#burn-rate).
 - **Estimated cost (USD):** current block, today, this week, this month, and an optional `plan` ratio against your subscription price. Burn rate ($/h) and a 24-hour sparkline.
-- **System:** CPU, memory, swap and disk meters, network download/upload sparklines and a per-core strip. Hidden on terminals shorter than 30 rows, or with `showSystem: false`.
+- **System:** CPU, memory, swap and disk meters, network download/upload sparklines and a per-core strip. On Linux it also shows temperatures, battery, CPU and GPU detail, stall pressure, disk speeds, process counts and network link details, and uptime everywhere. You can toggle each of those groups under Options → System metrics. Terminals narrower than 100 columns stack them as rows, and when height runs short they drop out so the session table keeps at least 3 rows: Network first, then Pressure and disk, CPU and GPU, Battery and uptime, with Temperatures last. The panel is hidden on terminals shorter than 30 rows, or with `showSystem: false`.
 - **Sessions:** grouped by project (the git repo name, so worktrees and subfolders of one repo share a group) under `── <project> (n) ──` header rows. Each row shows waiting (and why), working, or idle status, model, context-window fill, CPU and memory of the session's process, cost, last activity and uptime. The git branch is hidden by default; turn it on under Options → Columns. Live sessions idle past the cutoff (`idleCutoffMinutes`, default 1h) are dimmed. Exited sessions are removed at once unless `endedWindowHours` keeps them.
 - **Subagents:** active subagents appear as tree rows (`├─` / `└─`) under their parent session, with the agent type and last activity.
 - **Detail pane:** token breakdown, per-model cost, active agents, cwd, permission mode, Claude Code version.
@@ -121,6 +121,7 @@ Press `Esc` outside search to open the Options menu. `↑` `↓` move, `←` `�
 | Sort                                             | `sort`              | `project`           |
 | Detail pane                                      | `showDetail`        | on                  |
 | System panel                                     | `showSystem`        | on                  |
+| System metrics                                   | `systemMetrics`     | all groups          |
 | Columns                                          | `columns`           | all but `branch`    |
 | Dim idle after                                   | `idleCutoffMinutes` | 60 min (`1h`)       |
 | Keep exited                                      | `endedWindowHours`  | 0 (removed on exit) |
@@ -163,6 +164,7 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
   "sort": "project",
   "showDetail": true,
   "showSystem": true,
+  "systemMetrics": ["temps", "power", "chips", "pressure", "network"],
   "subscriptionUSD": null,
   "claudeDir": null,
   "usageApi": true
@@ -175,6 +177,7 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
 - `idleCutoffMinutes` (default `60`, range 1 to 10080) dims live sessions with no activity for longer than this.
 - `sort` takes `project` (default, grouped by project), `status`, `activity`, `cost`, `ctx` or `name`.
 - `showSystem` (default `true`) turns the System panel on or off.
+- `systemMetrics` takes any of `temps`, `power` (battery and uptime), `chips` (CPU and GPU), `pressure` (stall pressure, disk speeds and process counts), `network`. The default is all of them; an empty list keeps just the base meters. The network group shows your local IP address, so turn it off if you share your screen.
 - `subscriptionUSD` (default `null`) is your monthly plan price in USD, a positive number. `null` hides the `plan` ratio.
 
 ## Where the data comes from
