@@ -6,3 +6,5 @@ coverage/
 .superpowers/
 .claude/worktrees/
 release/
+
+brag-output/

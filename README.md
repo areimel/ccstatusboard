@@ -31,10 +31,13 @@ ccstatusboard runs on Linux or macOS. Windows is not supported.
 ### With npm (Node.js 22+)
 
 ```bash
-npx ccstatusboard          # run once, no install
-npm i -g ccstatusboard     # or install globally
+sudo npm i -g ccstatusboard
 ccstatusboard
 ```
+
+If your Node comes from nvm, fnm, Volta or Homebrew, leave out `sudo`: your global directory is already user-owned, and `sudo` may not find `npm`.
+
+To try it without installing, run `npx ccstatusboard`.
 
 ### Without Node.js (standalone binary)
 
@@ -55,11 +58,11 @@ Set these environment variables before `sh`, for example `curl -fsSL ... | CCSTA
 
 ### Updating
 
-For npm, run `npm i -g ccstatusboard@latest`. For the standalone binary, re-run the same `curl` command.
+For npm, run `sudo npm i -g ccstatusboard@latest`. For the standalone binary, re-run the same `curl` command.
 
 ### Uninstall
 
-- npm: `npm rm -g ccstatusboard`
+- npm: `sudo npm rm -g ccstatusboard`
 - Standalone binary: `curl -fsSL https://raw.githubusercontent.com/areimel/ccstatusboard/main/install.sh | sh -s -- --uninstall` (respects `CCSTATUSBOARD_INSTALL_DIR`), or just delete the file.
 
 ## What it shows
