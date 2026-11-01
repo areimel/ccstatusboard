@@ -171,6 +171,57 @@ export interface SystemStats {
   /** Bytes per second, summed over non-loopback interfaces. */
   net: { rxPerSec: number; txPerSec: number };
   load: [number, number, number];
+  /** Empty or undefined when the machine exposes no usable sensors. */
+  temps?: TempReading[] | undefined;
+  battery?: BatteryStats | undefined;
+  uptimeSec?: number | undefined;
+  cpuFreq?: { curHz: number; maxHz?: number | undefined } | undefined;
+  /** ACPI platform profile, e.g. `balanced`. */
+  powerProfile?: string | undefined;
+  gpu?: GpuStats | undefined;
+  /** Percent of the last 10s that some task stalled on each resource (Linux PSI). */
+  pressure?: { mem?: number | undefined; cpu?: number | undefined; io?: number | undefined } | undefined;
+  /** Bytes per second, summed over whole disks. */
+  diskIo?: { readPerSec: number; writePerSec: number } | undefined;
+  procs?: { processes?: number | undefined; threads?: number | undefined } | undefined;
+  /** Present whenever routing could be read; an empty object means offline. */
+  link?: LinkStats | undefined;
+}
+
+export interface TempReading {
+  label: string;
+  celsius: number;
+  /** Sensor-reported limits, when plausible. */
+  warn?: number | undefined;
+  crit?: number | undefined;
+}
+
+export interface BatteryStats {
+  percent: number;
+  /** Raw kernel status: Charging, Discharging, Not charging, Full, Unknown. */
+  status: string;
+  watts?: number | undefined;
+  secondsLeft?: number | undefined;
+  /** Full capacity as a percentage of design capacity. */
+  healthPercent?: number | undefined;
+  cycles?: number | undefined;
+}
+
+export interface GpuStats {
+  busyPercent?: number | undefined;
+  /** Bytes. */
+  vramUsed?: number | undefined;
+  clockHz?: number | undefined;
+  watts?: number | undefined;
+}
+
+export interface LinkStats {
+  /** Interface carrying the default route. */
+  iface?: string | undefined;
+  ip?: string | undefined;
+  signalDbm?: number | undefined;
+  /** Name of a connected VPN interface. */
+  vpn?: string | undefined;
 }
 
 /** Per-process resource sample, keyed by pid in maps. */
@@ -263,6 +314,9 @@ export const COLUMN_KEYS = [
   'uptime',
 ] as const;
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
+/** Toggleable System panel groups, in display order. */
+export const SYSTEM_METRIC_KEYS = ['temps', 'power', 'chips', 'pressure', 'network'] as const;
+export type SystemMetricKey = (typeof SYSTEM_METRIC_KEYS)[number];
 export const SORT_KEYS = ['project', 'status', 'activity', 'cost', 'ctx', 'name'] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
@@ -282,6 +336,8 @@ export interface Config {
   /** Monthly subscription price in USD; drives the plan value ratio. null = unset. */
   subscriptionUSD: number | null;
   showSystem: boolean;
+  /** Extra System panel groups to show; empty keeps just the base meters. */
+  systemMetrics: SystemMetricKey[];
 }
 
 export const ZERO_TOKENS: TokenCounts = Object.freeze({

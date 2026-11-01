@@ -88,6 +88,7 @@ export const OPTIONS: readonly Option[] = [
   { label: "Sort", key: "sort", default: "project" },
   { label: "Detail pane", key: "showDetail", default: "on" },
   { label: "System panel", key: "showSystem", default: "on" },
+  { label: "System metrics", key: "systemMetrics", default: "all groups" },
   { label: "Columns", key: "columns", default: "all but branch" },
   { label: "Dim idle after", key: "idleCutoffMinutes", default: "60 min (1h)" },
   { label: "Keep exited", key: "endedWindowHours", default: "0 (removed on exit)" },

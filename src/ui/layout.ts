@@ -9,6 +9,10 @@ export const DETAIL_ROWS = 6;
 export const TABLE_CHROME_ROWS = 3;
 export const FOOTER_ROWS = 1;
 export const SPARE_ROWS = 1;
+/** At this width the System panel adds a third column; below it, extras stack as rows. */
+export const SYSTEM_WIDE_COLUMNS = 100;
+/** Session rows the System panel's optional groups must leave free. */
+export const MIN_SESSION_ROWS = 3;
 
 /** Panel inner width and left-column width beside a fixed-width right column. */
 export function splitColumns(
@@ -47,6 +51,12 @@ export function computeLayout({ rows, columns, showDetail, panels }: LayoutInput
   const detailShown = showDetail && rows >= DETAIL_MIN_ROWS && rows - fixedRows - DETAIL_ROWS >= 1;
   const maxRows = Math.max(1, rows - fixedRows - (detailShown ? DETAIL_ROWS : 0));
   return { tooSmall, detailShown, maxRows, fixedRows };
+}
+
+/** Most rows the System panel may use while leaving the Detail pane and minimum session rows. */
+export function systemPanelBudget(rows: number, otherPanelRows: number, showDetail: boolean): number {
+  const detail = showDetail && rows >= DETAIL_MIN_ROWS ? DETAIL_ROWS : 0;
+  return rows - otherPanelRows - TABLE_CHROME_ROWS - FOOTER_ROWS - SPARE_ROWS - detail - MIN_SESSION_ROWS;
 }
 
 export function useTerminalSize(override?: { columns: number; rows: number }): {

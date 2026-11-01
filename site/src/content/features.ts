@@ -74,6 +74,7 @@ export const FEATURES: readonly Feature[] = [
     details: [
       "CPU, memory, swap and disk meters.",
       "Network download and upload sparklines, and a per-core strip.",
+      "On Linux: temperatures, battery, CPU and GPU detail, stall pressure, disk speeds and network link details, each with its own toggle.",
       "Sampled every 2 s, with 60 points of history for the sparklines.",
       "Hidden on terminals shorter than 30 rows, or when showSystem is false.",
     ],
