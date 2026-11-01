@@ -1,6 +1,6 @@
 {
   "name": "ccstatusboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "htop-style terminal dashboard for all your Claude Code sessions, usage limits and costs",
   "type": "module",
   "bin": {
