@@ -8,3 +8,6 @@ coverage/
 release/
 
 brag-output/
+brag-output-*/work/
+brag-output-*/tui-export/tui-frames.json
+brag-output-*/composition/.hyperframes/
