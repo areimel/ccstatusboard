@@ -19,9 +19,10 @@ const spans: Record<string, string> = {
   <div class="intro">
     <h2 id="features-title">Everything the board shows</h2>
     <p>
-      Six panels, all read from your local Claude Code files. The excerpts below are illustrative; the real layout
-      adapts to your terminal size and theme.
+      The six panels come from your local Claude Code files and the usage API. The excerpts below are illustrative;
+      the real layout adapts to your terminal size and theme.
     </p>
+    <p class="note">Costs are estimates from API list prices. On a Pro/Max subscription you are not billed these amounts.</p>
   </div>
   <div class="grid">
     {FEATURES.map((f) => <FeaturePlate feature={f} class={spans[f.id] ?? 'span-3'} />)}
@@ -38,6 +39,7 @@ const spans: Record<string, string> = {
     margin: 0 0 0.75rem;
   }
   .intro p { margin: 0; max-width: 62ch; line-height: 1.6; color: var(--muted-foreground); }
+  .intro .note { margin-top: 0.6rem; }
   .grid { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--border); background: var(--card); }
   .grid > :global(*) {
     min-width: 0;

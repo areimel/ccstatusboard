@@ -30,6 +30,7 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
+    "site-dev": "npm --prefix site run dev",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",

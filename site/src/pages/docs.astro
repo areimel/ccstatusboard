@@ -1,0 +1,113 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import InstallSection from '../components/InstallSection.astro';
+import UsageSection from '../components/UsageSection.astro';
+import FeaturePlate from '../components/FeaturePlate.astro';
+import PrivacySection from '../components/PrivacySection.astro';
+import { FEATURES } from '../content/features';
+
+const links = [
+  { id: 'install', label: 'Install' },
+  { id: 'usage', label: 'Usage' },
+  { id: 'panels', label: 'Panels' },
+  { id: 'privacy', label: 'Privacy and safety' },
+];
+---
+
+<Base
+  title="Docs: ccstatusboard"
+  description="How to install ccstatusboard, use its keys and flags, read each panel, and what it does with your data."
+>
+  <Header />
+  <main id="main">
+    <div class="page-wrap docs">
+      <h1 class="docs__title">Documentation</h1>
+      <p class="docs__lede">Install, usage, what each panel shows, and how ccstatusboard treats your data.</p>
+
+      <div class="docs__layout">
+        <nav class="docs__nav" aria-label="On this page">
+          <ul>
+            {links.map((l) => <li><a href={`#${l.id}`}>{l.label}</a></li>)}
+          </ul>
+        </nav>
+
+        <div class="docs__content">
+          <InstallSection />
+          <UsageSection />
+          <section id="panels" class="panels" aria-labelledby="panels-h">
+            <h2 id="panels-h" class="panels__h">Panels</h2>
+            <p class="panels__p">Each panel of the board, with what it shows and the details behind it.</p>
+            <div class="panels__list">
+              {FEATURES.map((f) => <FeaturePlate feature={f} showDetails />)}
+            </div>
+          </section>
+          <PrivacySection />
+        </div>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .docs { padding-block: clamp(2rem, 4vw, 3.5rem); }
+  .docs__title { margin: 0 0 8px; font-size: clamp(2rem, 4.5vw, 3rem); line-height: 1.1; letter-spacing: -0.02em; }
+  .docs__lede { margin: 0 0 28px; max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; }
+  .docs__layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .docs__content { min-width: 0; }
+  .docs__nav ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+  .docs__nav li { border-bottom: 1px solid var(--border); }
+  .docs__nav a {
+    display: flex; align-items: center; min-height: 44px; padding: 0 12px;
+    color: var(--muted-foreground); text-decoration: none; border-left: 2px solid transparent;
+  }
+  .docs__nav a:hover { color: var(--foreground); }
+  .docs__nav a[aria-current='true'] { color: var(--foreground); border-left-color: var(--primary); }
+  .docs__nav a:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+
+  .panels { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
+  .panels__h { margin: 0 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
+  .panels__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 24px; }
+  .panels__list { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .panels__list > :global(* + *) { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .panels__list > :global(*) { min-width: 0; }
+
+  @media (min-width: 900px) {
+    .docs__layout { grid-template-columns: 13rem minmax(0, 1fr); gap: 48px; align-items: start; }
+    .docs__nav { position: sticky; top: 5.5rem; }
+    .docs__nav a { min-height: 36px; padding: 0 12px; }
+  }
+</style>
+
+<script>
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.docs__nav a'));
+  const pairs = links
+    .map((a) => ({ a, el: document.getElementById(a.hash.slice(1)) }))
+    .filter((p): p is { a: HTMLAnchorElement; el: HTMLElement } => !!p.el);
+  if ('IntersectionObserver' in window && pairs.length) {
+    const visible = new Set<Element>();
+    const setCurrent = (cur: (typeof pairs)[number]) => {
+      pairs.forEach((p) => {
+        if (p === cur) p.a.setAttribute('aria-current', 'true');
+        else p.a.removeAttribute('aria-current');
+      });
+    };
+    // Last match wins: at a boundary the thin band below can touch two sections.
+    const mark = () => {
+      const cur = [...pairs].reverse().find((p) => visible.has(p.el));
+      if (cur) setCurrent(cur);
+    };
+    setCurrent(pairs[0]);
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => (e.isIntersecting ? visible.add(e.target) : visible.delete(e.target)));
+        mark();
+      },
+      // A thin band 30% down the viewport: below where anchored section tops land.
+      { rootMargin: '-30% 0px -69% 0px' },
+    );
+    pairs.forEach((p) => io.observe(p.el));
+  }
+</script>
