@@ -1,0 +1,46 @@
+<template>
+  <style>
+@font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "JetBrains Mono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+@font-face { font-family: "Board Symbols"; src: url("assets/fonts/board-symbols.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Medium.ttf"); font-weight: 500; }
+@font-face { font-family: "DM Sans"; src: url("assets/fonts/DMSans-Bold.ttf"); font-weight: 700; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #0c0c0a; }
+    
+    #flood { position: absolute; inset: 0; background: #ff4d00; clip-path: circle(0px at 540px 1080px); }
+    .stat { position: absolute; top: 164px; color: #141310; opacity: 0; }
+    #st1 { left: 72px; } #st2 { left: 640px; }
+    .num { font: 700 112px/1 "DM Sans", sans-serif; letter-spacing: -3px; white-space: nowrap; }
+    .lbl { font: 500 38px/1.3 "DM Sans", sans-serif; margin-top: 10px; white-space: nowrap; }
+    #rule { position: absolute; left: 72px; top: 386px; width: 936px; height: 4px; background: #141310; transform-origin: 0 50%; }
+    #nm { position: absolute; left: 66px; top: 454px; font: 700 148px/1.05 "DM Sans", sans-serif; color: #141310; letter-spacing: -4px; white-space: nowrap; display: flex; }
+    .nc { opacity: 0; }
+    #role { position: absolute; left: 72px; top: 630px; font: 700 58px/1.2 "DM Sans", sans-serif; color: #141310; letter-spacing: -1px; opacity: 0; white-space: nowrap; }
+    #url { position: absolute; left: 72px; top: 790px; width: 936px; font: 700 42px/104px "JetBrains Mono", monospace; color: #efebe0; background: #141310; border-radius: 16px; text-align: center; opacity: 0; white-space: nowrap; }
+  </style>
+  <div id="root" data-composition-id="credit" data-width="1080" data-height="1080">
+
+    <div id="flood"></div>
+    <div id="st1" class="stat"><div class="num">20 days</div><div class="lbl">to public release</div></div>
+    <div id="st2" class="stat"><div id="tests" class="num">0</div><div class="lbl">tests passing</div></div>
+    <div id="rule"></div>
+    <div id="nm"><span id="n0" class="nc">A</span><span id="n1" class="nc">l</span><span id="n2" class="nc">e</span><span id="n3" class="nc">c</span><span id="n4" class="nc">&nbsp;</span><span id="n5" class="nc">R</span><span id="n6" class="nc">e</span><span id="n7" class="nc">i</span><span id="n8" class="nc">m</span><span id="n9" class="nc">e</span><span id="n10" class="nc">l</span></div>
+    <div id="role">Open to engineering roles</div>
+    <div id="url">github.com/areimel/ccstatusboard</div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+
+    tl.to("#flood", { clipPath: "circle(1600px at 540px 1080px)", duration: 0.5, ease: "power2.inOut" }, 0);
+    tl.fromTo("#st1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.35);
+    tl.fromTo("#st2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.5);
+    const n = { v: 0 };
+    tl.to(n, { v: 734, duration: 0.5, ease: "power2.out", onUpdate: () => { document.getElementById("tests").textContent = String(Math.round(n.v)); } }, 0.5);
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, 0.75);
+    ["#n0","#n1","#n2","#n3","#n4","#n5","#n6","#n7","#n8","#n9","#n10"].forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, ease: "power1.out", immediateRender: false }, 1.0 + i * 0.033));
+    tl.fromTo("#role", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, 1.5);
+    tl.fromTo("#url", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out", immediateRender: false }, 2.0);
+    window.__timelines["credit"] = tl;
+  </script>
+</template>
