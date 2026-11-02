@@ -1,21 +1,33 @@
 ---
 import CopyCommand from './CopyCommand.astro';
+import { CURL_INSTALL } from '../content/install';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<section class="cta page-wrap" aria-labelledby="cta-title">
+<section id="install" class="cta page-wrap" aria-labelledby="cta-title">
   <div class="cta__inner">
     <h2 id="cta-title" class="cta__title">Open a terminal and run it.</h2>
     <p class="cta__text">No account and no setup. It finds your running Claude Code sessions on its own.</p>
-    <div class="cta__actions">
-      <CopyCommand cmd="npx ccstatusboard" label="Copy install command" class="cta__cmd" />
-      <a class="cta__link" href="#install">Other ways to install</a>
+    <div class="cta__methods">
+      <div class="cta__method">
+        <h3 class="cta__label">With npm</h3>
+        <CopyCommand cmd="npx ccstatusboard" label="Copy npm command" class="cta__cmd" />
+        <p class="cta__note">Needs Node 22+.</p>
+      </div>
+      <div class="cta__method">
+        <h3 class="cta__label">Standalone binary</h3>
+        <CopyCommand cmd={CURL_INSTALL} label="Copy install script command" class="cta__cmd" />
+        <p class="cta__note">Needs no Node.</p>
+      </div>
     </div>
+    <a class="cta__link" href={`${base}/docs/#install`}>All install options</a>
   </div>
 </section>
 
 <style>
   .cta { padding-block: clamp(56px, 9vw, 120px); }
-  .cta__inner { max-width: 44rem; }
+  .cta__inner { max-width: 52rem; min-width: 0; }
   .cta__title {
     margin: 0;
     font-size: clamp(2rem, 5vw, 3.5rem);
@@ -28,18 +40,29 @@ import CopyCommand from './CopyCommand.astro';
     color: var(--muted-foreground);
     line-height: 1.55;
   }
-  .cta__actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 24px;
+  .cta__methods {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
     margin-top: 28px;
   }
-  .cta__actions :global(.cta__cmd) { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+  .cta__method { min-width: 0; }
+  .cta__label {
+    margin: 0 0 8px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .cta__method :global(.cta__cmd) { min-width: 0; max-width: 100%; }
+  .cta__note {
+    margin: 8px 0 0;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+  }
   .cta__link {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+    margin-top: 16px;
     color: var(--foreground);
     text-decoration: underline;
     text-underline-offset: 4px;
