@@ -1,5 +1,4 @@
 ---
-import SectionIndex from './SectionIndex.astro';
 import KeyGrid from './KeyGrid.astro';
 import FlagTable from './FlagTable.astro';
 import { STATUS_LEGEND, THEMES, OPTIONS, CONFIG_PATH } from '../content/usage';
@@ -12,8 +11,7 @@ const statusClass: Record<string, string> = {
 };
 ---
 
-<section id="usage" class="page-wrap usage" aria-labelledby="usage-h">
-  <SectionIndex fig="06" name="Usage" />
+<section id="usage" class="usage" aria-labelledby="usage-h">
   <h2 id="usage-h" class="usage__h">Usage</h2>
   <p class="usage__p">Run it with no arguments, or pass any of these flags.</p>
   <pre class="usage__cmd usage__synopsis"><code><span class="tui-dim" aria-hidden="true">$ </span>ccstatusboard [options]</code></pre>
@@ -72,8 +70,8 @@ const statusClass: Record<string, string> = {
 </section>
 
 <style>
-  .usage { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
-  .usage__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
+  .usage { padding-block: clamp(2.5rem, 5vw, 4.5rem); container-type: inline-size; }
+  .usage__h { margin: 0 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
   .usage__p a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
   .usage__p a:hover { color: var(--kojima-accent-ink); }
   .usage__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 14px; }
@@ -81,7 +79,7 @@ const statusClass: Record<string, string> = {
   .block { margin-top: 48px; min-width: 0; }
   .block h3 { margin: 0 0 12px; font-size: 1.125rem; font-weight: 500; }
   .block--split { display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr); gap: 32px 48px; }
-  @media (max-width: 760px) { .block--split { grid-template-columns: minmax(0, 1fr); } }
+  @container (max-width: 40rem) { .block--split { grid-template-columns: minmax(0, 1fr); } }
   .legend { list-style: none; margin: 0; display: grid; gap: 8px; font-size: 14px; }
   .legend__glyph { display: inline-block; width: 1.5em; font-size: 16px; }
   .themes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

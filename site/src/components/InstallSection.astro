@@ -1,5 +1,4 @@
 ---
-import SectionIndex from './SectionIndex.astro';
 import CopyCommand from './CopyCommand.astro';
 import {
   NPM_COMMANDS,
@@ -12,8 +11,7 @@ import {
 } from '../content/install';
 ---
 
-<section id="install" class="page-wrap install" aria-labelledby="install-h">
-  <SectionIndex fig="05" name="Install" />
+<section id="install" class="install" aria-labelledby="install-h">
   <h2 id="install-h" class="install__h">Install</h2>
   <p class="install__lede">Pick npm or a standalone binary. Both give you the same <code class="tui-inline">ccstatusboard</code> command.</p>
 
@@ -116,7 +114,7 @@ import {
 
 <style>
   .install { padding-block: clamp(2.5rem, 5vw, 4.5rem); }
-  .install__h { margin: 28px 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
+  .install__h { margin: 0 0 8px; font-size: clamp(1.625rem, 3.2vw, 2.25rem); line-height: 1.12; letter-spacing: -0.015em; }
   .install__lede, .step__p { max-width: 68ch; color: var(--muted-foreground); line-height: 1.6; margin: 8px 0 12px; }
   .steps { list-style: none; padding: 0; margin: 32px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; counter-reset: step; max-width: 56rem; }
   .step { position: relative; padding-left: 48px; min-width: 0; counter-increment: step; }

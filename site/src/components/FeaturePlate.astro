@@ -4,6 +4,7 @@ import type { Feature } from '../content/features';
 interface Props {
   feature: Feature;
   class?: string;
+  showDetails?: boolean;
 }
 
 type Seg = readonly [cls: string, text: string];
@@ -39,19 +40,25 @@ const EXCERPTS: Record<string, readonly (readonly Seg[])[]> = {
   ],
 };
 
-const { feature, class: className } = Astro.props;
+const { feature, class: className, showDetails = false } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const lowerTitle = feature.title.charAt(0).toLowerCase() + feature.title.slice(1);
 const lines = EXCERPTS[feature.id] ?? [];
 ---
 
-<article class:list={['feature', className]} aria-labelledby={`feature-${feature.id}`}>
+<article class:list={['feature', className]} id={showDetails ? `panel-${feature.id}` : undefined} aria-labelledby={`feature-${feature.id}`}>
   <h3 id={`feature-${feature.id}`}>{feature.title}</h3>
   <p class="summary">{feature.summary}</p>
   <pre class="tui excerpt" tabindex="0" role="group" aria-label={`Example: ${feature.title}`}>{lines.map((segs, i) => (
     <Fragment>{i > 0 && '\n'}{segs.map(([cls, text]) => (cls ? <span class={cls}>{text}</span> : text))}</Fragment>
   ))}</pre>
-  <ul class="details">
-    {feature.details.map((d) => <li>{d}</li>)}
-  </ul>
+  {showDetails ? (
+    <ul class="details">
+      {feature.details.map((d) => <li>{d}</li>)}
+    </ul>
+  ) : (
+    <a class="more" href={`${base}/docs/#panel-${feature.id}`}>Read more about {lowerTitle}</a>
+  )}
 </article>
 
 <style>
@@ -86,4 +93,12 @@ const lines = EXCERPTS[feature.id] ?? [];
     height: 5px;
     background: var(--input);
   }
+  .more {
+    align-self: flex-start;
+    font-size: 0.9rem;
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .more:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 </style>

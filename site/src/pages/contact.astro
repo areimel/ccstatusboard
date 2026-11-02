@@ -1,0 +1,100 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Footer from '../components/Footer.astro';
+import { NAME, AVAILABILITY, EMAIL, LINKS } from '../content/contact';
+import { ISSUES_URL } from '../content/site';
+
+const links = LINKS.map((l) => {
+  const u = new URL(l.url);
+  const path = u.pathname.replace(/\/$/, '');
+  return { ...l, host: `${u.hostname.replace(/^www\./, '')}${path}` };
+});
+---
+
+<Base
+  title={`Work with ${NAME}: ccstatusboard`}
+  description="Alec Reimel built ccstatusboard and is open to freelance work and job offers; get in touch by form or email."
+>
+  <Header />
+  <main id="main">
+    <div class="page-wrap">
+      <div class="contact">
+        <div class="info">
+          <h1>Work with {NAME}</h1>
+          <p class="tui avail"><span class="tui-warn" aria-hidden="true">●</span> {AVAILABILITY}</p>
+          <p class="lead">I'm open to freelance work and job offers.</p>
+          <p class="mail"><a href={`mailto:${EMAIL}`}>{EMAIL}</a></p>
+          <ul class="links">
+            {links.map((l) => (
+              <li><a href={l.url}><span class="label">{l.label}</span> <span class="host">{l.host}</span></a></li>
+            ))}
+          </ul>
+          <p class="note">
+            Found a bug in ccstatusboard? <a href={ISSUES_URL}>Open a GitHub issue</a>.
+          </p>
+        </div>
+        <div class="form-col"><ContactForm /></div>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .contact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    padding-block: clamp(2.5rem, 6vw, 5rem);
+    text-align: left;
+  }
+  @media (min-width: 900px) {
+    .contact { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  }
+  .info, .form-col { min-width: 0; }
+  h1 {
+    font-size: clamp(2rem, 4.5vw, 3.25rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 1.5rem;
+  }
+  .avail {
+    margin: 0 0 1.5rem;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 13px;
+    line-height: 1.6;
+    width: fit-content;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .lead { margin: 0 0 1rem; max-width: 62ch; line-height: 1.6; }
+  .mail { margin: 0 0 1.5rem; font-size: 1.125rem; overflow-wrap: anywhere; }
+  a {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  a:hover { color: var(--ring); }
+  a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .mail a, .links a, .note a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+  }
+  @media (pointer: coarse) {
+    .mail a, .links a { min-height: 44px; }
+    .note a { min-height: 44px; }
+  }
+  .links { list-style: none; margin: 0 0 2rem; padding: 0; max-width: 62ch; }
+  .links li { border-top: 1px solid var(--border); }
+  .links li:last-child { border-bottom: 1px solid var(--border); }
+  .links a { display: flex; flex-wrap: wrap; gap: 0 1rem; padding-block: 8px; width: 100%; }
+  .label { font-weight: 600; min-width: 5.5rem; }
+  .host { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 0.875rem; overflow-wrap: anywhere; }
+  .note { margin: 0; font-size: 0.875rem; color: var(--muted-foreground); max-width: 62ch; }
+  .note a { color: inherit; }
+</style>

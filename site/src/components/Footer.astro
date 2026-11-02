@@ -1,7 +1,10 @@
 ---
 import { AUTHOR, ISSUES_URL, LICENSE, NPM_URL, RELEASES_URL, REPO_URL } from '../content/site';
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const links = [
+  { href: `${base}/docs/`, label: 'Docs' },
+  { href: `${base}/contact/`, label: 'Contact' },
   { href: REPO_URL, label: 'GitHub' },
   { href: ISSUES_URL, label: 'Issues' },
   { href: RELEASES_URL, label: 'Releases' },
