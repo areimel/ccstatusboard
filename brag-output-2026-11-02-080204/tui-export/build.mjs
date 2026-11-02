@@ -2,11 +2,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CUES, DUR, EXPORT, SCENES, STEP } from '../timing.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const comp = path.join(here, '../composition');
 const data = JSON.parse(fs.readFileSync(path.join(here, 'tui-frames.json'), 'utf8'));
 const write = (p, s) => fs.writeFileSync(path.join(comp, p), s);
+
+// Scene-local time: every composition's timeline starts at its host's data-start.
+const num = (x) => +x.toFixed(4);
+const BOARD = { start: SCENES.reveal.start, end: SCENES.system.end };
+const bl = (film) => num(film - BOARD.start);
+const pl = (film) => num(film - SCENES.public.start);
+const cl = (film) => num(film - SCENES.credit.start);
+const { hook: HK, reveal: RV, product: PR, system: SY, public: PB, credit: CR } = CUES;
 
 const TESTS = 734; // vitest total, verified at build time
 const fontFaces = `
@@ -37,12 +46,12 @@ const remap = (html) => html.replaceAll('rgb(86,95,137)', 'rgb(138,148,190)').re
 const frameAt = (t) => data.frames.find((f) => f.t === t);
 function framesHtml(prefix, t0, t1, startAt) {
   let out = '';
-  for (let t = t0, i = 0; t < t1; t += 0.25, i++) {
-    out += `<pre id="${prefix}${i}" class="clip frame" data-start="${(startAt + i * 0.25).toFixed(2)}" data-duration="0.25" data-track-index="1">${remap(frameAt(t).lines.join('\n'))}</pre>\n`;
+  for (let t = t0, i = 0; t < t1; t += STEP, i++) {
+    out += `<pre id="${prefix}${i}" class="clip frame" data-start="${(startAt + i * STEP).toFixed(2)}" data-duration="${STEP}" data-track-index="1">${remap(frameAt(t).lines.join('\n'))}</pre>\n`;
   }
   return out;
 }
-const ref = frameAt(10).plain;
+const ref = frameAt(PR.nearLimitFlip + 1.5).plain; // after the flip, so hb-proj fits the wider NEAR LIMIT text
 const findRow = (re) => { const r = ref.findIndex((l) => re.test(l)); if (r < 0) throw new Error('row ' + re); return r; };
 const R = { h5: findRow(/^│ 5h\s+\[/), proj: findRow(/5h\s+proj/), sys: findRow(/╭ System/), sess: findRow(/╭ Sessions/), det: findRow(/╭ Detail/), rel: findRow(/●.*release-script/), press: findRow(/Press\s+mem/) };
 const endCol = (r) => ref[r].replace(/[\s│]+$/, '').length;
@@ -82,20 +91,20 @@ const hookCss = `
     #wait { font: 700 34px/48px "JetBrains Mono", "Board Symbols", monospace; color: #f2b84b; white-space: nowrap; margin-top: 4px; }`;
 const hookJs = `
     const pop = (id, at) => tl.fromTo(id, { opacity: 0, scale: 1.05 }, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, at);
-    tl.fromTo("#hook-t2", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, 1.0);
-    ["#p2", "#p3", "#p4", "#p5"].forEach((id, i) => pop(id, (i + 1) * 0.25));
+    tl.fromTo("#hook-t2", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, ${HK.t2In});
+    ["#p2", "#p3", "#p4", "#p5"].forEach((id, i) => pop(id, ${JSON.stringify(HK.paneTimes)}[i + 1]));
     ["#p1-s", "#p2-s", "#p3-s", "#p4-s"].forEach((id, p) => {
-      for (let k = 1; k <= 18; k++) tl.set(id, { y: -30 * Math.max(0, k - 2) }, (k * 0.25 + (p * 0.125)));
+      for (let k = 1; k * ${HK.scrollStep} + p * ${HK.scrollStep / 2} <= ${HK.titlesOut}; k++) tl.set(id, { y: -30 * Math.max(0, k - 2) }, k * ${HK.scrollStep} + p * ${HK.scrollStep / 2});
     });
-    ["#st0", "#st1", "#st2"].forEach((id, i) => tl.set(id, { opacity: 1 }, 1.0 + i * 0.25));
+    ["#st0", "#st1", "#st2"].forEach((id, i) => tl.set(id, { opacity: 1 }, ${JSON.stringify(HK.stuck)}[i]));
     // scene's turn: release-script stops and asks; everything else keeps moving
-    tl.to("#p5", { borderColor: "#f2b84b", boxShadow: "0 0 34px rgba(242,184,75,.38)", duration: 0.25, ease: "power2.out" }, 2.0);
-    tl.fromTo("#wait", { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "none", immediateRender: false }, 2.0);
-    tl.to(["#p1", "#p2", "#p3", "#p4"], { opacity: 0.42, duration: 0.35, ease: "power2.inOut" }, 2.25);
+    tl.to("#p5", { borderColor: "#f2b84b", boxShadow: "0 0 34px rgba(242,184,75,.38)", duration: 0.25, ease: "power2.out" }, ${HK.waitIn});
+    tl.fromTo("#wait", { opacity: 0 }, { opacity: 1, duration: 0.14, ease: "none", immediateRender: false }, ${HK.waitIn});
+    tl.to(["#p1", "#p2", "#p3", "#p4"], { opacity: 0.42, duration: 0.35, ease: "power2.inOut" }, ${HK.dim});
     // exit: stuck pane becomes the world
-    tl.to(["#hook-t1", "#hook-t2"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power1.in" }, 3.55);
-    tl.to(["#p1", "#p2", "#p3", "#p4"], { opacity: 0, duration: 0.2, ease: "power1.in" }, 3.55);
-    tl.to("#p5", { scale: 2.6, y: -300, opacity: 0, duration: 0.42, ease: "power3.in" }, 3.56);`;
+    tl.to(["#hook-t1", "#hook-t2"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power1.in" }, ${HK.titlesOut});
+    tl.to(["#p1", "#p2", "#p3", "#p4"], { opacity: 0, duration: 0.2, ease: "power1.in" }, ${HK.titlesOut});
+    tl.to("#p5", { scale: 2.6, y: -300, opacity: 0, duration: 0.42, ease: "power3.in" }, ${HK.zoom});`;
 write('compositions/hook.html', scene('hook', hookCss, hookBody, hookJs));
 
 // ---------- scene 2-4: the real board ----------
@@ -105,7 +114,7 @@ const hb = (id, r0, r1, c0, c1) => `<div id="${id}" class="hb" style="left:${c0 
 const cover = (id, r0, r1) => `<div id="${id}" class="cov" style="top:${r0 * LH}px;height:${(r1 - r0) * LH}px"></div>`;
 const boardBody = `
     <div id="cam"><div id="screen" data-layout-allow-overlap>
-${framesHtml('f', 4, 15, 0)}
+${framesHtml('f', EXPORT.RANGES[0][0], EXPORT.RANGES[0][1], 0)}
 ${hb('hb-rel', R.rel, R.rel, 1, endCol(R.rel) > 70 ? 67 : endCol(R.rel))}
 <div id="callout" style="left:${1 * CW}px;top:${(R.rel + 1.15) * LH}px;width:${66 * CW}px">waiting: permission to run npm publish</div>
 ${hb('hb-cost', R.h5, R.h5 + 4, C.block - 1, C.block + 16)}
@@ -117,9 +126,9 @@ ${hb('hb-press', R.press, R.press, 1, 38)}
 ${cover('c1', 1, R.sys)}${cover('c2', R.sys, R.sess)}${cover('c3', R.sess, R.det)}${cover('c4', R.det, ROWS)}
     </div></div>
     <div id="band"></div>
-    <div id="title" class="clip" data-start="0" data-duration="3" data-track-index="2"><div id="title-a">ccstatusboard</div><div id="title-b">One live dashboard for every <em>Claude Code</em> session.</div></div>
-    <div id="cap3" class="clip" data-start="3" data-duration="4" data-track-index="2"><div id="l1" class="l">Who needs you.</div><div id="l2" class="l">What it costs.</div><div id="l3" class="l">When you hit the limit.</div></div>
-    <div id="cap4" class="clip" data-start="7" data-duration="4" data-track-index="2"><div id="s-h"><em>New:</em> the whole machine, live.</div><div id="chips"><span id="ch-net" class="chip">Network</span><span id="ch-temp" class="chip">Temps</span><span id="ch-gpu" class="chip">GPU</span><span id="ch-press" class="chip">Pressure</span></div></div>`;
+    <div id="title" class="clip" data-start="${bl(SCENES.reveal.start)}" data-duration="${SCENES.reveal.end - SCENES.reveal.start}" data-track-index="2"><div id="title-a">ccstatusboard</div><div id="title-b">One live dashboard for every <em>Claude Code</em> session.</div></div>
+    <div id="cap3" class="clip" data-start="${bl(SCENES.product.start)}" data-duration="${SCENES.product.end - SCENES.product.start}" data-track-index="2"><div id="l1" class="l">Who needs you.</div><div id="l2" class="l">What it costs.</div><div id="l3" class="l">When you hit the limit.</div></div>
+    <div id="cap4" class="clip" data-start="${bl(SCENES.system.start)}" data-duration="${SCENES.system.end - SCENES.system.start}" data-track-index="2"><div id="s-h"><em>New:</em> the whole machine, live.</div><div id="chips"><span id="ch-net" class="chip">Network</span><span id="ch-temp" class="chip">Temps</span><span id="ch-gpu" class="chip">GPU</span><span id="ch-press" class="chip">Pressure</span></div></div>`;
 const boardCss = `
     #cam { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; transform-origin: 0 0; }
     #screen { position: absolute; left: ${OX}px; top: ${OY}px; width: ${COLS * CW}px; height: ${ROWS * LH}px; }
@@ -142,47 +151,47 @@ const boardJs = `
     const CW=${CW}, LH=${LH}, OX=${OX}, OY=${OY};
     const cam = (c, r, sx, sy, s) => ({ x: sx - s * (OX + c * CW), y: sy - s * (OY + r * LH), scale: s });
     const E = "power3.inOut", CAM = "#cam";
-    const move = (to, at, d = 0.5) => tl.to(CAM, { ...to, duration: d, ease: E }, at);
+    const move = (to, at, d) => tl.to(CAM, { ...to, duration: d, ease: E }, at);
     const blur = (id, at) => tl.fromTo(id, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, at);
     const out = (ids, at) => tl.to(ids, { opacity: 0, filter: "blur(6px)", duration: 0.16, ease: "power1.in" }, at);
     const draw = (id, at) => tl.fromTo(id, { opacity: 0, clipPath: "inset(-12px 100% -12px -12px)" }, { opacity: 1, clipPath: "inset(-12px -12px -12px -12px)", duration: 0.3, ease: "power2.out", immediateRender: false }, at);
     const undraw = (ids, at) => tl.to(ids, { opacity: 0, duration: 0.16, ease: "power1.in" }, at);
 
-    // scene 2 (film 4-7): panels wipe on, one per half beat
-    ["#c1", "#c2", "#c3", "#c4"].forEach((id, i) => tl.to(id, { scaleX: 0, duration: 0.4, ease: "power3.out" }, i * 0.25));
-    blur("#title-a", 0.05); blur("#title-b", 0.3);
-    out(["#title-a", "#title-b"], 2.82);
+    // reveal: panels wipe on, one per wipeStep
+    ["#c1", "#c2", "#c3", "#c4"].forEach((id, i) => tl.to(id, { scaleX: 0, duration: ${RV.wipeDur}, ease: "power3.out" }, ${RV.wipeStep} * i));
+    blur("#title-a", ${bl(RV.nameIn)}); blur("#title-b", ${bl(RV.tagIn)});
+    out(["#title-a", "#title-b"], ${bl(RV.out)});
 
-    // scene 3 (film 7-11)
-    move(cam(33.5, ${R.rel + 1}, 540, 560, 1.55), 3.0);
-    blur("#l1", 3.1); draw("#hb-rel", 3.45); tl.to("#callout", { opacity: 1, duration: 0.15 }, 3.5);
-    undraw(["#hb-rel", "#callout"], 3.95);
-    move(cam(${C.block + 7.5}, ${R.h5 + 2.5}, 540, 600, 3), 4.0);
-    blur("#l2", 4.1); draw("#hb-cost", 4.45);
-    undraw("#hb-cost", 4.95);
-    move(cam(31, ${R.h5 + 3.5}, 540, 600, 1.72), 5.0);
-    blur("#l3", 5.1); draw("#hb-proj", 5.5);
-    undraw("#hb-proj", 6.85);
-    out(["#l1", "#l2", "#l3"], 6.82);
+    // product: live data keeps the holds alive, so the camera stays still between moves
+    move(cam(33.5, ${R.rel + 1}, 540, 560, 1.55), ${bl(PR.shot1.move)}, ${PR.shot1.moveDur});
+    blur("#l1", ${bl(PR.shot1.lineIn)}); draw("#hb-rel", ${bl(PR.shot1.box)}); tl.to("#callout", { opacity: 1, duration: 0.15 }, ${bl(PR.shot1.calloutIn)});
+    undraw(["#hb-rel", "#callout"], ${bl(PR.shot1.out)});
+    move(cam(${C.block + 7.5}, ${R.h5 + 2.5}, 540, 600, 3), ${bl(PR.shot2.move)}, ${PR.shot2.moveDur});
+    blur("#l2", ${bl(PR.shot2.lineIn)}); draw("#hb-cost", ${bl(PR.shot2.box)});
+    undraw("#hb-cost", ${bl(PR.shot2.out)});
+    move(cam(31, ${R.h5 + 3.5}, 540, 600, 1.72), ${bl(PR.shot3.move)}, ${PR.shot3.moveDur});
+    blur("#l3", ${bl(PR.shot3.lineIn)}); draw("#hb-proj", ${bl(PR.shot3.box)});
+    undraw("#hb-proj", ${bl(PR.shot3.out)});
+    out(["#l1", "#l2", "#l3"], ${bl(PR.shot3.out)});
 
-    // scene 4 (film 11-15): whole panel, across the new columns, back to the meters
-    move(cam(55, ${R.sys + 3.5}, 540, 590, 0.98), 7.0);
-    move(cam(76.5, ${R.sys + 3.5}, 540, 600, 1.62), 7.5);
-    blur("#s-h", 7.1);
+    // system: whole panel, across the new columns, back to the meters
+    move(cam(55, ${R.sys + 3.5}, 540, 590, 0.98), ${bl(SY.moves[0].at)}, ${SY.moves[0].d});
+    move(cam(76.5, ${R.sys + 3.5}, 540, 600, 1.62), ${bl(SY.moves[1].at)}, ${SY.moves[1].d});
+    blur("#s-h", ${bl(SY.headIn)});
     const chipIn = (id, at) => tl.fromTo(id, { opacity: 0 }, { opacity: 1, duration: 0.15, immediateRender: false }, at);
-    ["#ch-net", "#ch-temp", "#ch-gpu", "#ch-press"].forEach((id, i) => chipIn(id, 7.35 + i * 0.05));
+    ["#ch-net", "#ch-temp", "#ch-gpu", "#ch-press"].forEach((id, i) => chipIn(id, ${bl(SY.chipsIn)} + i * 0.05));
     const lit = (chip, box, at, end) => {
       tl.to(chip, { backgroundColor: "#ff4d00", color: "#141310", borderColor: "#ff4d00", duration: 0.12 }, at);
       draw(box, at);
       tl.to(chip, { backgroundColor: "rgba(0,0,0,0)", color: "#efebe0", borderColor: "#4a483f", duration: 0.12 }, end);
       undraw(box, end);
     };
-    lit("#ch-net", "#hb-net", 8.0, 8.75);
-    lit("#ch-temp", "#hb-temp", 8.75, 9.5);
-    lit("#ch-gpu", "#hb-gpu", 9.5, 10.0);
-    move(cam(35, ${R.sys + 3.5}, 540, 600, 1.62), 10.0);
-    lit("#ch-press", "#hb-press", 10.25, 10.85);
-    out(["#s-h", "#ch-net", "#ch-temp", "#ch-gpu", "#ch-press"], 10.82);`;
+    lit("#ch-net", "#hb-net", ${bl(SY.net[0])}, ${bl(SY.net[1])});
+    lit("#ch-temp", "#hb-temp", ${bl(SY.temp[0])}, ${bl(SY.temp[1])});
+    lit("#ch-gpu", "#hb-gpu", ${bl(SY.gpu[0])}, ${bl(SY.gpu[1])});
+    move(cam(35, ${R.sys + 3.5}, 540, 600, 1.62), ${bl(SY.moves[2].at)}, ${SY.moves[2].d});
+    lit("#ch-press", "#hb-press", ${bl(SY.press[0])}, ${bl(SY.press[1])});
+    out(["#s-h", "#ch-net", "#ch-temp", "#ch-gpu", "#ch-press"], ${bl(SY.out)});`;
 write('compositions/board.html', scene('board', boardCss, boardBody, boardJs));
 
 // ---------- scene 5: public ----------
@@ -194,7 +203,7 @@ const pubBody = `
     <div id="win"><div id="wbar"><i></i><i></i><i></i></div>
       <div id="prompt"><span class="d">$</span> ${[...cmd].map((c, i) => `<span id="k${i}" class="k">${c === ' ' ? '&nbsp;' : c}</span>`).join('')}<span id="caret"></span></div>
       <div id="wscreen">
-${framesHtml('w', 16.5, 19, 1.5).replaceAll('class="clip frame"', 'class="clip frame"')}
+${framesHtml('w', EXPORT.RANGES[1][0], EXPORT.RANGES[1][1], pl(PB.enter))}
       </div>
     </div>
     <div id="chips2"><span class="c2">npm</span><span class="c2">standalone binary</span><span class="c2">Linux</span><span class="c2">macOS</span></div>
@@ -217,15 +226,19 @@ const pubCss = `
     #site { position: absolute; left: 72px; top: 920px; font: 700 40px/1.2 "JetBrains Mono", monospace; color: #ff4d00; opacity: 0; white-space: nowrap; }`;
 const pubJs = `
     const blur = (id, at) => tl.fromTo(id, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, at);
-    blur("#pu-1", 0.05); blur("#pu-2", 0.5);
+    blur("#pu-1", ${pl(PB.l1In)}); blur("#pu-2", ${pl(PB.l2In)});
     tl.fromTo("#win", { y: 40, scale: 0.97 }, { y: 0, scale: 1, duration: 0.45, ease: "expo.out" }, 0);
-    ${JSON.stringify([...cmd].map((_, i) => '#k' + i))}.forEach((id, i) => tl.set(id, { opacity: 1 }, 0.3 + i * 0.0625));
-    for (let i = 0; i <= 17; i++) tl.set("#caret", { x: -(17 - i) * 34.8 }, i === 0 ? 0 : 0.3 + (i - 1) * 0.0625);
-    // Enter on the 16.5s beat: the prompt clears and the board is running
-    tl.set(["#prompt"], { opacity: 0 }, 1.5);
-    gsap.utils.toArray(".c2").forEach((el, i) => tl.fromTo(el, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 1.5 + i * 0.08));
-    blur("#site", 1.9);
-    tl.to(["#pu-1", "#pu-2", "#win", "#chips2", "#site"], { opacity: 0, duration: 0.16, ease: "power1.in" }, 3.82);`;
+    ${JSON.stringify([...cmd].map((_, i) => '#k' + i))}.forEach((id, i) => tl.set(id, { opacity: 1 }, ${pl(PB.typeStart)} + i * ${PB.typeStep}));
+    // caret blinks on the half beat until typing starts, then holds steady
+    for (let t = 0, on = 1; t < ${pl(PB.typeStart)}; t += 0.5, on = 1 - on) tl.set("#caret", { opacity: on }, t);
+    tl.set("#caret", { opacity: 1 }, ${pl(PB.typeStart)});
+    // one caret step per typed character
+    for (let i = 0; i <= 17; i++) tl.set("#caret", { x: -(17 - i) * 34.8 }, i === 0 ? 0 : ${pl(PB.typeStart)} + (i - 1) * ${PB.typeStep});
+    // Enter: the prompt clears and the board is running
+    tl.set(["#prompt"], { opacity: 0 }, ${pl(PB.enter)});
+    gsap.utils.toArray(".c2").forEach((el, i) => tl.fromTo(el, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: ${PB.chipStep}, ease: "expo.out", immediateRender: false }, ${pl(PB.chipsIn)} + i * ${PB.chipStep}));
+    blur("#site", ${pl(PB.siteIn)});
+    tl.to(["#pu-1", "#pu-2", "#win", "#chips2", "#site"], { opacity: 0, duration: 0.16, ease: "power1.in" }, ${pl(PB.out)});`;
 write('compositions/public.html', scene('public', pubCss, pubBody, pubJs));
 
 // ---------- scene 6: proof + credit ----------
@@ -250,15 +263,15 @@ const credCss = `
     #role { position: absolute; left: 72px; top: 630px; font: 700 58px/1.2 "DM Sans", sans-serif; color: #141310; letter-spacing: -1px; opacity: 0; white-space: nowrap; }
     #url { position: absolute; left: 72px; top: 790px; width: 936px; font: 700 42px/104px "JetBrains Mono", monospace; color: #efebe0; background: #141310; border-radius: 16px; text-align: center; opacity: 0; white-space: nowrap; }`;
 const credJs = `
-    tl.to("#flood", { clipPath: "circle(1600px at 540px 1080px)", duration: 0.5, ease: "power2.inOut" }, 0);
-    tl.fromTo("#st1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.35);
-    tl.fromTo("#st2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.5);
+    tl.to("#flood", { clipPath: "circle(1600px at 540px 1080px)", duration: ${CR.floodDur}, ease: "power2.inOut" }, ${cl(CR.flood)});
+    tl.fromTo("#st1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, ${cl(CR.stat1In)});
+    tl.fromTo("#st2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, ${cl(CR.stat2In)});
     const n = { v: 0 };
-    tl.to(n, { v: ${TESTS}, duration: 0.5, ease: "power2.out", onUpdate: () => { document.getElementById("tests").textContent = String(Math.round(n.v)); } }, 0.5);
-    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, 0.75);
-    ${JSON.stringify([...name].map((_, i) => '#n' + i))}.forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, ease: "power1.out", immediateRender: false }, 1.0 + i * 0.033));
-    tl.fromTo("#role", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, 1.5);
-    tl.fromTo("#url", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out", immediateRender: false }, 2.0);`;
+    tl.to(n, { v: ${TESTS}, duration: 0.3, ease: "power2.out", onUpdate: () => { document.getElementById("tests").textContent = String(Math.round(n.v)); } }, ${cl(CR.stat2In)});
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, ${cl(CR.ruleIn)});
+    ${JSON.stringify([...name].map((_, i) => '#n' + i))}.forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power1.out", immediateRender: false }, ${cl(CR.nameIn)} + i * 0.03));
+    tl.fromTo("#role", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power2.out", immediateRender: false }, ${cl(CR.roleIn)});
+    tl.fromTo("#url", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out", immediateRender: false }, ${cl(CR.urlIn)});`;
 write('compositions/credit.html', scene('credit', credCss, credBody, credJs));
 
 // ---------- root ----------
@@ -277,12 +290,12 @@ write('index.html', `<!doctype html>
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-duration="24" data-width="1080" data-height="1080">
-      ${host('hook', 0, 4)}
-      ${host('board', 4, 11)}
-      ${host('public', 15, 4)}
-      ${host('credit', 19, 5)}
-      <audio id="music" class="clip" src="assets/music.wav" data-start="0" data-duration="24" data-track-index="1"></audio>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="${DUR}" data-width="1080" data-height="1080">
+      ${host('hook', SCENES.hook.start, SCENES.hook.end - SCENES.hook.start)}
+      ${host('board', BOARD.start, BOARD.end - BOARD.start)}
+      ${host('public', SCENES.public.start, SCENES.public.end - SCENES.public.start)}
+      ${host('credit', SCENES.credit.start, SCENES.credit.end - SCENES.credit.start)}
+      <audio id="music" class="clip" src="assets/music.wav" data-start="0" data-duration="${DUR}" data-track-index="1"></audio>
     </div>
     <script>
       const tl = gsap.timeline({ paused: true });

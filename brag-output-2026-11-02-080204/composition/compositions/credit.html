@@ -32,15 +32,15 @@
     window.__timelines = window.__timelines || {};
     const tl = gsap.timeline({ paused: true });
 
-    tl.to("#flood", { clipPath: "circle(1600px at 540px 1080px)", duration: 0.5, ease: "power2.inOut" }, 0);
-    tl.fromTo("#st1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.35);
-    tl.fromTo("#st2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.5);
+    tl.to("#flood", { clipPath: "circle(1600px at 540px 1080px)", duration: 0.75, ease: "power2.inOut" }, 0);
+    tl.fromTo("#st1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 0.5);
+    tl.fromTo("#st2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out", immediateRender: false }, 3.75);
     const n = { v: 0 };
-    tl.to(n, { v: 734, duration: 0.5, ease: "power2.out", onUpdate: () => { document.getElementById("tests").textContent = String(Math.round(n.v)); } }, 0.5);
-    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, 0.75);
-    ["#n0","#n1","#n2","#n3","#n4","#n5","#n6","#n7","#n8","#n9","#n10"].forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, ease: "power1.out", immediateRender: false }, 1.0 + i * 0.033));
-    tl.fromTo("#role", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out", immediateRender: false }, 1.5);
-    tl.fromTo("#url", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out", immediateRender: false }, 2.0);
+    tl.to(n, { v: 734, duration: 0.3, ease: "power2.out", onUpdate: () => { document.getElementById("tests").textContent = String(Math.round(n.v)); } }, 3.75);
+    tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, 6);
+    ["#n0","#n1","#n2","#n3","#n4","#n5","#n6","#n7","#n8","#n9","#n10"].forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power1.out", immediateRender: false }, 6.5 + i * 0.03));
+    tl.fromTo("#role", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power2.out", immediateRender: false }, 8.75);
+    tl.fromTo("#url", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out", immediateRender: false }, 10);
     window.__timelines["credit"] = tl;
   </script>
 </template>

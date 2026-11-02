@@ -1,5 +1,6 @@
 # Review
-Measured: 1080x1080, 30fps, 24.0s, H.264/yuv420p/AAC; -15.6 LUFS, -2.6 dBFS true peak; audio onsets on the beat grid.
-Looked at: stills of every scene and cut from the render, plus a 360px phone sheet. The sound was measured, not heard.
-Weakest shot: full-board frames (scene 2, scene 5) are unreadable at phone size; they carry context, while captions and zooms carry the meaning.
-Warnings kept: line_unread and contrast on board frames and scrolling panes, which are real TUI output and texture; text_occluded on the reveal's wipe covers, which is intentional; file-size lint on generated board frames.
+Measured on brag.mp4: 1080x1080, 30fps, 72.0s, H.264/yuv420p/AAC; -14.9 LUFS, -1.9 dBFS true peak, no flat-topped samples, DC 0.00014. Stem measurements: mono loss 0.6 LU, phone simulation 5.8 LU down, cue onsets within 4ms.
+Looked at: contact sheet of the render, stills of each scene and cue, a 360px phone sheet. An independent review of the 68s pass drove the changes to 72s; that review was not repeated on the 72s render.
+Not heard: nobody has listened to the score. Lead pitch check fails: raw FFT peak worst -21.6c, harmonic-sum estimate worst 11.0c, sub 0.0c. Likely an estimator artefact of detuned saws, not confirmed.
+Weakest shots: full-board frames in scenes 2 and 5 are unreadable at phone size, so captions carry them. 58.8-61.75 is one stat on empty orange, kept so each stat gets its reading time.
+Warnings kept: `hyperframes check` exits 1 on text_occluded (TUI frames under #band and the wipe covers, intentional; the 24s cut had the same class). Also line_unread, contrast, text_below_floor on TUI frames, and file-size/track-density lint on generated frames.
