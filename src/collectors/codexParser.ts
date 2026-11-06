@@ -294,7 +294,7 @@ export function projectCodexSession(
   options: CodexProjectionOptions,
 ): { events: TranscriptEvent[]; metadata: CodexSessionMetadata } {
   const ownMeta = observations.find((o) => o.kind === 'session' && o.sessionId === options.sessionId);
-  const forked = ownMeta?.forkedFromId !== undefined;
+  const forked = ownMeta?.forkedFromId !== undefined || ownMeta?.parentSessionId !== undefined;
   const metadata: CodexSessionMetadata = {
     cwd: ownMeta?.cwd,
     version: ownMeta?.version,
@@ -318,6 +318,13 @@ export function projectCodexSession(
   }
   const events: TranscriptEvent[] = [];
   const seenResponses = new Set<string>();
+  const legacyTotals = new Map<string, CodexUsage>();
+  const responseTotals = new Map<string, CodexUsage>();
+  const accumulate = (totals: Map<string, CodexUsage>, turn: string, usage: CodexUsage) => {
+    const total = totals.get(turn) ?? { ...ZERO_USAGE };
+    for (const key of usageKeys) total[key] += usage[key];
+    totals.set(turn, total);
+  };
   let previous: CodexUsage = { ...ZERO_USAGE };
   let hasBaseline = ownMeta !== undefined && !forked && options.incomplete !== true;
   let turnId = '';
@@ -355,6 +362,7 @@ export function projectCodexSession(
       const key = `response:${observation.sessionId}:${observation.responseId}`;
       if (!seenResponses.has(key)) {
         seenResponses.add(key);
+        accumulate(responseTotals, observation.turnId ?? turnId, observation.usage);
         emit(observation.usage, observation, key);
       }
     } else if (observation.kind === 'tokens') {
@@ -375,9 +383,14 @@ export function projectCodexSession(
         metadata.accountingIncomplete = true;
         continue;
       }
+      accumulate(legacyTotals, turnId, delta);
       if (!responseTurns.has(turnId))
         emit(delta, observation, `legacy:${turnId}:${legacyIndex++}:${JSON.stringify(next)}`);
     }
+  }
+  for (const [turn, observed] of responseTotals) {
+    const legacy = legacyTotals.get(turn);
+    if (legacy && usageKeys.some((key) => legacy[key] > observed[key])) metadata.accountingIncomplete = true;
   }
   events.push({
     kind: 'meta',
@@ -418,7 +431,8 @@ export function codexLimits(observations: readonly CodexObservation[], now: numb
   const weekly = defaultBucket?.limits?.find((w) => w.id?.endsWith(':secondary'));
   return {
     source: 'observed',
-    status: windows.length === 0 ? 'loading' : stale ? 'stale' : 'ok',
+    status: windows.length === 0 ? 'error' : stale ? 'stale' : 'ok',
+    ...(windows.length === 0 ? { error: 'No quota observation available' } : {}),
     windows,
     ...(block ? { block: { ...block, observedAt: defaultBucket!.timestamp } } : {}),
     ...(weekly ? { weekly: { ...weekly, observedAt: defaultBucket!.timestamp } } : {}),

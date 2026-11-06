@@ -274,6 +274,16 @@ describe('passive Codex monitor', () => {
     expect(f.onDirectory).toHaveBeenLastCalledWith(false);
   });
 
+  it('accepts a symlink for the explicitly configured Codex home', async () => {
+    const f = await fixture();
+    await f.write(meta() + context() + usage());
+    const alias = join(f.root, 'codex-alias');
+    await symlink(f.codexDir, alias);
+    await new CodexMonitor({ ...f.options, codexDir: alias }).pollOnce();
+    expect(f.onDirectory).toHaveBeenLastCalledWith(true);
+    expect(countUsage(f.sessions.get(ID)!.events)).toBe(70);
+  });
+
   it('disables cache writes when cache is configured under Codex home', async () => {
     const f = await fixture();
     await f.write(meta() + context() + usage());

@@ -154,6 +154,18 @@ describe('Codex rollout parser', () => {
     expect(events[0]?.record.key).toBe('response:s1:r1');
   });
 
+  it('marks partial response records incomplete when cumulative evidence reports more usage', () => {
+    const response = parse('token_usage_record', {
+      thread_id: 's1',
+      turn_id: 't1',
+      response_id: 'r1',
+      usage: usage(50, 10, 10),
+    });
+    const result = records([session(), context(), snapshot(), response]);
+    expect(result.metadata.accountingIncomplete).toBe(true);
+    expect(result.events.filter((e) => e.kind === 'usage')).toHaveLength(1);
+  });
+
   it('does not attribute copied response records to their enclosing fork', () => {
     const response = parse('token_usage_record', {
       thread_id: 'parent',
@@ -242,5 +254,6 @@ describe('Codex rollout parser', () => {
     expect(codexLimits(observations, TS + 3600001).status).toBe('stale');
     expect(codexLimits([limit('old', 10, TS - 3600000), limit('fresh', 5, TS)], TS + 3).status).toBe('stale');
     expect(limits.block?.id).toBe('codex:primary');
+    expect(codexLimits([], TS)).toMatchObject({ status: 'error', error: 'No quota observation available' });
   });
 });

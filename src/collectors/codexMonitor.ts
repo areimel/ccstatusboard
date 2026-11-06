@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, stat as fsStat, writeFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { decompress } from 'fzstd';
 import type { LimitsState, ScanProgress, TranscriptEvent } from '../domain/types.js';
@@ -137,7 +137,8 @@ export class CodexMonitor {
     let directoryFound = false;
     let unreadable = false;
     try {
-      directoryFound = (await this.deps.stat(this.root)).isDirectory();
+      const rootStat = this.options.deps?.stat ? await this.deps.stat(this.root) : await fsStat(this.root);
+      directoryFound = rootStat.isDirectory();
     } catch (error) {
       unreadable = (error as NodeJS.ErrnoException).code !== 'ENOENT';
     }
@@ -332,9 +333,8 @@ export class CodexMonitor {
           return true;
         })
         .sort((a, b) => a.timestamp - b.timestamp);
-      const parentId = session.observations.find(
-        (o) => o.kind === 'session' && o.sessionId === sessionId,
-      )?.forkedFromId;
+      const sessionMeta = session.observations.find((o) => o.kind === 'session' && o.sessionId === sessionId);
+      const parentId = sessionMeta?.forkedFromId ?? sessionMeta?.parentSessionId;
       const parent = parentId ? sessions.get(parentId) : undefined;
       const parentTurnIds =
         parent === undefined
