@@ -14,6 +14,7 @@ import { scanSubagents } from '../collectors/subagents.js';
 import { ProcStatsSampler, type ProcStatsDeps } from '../collectors/procStats.js';
 import { SystemMonitor, type SystemMonitorDeps } from '../collectors/system/systemMonitor.js';
 import { UsagePoller } from '../collectors/usageApi.js';
+import { CodexMonitor } from '../collectors/codexMonitor.js';
 import type { CredentialsResult } from '../collectors/credentials.js';
 
 export interface Runtime {
@@ -54,15 +55,26 @@ interface TrackedFile {
 export function createRuntime(opts: RuntimeOptions): Runtime {
   const { config, claudeDir, cacheDir, version } = opts;
   const now = opts.now ?? Date.now;
+  const claudeEnabled = config.providers.includes('claude');
+  // Embedded runtimes must supply a path explicitly; never discover a developer's home in tests.
+  const codexEnabled = config.providers.includes('codex') && opts.codexDir !== undefined;
   const fetchDep = opts.fetch ? { fetch: opts.fetch } : {};
 
   const store = new Store({
     now,
     refreshMs: config.refreshMs,
     endedWindowHours: config.endedWindowHours,
+    idleCutoffMinutes: config.idleCutoffMinutes,
     claudeDir,
     claudeDirFound: existsSync(claudeDir),
   });
+  store.setProviderEnabled('claude', claudeEnabled);
+  store.setProviderDirectory('codex', opts.codexDir ?? '', codexEnabled && existsSync(opts.codexDir!));
+  store.setProviderEnabled('codex', codexEnabled);
+  if (!claudeEnabled) {
+    store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
+    store.setLimits({ status: 'disabled', perModelWeekly: [] });
+  }
 
   const resolveProject = opts.resolveProject ?? createProjectResolver();
   const files = new Map<string, TrackedFile>();
@@ -75,6 +87,36 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
   };
   let started = false;
   let stopped = false;
+
+  const codex = codexEnabled
+    ? new CodexMonitor({
+        codexDir: opts.codexDir!,
+        cacheDir,
+        deps: { now },
+        onSession: (sessionId, events) => {
+          if (stopped) return;
+          store.replaceProviderSession(sessionId, events, 'codex');
+          const meta = events.findLast((event) => event.kind === 'meta' && event.cwd);
+          if (meta?.kind === 'meta' && meta.cwd) {
+            const cwd = meta.cwd;
+            void resolveProject(cwd)
+              .then((name) => {
+                if (!stopped) store.setProject(cwd, name);
+              })
+              .catch(() => undefined);
+          }
+        },
+        onLimits: (limits) => {
+          if (!stopped) store.setLimits(limits, 'codex');
+        },
+        onProgress: (progress) => {
+          if (!stopped) store.setScanProgress(progress, 'codex');
+        },
+        onDirectory: (found) => {
+          if (!stopped) store.setProviderDirectory('codex', opts.codexDir!, found);
+        },
+      })
+    : null;
 
   /** Store calls are routed through here so a late callback after stop() is a no-op. */
   const applyEvents = (sessionId: string, events: TranscriptEvent[]) => {
@@ -179,7 +221,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     claudeDir,
     intervalSeconds: config.usagePollSeconds,
     version,
-    enabled: config.usageApi,
+    enabled: claudeEnabled && config.usageApi,
     deps: { ...fetchDep, now, ...(opts.readCredentials ? { readCredentials: opts.readCredentials } : {}) },
     // An in-flight poll may resolve after stop(); drop it.
     onUpdate: (l: LimitsState) => {
@@ -217,9 +259,10 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     store,
     applyConfig(patch) {
       if (stopped) return;
-      const o: { refreshMs?: number; endedWindowHours?: number } = {};
+      const o: { refreshMs?: number; endedWindowHours?: number; idleCutoffMinutes?: number } = {};
       if (patch.refreshMs !== undefined) o.refreshMs = patch.refreshMs;
       if (patch.endedWindowHours !== undefined) o.endedWindowHours = patch.endedWindowHours;
+      if (patch.idleCutoffMinutes !== undefined) o.idleCutoffMinutes = patch.idleCutoffMinutes;
       if (Object.keys(o).length > 0) store.setOptions(o);
       if (patch.usagePollSeconds !== undefined) poller.setIntervalSeconds(patch.usagePollSeconds);
     },
@@ -227,22 +270,27 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       if (started || stopped) return;
       started = true;
       store.start();
-      tailer.start();
-      poller.start();
+      if (claudeEnabled) {
+        tailer.start();
+        poller.start();
+      }
       systemMonitor?.start();
       if (procSampler) every(sampleProcs, PROC_SAMPLE_MS);
-      void scanner.run().catch(() => {
-        if (!stopped) store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
-      });
-      every(scanAgents, AGENT_SCAN_MS);
+      if (claudeEnabled) {
+        void scanner.run().catch(() => {
+          if (!stopped) store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
+        });
+        every(scanAgents, AGENT_SCAN_MS);
+      }
       every(loadPricing, PRICING_RELOAD_MS);
       await Promise.all([
         loadPricing().catch(() => {
           if (!stopped) store.setPricing(null, 'unavailable');
         }),
-        registry.scanOnce(),
+        ...(claudeEnabled ? [registry.scanOnce()] : []),
+        ...(codex ? [codex.start()] : []),
       ]);
-      if (!stopped) registry.start();
+      if (!stopped && claudeEnabled) registry.start();
     },
     stop() {
       if (stopped) return;
@@ -251,6 +299,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       registry.stop();
       tailer.stop();
       poller.stop();
+      codex?.stop();
       systemMonitor?.stop();
       store.stop();
     },

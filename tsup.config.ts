@@ -10,6 +10,7 @@ export default defineConfig({
   format: ['esm'],
   target: 'node22',
   platform: 'node',
+  noExternal: ['fzstd'],
   clean: true,
   sourcemap: true,
   banner: { js: '#!/usr/bin/env node' },
