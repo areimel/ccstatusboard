@@ -1,3 +1,4 @@
+import type { ProviderFilter } from './uiState.js';
 import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import type { ColumnKey, DisplayStatus, SessionView, SortKey, SubagentView } from '../domain/types.js';
@@ -40,7 +41,13 @@ const HEADERS: Record<ColumnKey, string> = {
   uptime: 'UP',
 };
 
-const GLYPHS: Record<DisplayStatus, string> = { waiting: '●', busy: '◐', idle: '○', ended: '·' };
+const GLYPHS: Record<DisplayStatus, string> = {
+  waiting: '●',
+  busy: '◐',
+  idle: '○',
+  ended: '·',
+  unknown: '?',
+};
 
 export interface SessionTableProps {
   sessions: SessionView[];
@@ -51,6 +58,8 @@ export interface SessionTableProps {
   now: number;
   sort: SortKey;
   filter: 'all' | 'live';
+  providerFilter?: ProviderFilter;
+  showProvider?: boolean;
   /** Live sessions idle longer than this many minutes render dimmed. */
   idleCutoffMinutes?: number;
   emptyMessage?: string;
@@ -109,6 +118,7 @@ function Row(props: {
   now: number;
   selected: boolean;
   stale: boolean;
+  showProvider?: boolean;
 }): JSX.Element {
   const theme = useTheme();
   const { session: s, cols, nameW, now, selected, stale } = props;
@@ -124,6 +134,7 @@ function Row(props: {
             dimColor={faded && !selected}
             bold={c === 'status' && s.status === 'waiting'}
           >
+            {props.showProvider && c === cols[0] ? `${s.provider === 'codex' ? 'X' : 'C'} ` : ''}
             {cellText(c, s, now, nameW)}
           </Text>
         </Box>
@@ -169,7 +180,10 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
   const rows = buildRows(sessions, sort);
   const { start, end } = rowWindow(rows, selectedIndex, maxRows);
   const inner = Math.max(20, width - 4);
-  const title = `Sessions ── sort: ${sort} ── filter: ${filter}`;
+  const activity = filter === 'live' && sessions.some((s) => s.provider === 'codex') ? 'live/recent' : filter;
+  const provider =
+    props.providerFilter && props.providerFilter !== 'all' ? ` ── ${props.providerFilter}` : '';
+  const title = `Sessions${provider} ── sort: ${sort} ── filter: ${activity}`;
   return (
     <Panel title={title} width={width}>
       <Box columnGap={1}>
@@ -182,7 +196,7 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
         ))}
       </Box>
       {sessions.length === 0 ? (
-        <Text color={theme.dim}>{props.emptyMessage ?? 'No Claude Code sessions in the last 24h'}</Text>
+        <Text color={theme.dim}>{props.emptyMessage ?? 'No sessions in the last 24h'}</Text>
       ) : (
         rows.slice(start, end).map((r) =>
           r.kind === 'group' ? (
@@ -191,12 +205,13 @@ export function SessionTable(props: SessionTableProps): JSX.Element {
             </Text>
           ) : r.kind === 'session' ? (
             <Row
-              key={r.session.sessionId}
+              key={r.session.key ?? `${r.session.provider ?? 'claude'}:${r.session.sessionId}`}
               session={r.session}
               cols={cols}
               nameW={nameW}
               now={now}
               selected={r.index === selectedIndex}
+              showProvider={props.showProvider}
               stale={isStale(r.session, now, cutoff)}
             />
           ) : (

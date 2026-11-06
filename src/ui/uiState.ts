@@ -3,12 +3,16 @@ import { SORT_KEYS } from '../domain/types.js';
 import { cycle } from '../domain/cycle.js';
 import { cycleTheme } from './theme.js';
 
+export type ProviderFilter = 'all' | 'claude' | 'codex';
+
 export type UiMode = 'normal' | 'search' | 'help' | 'options';
 
 export interface UiState {
   selectedIndex: number;
   filter: 'all' | 'live';
   search: string;
+  providerFilter: ProviderFilter;
+  usageProvider: 'claude' | 'codex';
   mode: UiMode;
   /** Live config; theme, sort and showDetail are read from here (single source of truth). */
   config: Config;
@@ -24,6 +28,8 @@ export type UiAction =
         | 'toggleDetail'
         | 'cycleSort'
         | 'toggleFilter'
+        | 'cycleProvider'
+        | 'cycleUsageProvider'
         | 'startSearch'
         | 'endSearch'
         | 'clearSearch'
@@ -42,6 +48,8 @@ export function initialUiState(config: Config): UiState {
     selectedIndex: 0,
     filter: 'all',
     search: '',
+    providerFilter: 'all',
+    usageProvider: 'claude',
     mode: 'normal',
     config,
   };
@@ -69,6 +77,14 @@ export function uiReducer(s: UiState, a: UiAction, rowCount: number): UiState {
     }
     case 'toggleFilter':
       return { ...s, filter: s.filter === 'all' ? 'live' : 'all', selectedIndex: 0 };
+    case 'cycleProvider':
+      return {
+        ...s,
+        providerFilter: cycle(['all', 'claude', 'codex'] as const, s.providerFilter, 1),
+        selectedIndex: 0,
+      };
+    case 'cycleUsageProvider':
+      return { ...s, usageProvider: s.usageProvider === 'claude' ? 'codex' : 'claude' };
     case 'startSearch':
       return { ...s, mode: 'search' };
     case 'endSearch':

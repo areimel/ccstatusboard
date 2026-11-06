@@ -36,6 +36,8 @@ const normalKeys: ModeHandler = (input, key, { ui, dispatch, onQuit }) => {
   else if (key.return) dispatch({ type: 'toggleDetail' });
   else if (input === 's') dispatch({ type: 'cycleSort' });
   else if (input === 'f') dispatch({ type: 'toggleFilter' });
+  else if (input === 'p') dispatch({ type: 'cycleProvider' });
+  else if (input === 'P') dispatch({ type: 'cycleUsageProvider' });
   else if (input === 't') dispatch({ type: 'nextTheme' });
   else if (input === 'T') dispatch({ type: 'prevTheme' });
   else if (input === '/') dispatch({ type: 'startSearch' });

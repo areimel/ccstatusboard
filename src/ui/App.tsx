@@ -48,8 +48,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   const inkTheme = useMemo(() => inkUiTheme(theme), [theme]);
 
   const visible = useMemo(
-    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), cfg.sort),
-    [snapshot.sessions, ui.filter, ui.search, cfg.sort],
+    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search, ui.providerFilter), cfg.sort),
+    [snapshot.sessions, ui.filter, ui.search, ui.providerFilter, cfg.sort],
   );
   const selected = clamp(ui.selectedIndex, visible.length);
   // Re-clamp against the current list so a stale index never leaks into the reducer.
@@ -96,8 +96,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   });
   const emptyMessage =
     cfg.endedWindowHours === 0
-      ? 'No live Claude Code sessions'
-      : `No Claude Code sessions in the last ${cfg.endedWindowHours}h`;
+      ? 'No live or recently observed sessions'
+      : `No sessions in the last ${cfg.endedWindowHours}h`;
   if (tooSmall) {
     return <Text>Terminal too small</Text>;
   }
@@ -115,10 +115,14 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
         onClose={() => reduce({ type: 'closeOptions' })}
       />
     );
-  } else if (!snapshot.claudeDirFound) {
+  } else if (
+    !snapshot.claudeDirFound &&
+    !snapshot.providers?.codex?.found &&
+    snapshot.sessions.length === 0
+  ) {
     body = (
       <Panel title="Sessions" width={columns}>
-        <Text>Claude Code data not found at {snapshot.claudeDir}</Text>
+        <Text>Session data not found</Text>
       </Panel>
     );
   } else if (snapshot.sessions.length === 0 || visible.length === 0) {
@@ -139,6 +143,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
           now={snapshot.now}
           sort={cfg.sort}
           filter={ui.filter}
+          providerFilter={ui.providerFilter}
+          showProvider={new Set(snapshot.sessions.map((s) => s.provider ?? 'claude')).size > 1}
           idleCutoffMinutes={cfg.idleCutoffMinutes}
           emptyMessage={emptyMessage}
         />
