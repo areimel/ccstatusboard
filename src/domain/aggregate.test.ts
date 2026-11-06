@@ -40,6 +40,20 @@ describe('totalsForWindow', () => {
     expect(t.byModel).not.toHaveProperty('x');
   });
 
+  it('treats inherited object-property names as ordinary model identifiers', () => {
+    const records = [
+      rec('__proto__', NOW, tok(2)),
+      rec('constructor', NOW, tok(3)),
+      rec('__proto__', NOW, tok(4)),
+    ];
+    const totals = totalsForWindow(records, w, () => opus);
+    expect(totals.costUSD).toBe(9);
+    expect(Object.getPrototypeOf(totals.byModel)).toBeNull();
+    expect(totals.byModel['__proto__']?.tokens.input).toBe(6);
+    expect(totals.byModel['constructor']?.tokens.input).toBe(3);
+    expect(Object.hasOwn(totals.byModel, '__proto__')).toBe(true);
+  });
+
   it('includes records exactly on both window boundaries', () => {
     const edge = [rec('opus', w.start, tok(1)), rec('opus', w.end, tok(1))];
     expect(totalsForWindow(edge, w, lookup).costUSD).toBe(2);

@@ -16,7 +16,11 @@ export function totalsForWindow(
   w: TimeWindow,
   lookup: PriceLookup | null,
 ): WindowTotals {
-  const totals: WindowTotals = { costUSD: lookup ? 0 : null, tokens: { ...ZERO_TOKENS }, byModel: {} };
+  const totals: WindowTotals = {
+    costUSD: lookup ? 0 : null,
+    tokens: { ...ZERO_TOKENS },
+    byModel: Object.create(null) as Record<string, ModelTotals>,
+  };
   for (const r of records) {
     if (r.timestamp < w.start || r.timestamp > w.end) continue;
     const price = lookup?.(r.model, r.provider);
