@@ -56,10 +56,6 @@ export function unknownModelsIn(records: Iterable<UsageRecord>, lookup: PriceLoo
   return [...unknown].sort();
 }
 
-function pricedCost(r: UsageRecord, lookup: PriceLookup): number {
-  return recordCost(r.tokens, lookup(r.model, r.provider)) ?? 0;
-}
-
 /** Cost of records in (now - 60 min, now], i.e. $/h. */
 export function burnRatePerHour(
   records: Iterable<UsageRecord>,
@@ -69,7 +65,11 @@ export function burnRatePerHour(
   if (!lookup) return null;
   let sum = 0;
   for (const r of records) {
-    if (r.timestamp > now - HOUR_MS && r.timestamp <= now) sum += pricedCost(r, lookup);
+    if (r.timestamp > now - HOUR_MS && r.timestamp <= now) {
+      const cost = recordCost(r.tokens, lookup(r.model, r.provider));
+      if (cost === null && r.provider === 'codex') return null;
+      sum += cost ?? 0;
+    }
   }
   return sum;
 }
@@ -88,7 +88,9 @@ export function hourlySparkline(
     if (age < 0) continue;
     const i = age === 0 ? hours - 1 : hours - Math.ceil(age / HOUR_MS);
     if (i < 0 || i >= hours) continue;
-    buckets[i] = (buckets[i] ?? 0) + pricedCost(r, lookup);
+    const cost = recordCost(r.tokens, lookup(r.model, r.provider));
+    if (cost === null && r.provider === 'codex') return [];
+    buckets[i] = (buckets[i] ?? 0) + (cost ?? 0);
   }
   return buckets;
 }

@@ -3,6 +3,7 @@ import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } fr
 import { DedupSet } from '../domain/dedup.js';
 import { projectBurn } from '../domain/burn-rate-formula.js';
 import {
+  emptyWindowTotals,
   type LimitsState,
   type PriceLookup,
   type PricingStatus,
@@ -304,6 +305,8 @@ export class Store {
       limit?.durationMs ?? (limit?.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);
     const block = state.limits.block?.resetsAt;
     const week = state.limits.weekly?.resetsAt;
+    const validCodexBlock =
+      provider !== 'codex' || (block !== undefined && (limitDuration(state.limits.block) ?? 0) > 0);
     const blockWindow: TimeWindow =
       block === undefined
         ? (deriveCurrentBlock(
@@ -315,15 +318,31 @@ export class Store {
       week === undefined
         ? rollingWeekWindow(now)
         : weekWindowFromLimit(week, now, limitDuration(state.limits.weekly));
-    const blockBurn = projectBurn(state.limits.block, state.history.samples('block'), now, 'block');
-    const weekBurn = projectBurn(state.limits.weekly, state.history.samples('week'), now, 'week');
+    const canProject = (limit: LimitsState['block']) => {
+      if (provider === 'claude') return true;
+      const observedAt = limit?.observedAt ?? state.limits.observedAt;
+      return (
+        state.limits.status === 'ok' &&
+        limit?.resetsAt !== undefined &&
+        limit.resetsAt > now &&
+        (observedAt === undefined || now - observedAt <= 5 * 60_000)
+      );
+    };
+    const blockBurn = canProject(state.limits.block)
+      ? projectBurn(state.limits.block, state.history.samples('block'), now, 'block')
+      : undefined;
+    const weekBurn = canProject(state.limits.weekly)
+      ? projectBurn(state.limits.weekly, state.history.samples('week'), now, 'week')
+      : undefined;
     return {
       dir: sanitizeText(state.dir),
       found: state.found,
       enabled: state.enabled,
       limits: state.limits,
       costs: {
-        block: sanitizeWindowTotals(totalsForWindow(records, blockWindow, lookup)),
+        block: validCodexBlock
+          ? sanitizeWindowTotals(totalsForWindow(records, blockWindow, lookup))
+          : { ...emptyWindowTotals(), costUSD: null },
         today: sanitizeWindowTotals(totalsForWindow(records, todayWindow(now), lookup)),
         week: sanitizeWindowTotals(totalsForWindow(records, weekWindow, lookup)),
         month: sanitizeWindowTotals(totalsForWindow(records, monthWindow(now), lookup)),
@@ -365,7 +384,9 @@ export class Store {
       if (!visible) continue;
       const view = buildSessionView(s, lookup);
       view.recentlyObserved = recentlyObserved;
-      if (s.provider === 'codex' && !recentlyObserved) view.status = 'ended';
+      if (s.provider === 'codex' && !recentlyObserved) {
+        view.status = s.meta.observedStatus === 'ended' ? 'ended' : 'unknown';
+      }
       if (view.cwd) view.project = sanitizeText(this.projects.get(view.cwd) ?? basename(view.cwd));
       const proc = s.live && s.registry ? this.procStats.get(s.registry.pid) : undefined;
       if (proc) {

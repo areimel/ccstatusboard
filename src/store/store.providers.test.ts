@@ -109,4 +109,45 @@ describe('provider isolation', () => {
     });
     expect(store.getSnapshot().sessions[0]).toMatchObject({ costUSD: null, accountingIncomplete: true });
   });
+  it('requires a reported Codex block window and keeps unpriced burn unknown', () => {
+    const store = makeStore();
+    store.setPricing(() => undefined, 'ok');
+    store.replaceProviderSession('s1', [meta(), codexUsage()]);
+    store.flush();
+    const codex = store.getSnapshot().providers?.codex;
+    expect(codex?.costs.block.costUSD).toBeNull();
+    expect(codex?.costs.burnRatePerHour).toBeNull();
+    expect(codex?.costs.hourlySparkline).toEqual([]);
+  });
+
+  it('does not infer process exit from an aged observation', () => {
+    const store = makeStore({ endedWindowHours: 24 });
+    store.replaceProviderSession('s1', [meta({ timestamp: NOW - 2 * HOUR })]);
+    store.flush();
+    expect(store.getSnapshot().sessions[0]).toMatchObject({
+      status: 'unknown',
+      live: false,
+      recentlyObserved: false,
+    });
+  });
+
+  it('expires observed quota projections as time advances without more observations', () => {
+    let now = NOW;
+    const store = makeStore({ now: () => now });
+    store.setLimits(
+      {
+        status: 'ok',
+        source: 'observed',
+        observedAt: NOW,
+        block: { label: '2h', percent: 50, durationMs: 2 * HOUR, resetsAt: NOW + HOUR },
+        perModelWeekly: [],
+      },
+      'codex',
+    );
+    store.flush();
+    expect(store.getSnapshot().providers?.codex?.burn.block).toBeDefined();
+    now += 6 * MIN;
+    store.flush();
+    expect(store.getSnapshot().providers?.codex?.burn.block).toBeUndefined();
+  });
 });
