@@ -79,6 +79,7 @@ export type PriceLookup = (model: string, provider?: Provider) => ModelPrice | u
 export type PricingStatus = 'loading' | 'ok' | 'stale' | 'unavailable';
 
 export interface Limit {
+  observedAt?: number;
   id?: string;
   windowMinutes?: number;
   durationMs?: number;

@@ -147,9 +147,9 @@ export class Store {
     const state = this.provider(provider);
     state.limits = sanitizeLimits(l);
     const now = this.opts.now();
-    const t = l.fetchedAt ?? now;
-    state.history.record('block', state.limits.block, t, now);
-    state.history.record('week', state.limits.weekly, t, now);
+    const t = l.observedAt ?? l.fetchedAt ?? now;
+    state.history.record('block', state.limits.block, state.limits.block?.observedAt ?? t, now);
+    state.history.record('week', state.limits.weekly, state.limits.weekly?.observedAt ?? t, now);
     this.markDirty();
   }
 
