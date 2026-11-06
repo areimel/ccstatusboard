@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+let f='tui-export/build.mjs', s=fs.readFileSync(f,'utf8');
+const rep=(a,b)=>{ if(!s.includes(a)) throw new Error('missing '+a); s=s.split(a).join(b); };
+rep("#p1 { opacity: 1 !important; } .pane {",".pane {");
+rep("#hook-t1 { top: 74px; opacity: 1; }","#hook-t1 { top: 74px; opacity: 1; } #p1 { opacity: 1; }");
+rep("#prompt { position: absolute; left: 24px; top: 58px; font: 700 44px/56px","#prompt { position: absolute; left: 96px; top: 226px; font: 700 58px/72px");
+rep("#caret { display: inline-block; width: 24px; height: 46px; background: #ff4d00; margin-top: 5px; }","#caret { display: inline-block; width: 32px; height: 60px; background: #ff4d00; margin-top: 6px; }");
+rep("#prompt .d { color: #ff4d00; margin-right: 26px; }","#prompt .d { color: #ff4d00; margin-right: 34px; }");
+rep(`.forEach((id, i) => tl.set(id, { opacity: 1 }, 0.3 + i * 0.0625));`,`.forEach((id, i) => tl.set(id, { opacity: 1 }, 0.3 + i * 0.0625));
+    for (let i = 0; i <= ${[...'npx ccstatusboard'].length}; i++) tl.set("#caret", { x: -(${[...'npx ccstatusboard'].length} - i) * 34.8 }, i === 0 ? 0 : 0.3 + (i - 1) * 0.0625);`);
+fs.writeFileSync(f,s);

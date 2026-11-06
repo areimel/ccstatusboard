@@ -1,0 +1,70 @@
+{
+  "cols": 150,
+  "rows": 42,
+  "note": "rows/cols are 0-based inclusive; derived from plain text of frame 0",
+  "header": {
+    "rowStart": 0,
+    "rowEnd": 0,
+    "colStart": 0,
+    "colEnd": 149
+  },
+  "usage": {
+    "rowStart": 1,
+    "rowEnd": 10,
+    "colStart": 0,
+    "colEnd": 149
+  },
+  "burnRate": {
+    "rowStart": 6,
+    "rowEnd": 8,
+    "colStart": 0,
+    "colEnd": 149,
+    "headingRow": 6,
+    "projRows": [
+      7,
+      8
+    ]
+  },
+  "costRows": {
+    "rowStart": 2,
+    "rowEnd": 6,
+    "colStart": 128,
+    "colEnd": 147,
+    "note": "block/week/today/month/plan at right of Usage"
+  },
+  "system": {
+    "rowStart": 11,
+    "rowEnd": 16,
+    "colStart": 0,
+    "colEnd": 149
+  },
+  "sessions": {
+    "rowStart": 17,
+    "rowEnd": 33,
+    "colStart": 0,
+    "colEnd": 149
+  },
+  "sessionsHeaderRow": 18,
+  "sessionsContextColumn": {
+    "rowStart": 18,
+    "rowEnd": 32,
+    "colStart": 67,
+    "colEnd": 69,
+    "note": "column range of the CTX header text; bars may extend a few cols right"
+  },
+  "footer": {
+    "rowStart": 34,
+    "rowEnd": 41,
+    "colStart": 0,
+    "colEnd": 149
+  },
+  "missing": [],
+  "panelLines": {
+    "1": "╭ Usage ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+    "2": "│ 5h     [||||||||||||||||||||||||||||||||||                     58%] resets 2h14m                                              block  $12.40        │",
+    "6": "│ Burn Rate                                                                                                                     plan   2.1×          │",
+    "11": "╭ System ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+    "17": "╭ Sessions ── sort: project ── filter: all ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+    "18": "│ ST    PROJECT        NAME                             MODEL      CTX               CPU   MEM    COST      LAST     UP                              │"
+  }
+}
