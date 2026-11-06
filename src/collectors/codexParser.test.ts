@@ -20,7 +20,7 @@ const parse = (type: string, payload: unknown, t = TS): CodexObservation =>
 const session = (extra = {}) =>
   parse('session_meta', { id: 's1', cwd: '/project', cli_version: '0.166.0', ...extra });
 const context = (turn = 't1') => parse('turn_context', { turn_id: turn, model: 'gpt-5.4' }, TS + 1);
-const snapshot = (value = usage(), t = TS + 2) =>
+const snapshot = (value: Record<string, unknown> = usage(), t = TS + 2) =>
   parse(
     'event_msg',
     {
@@ -61,6 +61,9 @@ describe('Codex rollout parser', () => {
       expect(parseCodexLine(line)).toBeUndefined();
     }
     expect(parseCodexRecord(raw('response_item', { text: 'not retained' }))).toBeUndefined();
+    for (const type of ['__proto__', 'constructor', 'toString']) {
+      expect(parseCodexRecord(raw('event_msg', { type }))).toBeUndefined();
+    }
   });
 
   it('normalizes cached input and reasoning subsets without double counting', () => {
@@ -77,6 +80,55 @@ describe('Codex rollout parser', () => {
       contextTokens: 120,
       contextWindow: 200000,
     });
+  });
+
+  it('normalizes generic cache writes as part of the input total', () => {
+    const events = billed([session(), context(), snapshot({ ...usage(), cache_write_input_tokens: 10 })]);
+    expect(events[0]?.record.tokens).toMatchObject({ input: 60, cacheRead: 30, cacheWrite5m: 10 });
+  });
+
+  it('keeps mixed historical legacy turns and newer per-response turns', () => {
+    const response = parse(
+      'token_usage_record',
+      { thread_id: 's1', turn_id: 't2', response_id: 'r2', usage: usage(50, 10, 10) },
+      TS + 4,
+    );
+    const events = billed([
+      session(),
+      context('t1'),
+      snapshot(),
+      context('t2'),
+      snapshot(usage(150, 30, 40)),
+      response,
+    ]);
+    expect(events).toHaveLength(2);
+    expect(events.map((e) => e.record.tokens.input)).toEqual([70, 40]);
+  });
+
+  it('rebases when a reset returns to a previously observed cumulative vector', () => {
+    const observations = [
+      session(),
+      context(),
+      snapshot(),
+      snapshot(usage(200, 40, 60)),
+      snapshot(),
+      snapshot(usage(150, 30, 40)),
+    ];
+    const events = billed(observations);
+    expect(events).toHaveLength(3);
+    expect(events[2]?.record.tokens).toMatchObject({ input: 40, output: 10, cacheRead: 10 });
+    expect(records(observations).metadata.accountingIncomplete).toBe(true);
+  });
+
+  it('attributes usage to the model selected at each turn', () => {
+    const events = billed([
+      session(),
+      context(),
+      snapshot(),
+      parse('turn_context', { turn_id: 't2', model: 'gpt-5.4-mini' }),
+      snapshot(usage(150, 30, 40)),
+    ]);
+    expect(events.map((e) => e.record.model)).toEqual(['gpt-5.4', 'gpt-5.4-mini']);
   });
 
   it('derives cumulative deltas and ignores repeated totals on resume', () => {
@@ -188,5 +240,7 @@ describe('Codex rollout parser', () => {
     });
     expect(codexLimits(observations, TS + 6 * 60000).status).toBe('stale');
     expect(codexLimits(observations, TS + 3600001).status).toBe('stale');
+    expect(codexLimits([limit('old', 10, TS - 3600000), limit('fresh', 5, TS)], TS + 3).status).toBe('stale');
+    expect(limits.block?.id).toBe('codex:primary');
   });
 });

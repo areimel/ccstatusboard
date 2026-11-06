@@ -159,7 +159,8 @@ export function parseCodexRecord(raw: unknown): CodexObservation | undefined {
     exec_approval_request: 'waiting',
     apply_patch_approval_request: 'waiting',
   };
-  const status = str(p.type) ? statuses[p.type as string] : undefined;
+  const status =
+    str(p.type) && Object.hasOwn(statuses, p.type as string) ? statuses[p.type as string] : undefined;
   return status === undefined ? undefined : { kind: 'status', timestamp: t, status, turnId: str(p.turn_id) };
 }
 
@@ -169,6 +170,93 @@ export function parseCodexLine(line: string): CodexObservation | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Cache data is untrusted too: rebuild only validated, explicitly permitted fields. */
+export function decodeCodexObservation(value: unknown): CodexObservation | undefined {
+  if (
+    !obj(value) ||
+    !['session', 'context', 'tokens', 'response', 'status'].includes(String(value.kind)) ||
+    typeof value.timestamp !== 'number' ||
+    !Number.isFinite(value.timestamp)
+  )
+    return undefined;
+  const result: CodexObservation = {
+    kind: value.kind as CodexObservation['kind'],
+    timestamp: value.timestamp,
+  };
+  for (const key of [
+    'sessionId',
+    'parentSessionId',
+    'forkedFromId',
+    'cwd',
+    'version',
+    'gitBranch',
+    'model',
+    'turnId',
+    'responseId',
+    'limitBucket',
+  ] as const) {
+    if (value[key] !== undefined) {
+      if (!str(value[key])) return undefined;
+      result[key] = value[key] as string;
+    }
+  }
+  for (const key of ['startedAt', 'contextWindow'] as const) {
+    if (value[key] !== undefined) {
+      if (count(value[key]) === undefined) return undefined;
+      result[key] = value[key] as number;
+    }
+  }
+  for (const key of ['usage', 'lastUsage'] as const) {
+    if (value[key] === undefined) continue;
+    const u = value[key];
+    if (!obj(u)) return undefined;
+    const valid = parseUsage({
+      input_tokens: u.input,
+      cached_input_tokens: u.cached,
+      cache_write_input_tokens: u.cacheWrite,
+      output_tokens: u.output,
+      reasoning_output_tokens: u.reasoning,
+      total_tokens: u.total,
+    });
+    if (!valid) return undefined;
+    result[key] = valid;
+  }
+  if (value.status !== undefined) {
+    if (!['busy', 'idle', 'waiting', 'unknown', 'ended'].includes(String(value.status))) return undefined;
+    result.status = value.status as DisplayStatus;
+  }
+  if (value.limits !== undefined) {
+    if (!Array.isArray(value.limits)) return undefined;
+    result.limits = [];
+    for (const limit of value.limits) {
+      if (
+        !obj(limit) ||
+        !str(limit.label) ||
+        typeof limit.percent !== 'number' ||
+        !Number.isFinite(limit.percent) ||
+        limit.percent < 0 ||
+        limit.percent > 100
+      )
+        return undefined;
+      const valid: Limit = { label: limit.label as string, percent: limit.percent };
+      if (limit.id !== undefined) {
+        if (!str(limit.id)) return undefined;
+        valid.id = limit.id as string;
+      }
+      for (const key of ['windowMinutes', 'durationMs', 'resetsAt', 'observedAt'] as const) {
+        if (limit[key] === undefined) continue;
+        if (count(limit[key]) === undefined) return undefined;
+        valid[key] = limit[key] as number;
+      }
+      result.limits.push(valid);
+    }
+  }
+  if (result.kind === 'session' && !result.sessionId) return undefined;
+  if (result.kind === 'response' && (!result.sessionId || !result.responseId || !result.usage))
+    return undefined;
+  return result;
 }
 
 function tokens(usage: CodexUsage): TokenCounts {
@@ -225,11 +313,11 @@ export function projectCodexSession(
       currentTurn = observation.turnId;
     if (observation.kind === 'response' && observation.sessionId === options.sessionId) {
       responseTurns.add(observation.turnId ?? currentTurn);
+      if (!(observation.turnId ?? currentTurn)) metadata.accountingIncomplete = true;
     }
   }
   const events: TranscriptEvent[] = [];
   const seenResponses = new Set<string>();
-  const seenSnapshots = new Set<string>();
   let previous: CodexUsage = { ...ZERO_USAGE };
   let hasBaseline = ownMeta !== undefined && !forked && options.incomplete !== true;
   let turnId = '';
@@ -274,9 +362,6 @@ export function projectCodexSession(
       metadata.contextTokens = observation.lastUsage?.total ?? metadata.contextTokens;
       if (!observation.usage) continue;
       const next = observation.usage;
-      const signature = JSON.stringify([turnId, next]);
-      if (seenSnapshots.has(signature)) continue;
-      seenSnapshots.add(signature);
       const inherited =
         forked && (options.parentTurnIds === undefined || !turnId || options.parentTurnIds.has(turnId));
       const delta = hasBaseline ? difference(next, previous) : undefined;
@@ -322,13 +407,21 @@ export function codexLimits(observations: readonly CodexObservation[], now: numb
       buckets.set(observation.limitBucket, observation);
   }
   const latest = Math.max(...[...buckets.values()].map((o) => o.timestamp));
-  const windows = [...buckets.values()].flatMap((o) => o.limits ?? []);
-  const stale =
-    now - latest > 5 * 60_000 || windows.some((w) => w.resetsAt !== undefined && w.resetsAt <= now);
+  const windows = [...buckets.values()].flatMap((o) =>
+    (o.limits ?? []).map((window) => ({ ...window, observedAt: o.timestamp })),
+  );
+  const stale = windows.some(
+    (w) => now - w.observedAt > 5 * 60_000 || (w.resetsAt !== undefined && w.resetsAt <= now),
+  );
+  const defaultBucket = buckets.get('codex') ?? [...buckets.values()][0];
+  const block = defaultBucket?.limits?.find((w) => w.id?.endsWith(':primary'));
+  const weekly = defaultBucket?.limits?.find((w) => w.id?.endsWith(':secondary'));
   return {
     source: 'observed',
     status: windows.length === 0 ? 'loading' : stale ? 'stale' : 'ok',
     windows,
+    ...(block ? { block: { ...block, observedAt: defaultBucket!.timestamp } } : {}),
+    ...(weekly ? { weekly: { ...weekly, observedAt: defaultBucket!.timestamp } } : {}),
     perModelWeekly: [],
     ...(Number.isFinite(latest) ? { observedAt: latest, fetchedAt: latest } : {}),
   };
