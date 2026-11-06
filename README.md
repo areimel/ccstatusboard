@@ -1,6 +1,6 @@
 # ccstatusboard
 
-An htop-style terminal dashboard for **all** your Claude Code sessions: usage limits, estimated costs, and what every session is doing right now.
+An htop-style terminal dashboard for **Claude Code and Codex** sessions: usage limits, estimated costs, and session activity in one terminal.
 
 Website: https://areimel.github.io/ccstatusboard/
 
@@ -23,6 +23,31 @@ Website: https://areimel.github.io/ccstatusboard/
 ```
 
 (Illustrative mockup; the real layout adapts to your terminal size and theme.)
+
+## Codex monitoring
+
+Both providers are enabled by default. Codex data comes from `$CODEX_HOME` (normally `~/.codex`), or the `--codex-dir` override:
+
+```bash
+ccstatusboard                         # monitor Claude Code and Codex
+ccstatusboard --provider codex         # Codex only; no Claude credential reads
+ccstatusboard --provider claude        # Claude Code only
+ccstatusboard --codex-dir ~/codex-work # alternate Codex data directory
+```
+
+Press `p` to filter sessions by provider and `P` to select a usage panel on smaller terminals. Limits, costs, and subscription ratios stay separate. Full usage panels appear side by side when each has at least 60 columns, or stack when height permits; smaller terminals show one selectable panel.
+
+Codex collection passively reads active and archived rollout files, including `.jsonl.zst` archives. It does not read Codex credentials, call an OpenAI usage endpoint, start Codex, or refresh tokens. It observes local sessions from clients that write compatible rollouts to the selected directory; it does not fetch remote-only or account-wide session history.
+
+Quota percentages and reset times are the most recent snapshots written by Codex. Their age is shown, and observations older than five minutes are marked stale. Idle Codex sessions may not write new snapshots. Expired or stale observations do not drive quota burn projections.
+
+Codex session activity is **observed**, not confirmed process liveness: rollout metadata does not provide a PID. CPU and memory remain `—`. Recently observed sessions stay visible for `idleCutoffMinutes`; archived sessions use the exited-session retention setting. Child sessions retain their own usage and identify their parent in Detail; their usage is counted once in provider totals.
+
+Newer per-response usage records are preferred. Older cumulative snapshots are converted to deltas, with repeated snapshots and inherited fork history excluded when ownership can be established. Truncated history, ambiguous forks, counter resets, and missing prices produce partial or unavailable accounting. Cached input and reasoning breakdowns are not counted twice. Unknown context capacities display `—`.
+
+Dollar amounts are **estimated API-equivalent costs**, not subscription charges or actual billing. Set `codexSubscriptionUSD` separately from Claude's `subscriptionUSD` to show a Codex plan-value ratio; the ratio is hidden when its accounting is incomplete.
+
+[Terminal captures](docs/codex-monitoring-captures.md) show the responsive layout with synthetic data.
 
 ## Install
 
@@ -90,6 +115,8 @@ ccstatusboard [options]
 | `--ended-hours <n>`   | Keep ended sessions for n hours (default 0: removed when they exit)     |
 | `--sort <key>`        | `project` (default), `status`, `activity`, `cost`, `ctx` or `name`      |
 | `--claude-dir <path>` | Claude Code config dir (default `$CLAUDE_CONFIG_DIR`, else `~/.claude`) |
+| `--codex-dir <path>`  | Codex data dir (default `$CODEX_HOME`, else `~/.codex`)                 |
+| `--provider <name>`   | `all` (default), `claude`, or `codex`                                   |
 | `--no-usage-api`      | Do not call the Anthropic usage API (limits show "disabled")            |
 | `--config <path>`     | Config file path (default `~/.config/ccstatusboard/config.json`)        |
 | `-v`, `--version`     | Print version                                                           |
@@ -105,6 +132,8 @@ ccstatusboard [options]
 | `s`               | Cycle sort: project, status, activity, cost, ctx, name |
 | `t` / `T`         | Next / previous theme (saved to the config file)       |
 | `f`               | Filter: all / live only                                |
+| `p`               | Provider filter: all / Claude / Codex                  |
+| `P`               | Select usage provider in single-panel mode             |
 | `/`               | Search by name or cwd (`Enter` keeps, `Esc` clears)    |
 | `Esc`             | Options menu (when not searching, see below)           |
 | `?` / `F1`        | Toggle help                                            |
@@ -114,23 +143,24 @@ ccstatusboard [options]
 
 Press `Esc` outside search to open the Options menu. `↑` `↓` move, `←` `→` change a value, `Enter` edits numbers and column visibility, and `Esc` closes the menu. Changes apply immediately and are written to the config file.
 
-| Option                                           | Config key          | Default             |
-| ------------------------------------------------ | ------------------- | ------------------- |
-| Theme                                            | `theme`             | `default`           |
-| Subscription price (per month, for `plan` ratio) | `subscriptionUSD`   | unset               |
-| Sort                                             | `sort`              | `project`           |
-| Detail pane                                      | `showDetail`        | on                  |
-| System panel                                     | `showSystem`        | on                  |
-| System metrics                                   | `systemMetrics`     | all groups          |
-| Columns                                          | `columns`           | all but `branch`    |
-| Dim idle after                                   | `idleCutoffMinutes` | 60 min (`1h`)       |
-| Keep exited                                      | `endedWindowHours`  | 0 (removed on exit) |
-| Refresh                                          | `refreshMs`         | 1000 ms             |
-| Usage poll                                       | `usagePollSeconds`  | 60 s                |
+| Option                                           | Config key             | Default             |
+| ------------------------------------------------ | ---------------------- | ------------------- |
+| Theme                                            | `theme`                | `default`           |
+| Subscription price (per month, for `plan` ratio) | `subscriptionUSD`      | unset               |
+| Codex subscription price                         | `codexSubscriptionUSD` | unset               |
+| Sort                                             | `sort`                 | `project`           |
+| Detail pane                                      | `showDetail`           | on                  |
+| System panel                                     | `showSystem`           | on                  |
+| System metrics                                   | `systemMetrics`        | all groups          |
+| Columns                                          | `columns`              | all but `branch`    |
+| Dim idle after                                   | `idleCutoffMinutes`    | 60 min (`1h`)       |
+| Keep exited                                      | `endedWindowHours`     | 0 (removed on exit) |
+| Refresh                                          | `refreshMs`            | 1000 ms             |
+| Usage poll                                       | `usagePollSeconds`     | 60 s                |
 
 "Dim idle after" takes minutes or hours: `45`, `90m`, `1.5h`, `2h` or `1h 30m`. The arrow keys step it by 15 minutes. "Keep exited" is in hours; `0` removes an exited session at once.
 
-`claudeDir` and `usageApi` are shown but read-only in the menu: change them with `--claude-dir` / `--no-usage-api` or in the file, then restart.
+`providers`, `claudeDir`, `codexDir`, and `usageApi` are shown but read-only in the menu: change them with CLI flags or in the file, then restart. When Codex is included, the activity filter is labelled live/recent.
 
 ## Themes
 
@@ -166,7 +196,10 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
   "showSystem": true,
   "systemMetrics": ["temps", "power", "chips", "pressure", "network"],
   "subscriptionUSD": null,
+  "codexSubscriptionUSD": null,
+  "providers": ["claude", "codex"],
   "claudeDir": null,
+  "codexDir": null,
   "usageApi": true
 }
 ```
@@ -179,6 +212,7 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
 - `showSystem` (default `true`) turns the System panel on or off.
 - `systemMetrics` takes any of `temps`, `power` (battery and uptime), `chips` (CPU and GPU), `pressure` (stall pressure, disk speeds and process counts), `network`. The default is all of them; an empty list keeps just the base meters. The network group shows your local IP address, so turn it off if you share your screen.
 - `subscriptionUSD` (default `null`) is your monthly plan price in USD, a positive number. `null` hides the `plan` ratio.
+- `codexSubscriptionUSD` (default `null`) is the separate Codex plan price. `providers` enables either or both providers; old config files default to both. `codexDir` overrides `$CODEX_HOME` when set.
 
 ## Where the data comes from
 
@@ -193,19 +227,24 @@ The `plan N.N×` row in the Cost column is this month's API-equivalent cost divi
 | Prices                             | [LiteLLM's pricing table](https://github.com/BerriAI/litellm), cached for 24 h                                                        |
 | CPU, memory, swap, disk, net, load | `/proc` on Linux, `sysctl` and `netstat` on macOS; disk via `statfs`. Sampled every 2 s, with 60 points of history for the sparklines |
 | Per-session CPU and memory         | `/proc/<pid>/stat` and `statm` on Linux; `ps` on macOS, for the live session processes only                                           |
+| Codex metadata, tokens and context | `$CODEX_HOME/sessions/**/*.jsonl` and `archived_sessions/`, including compressed `.jsonl.zst` rollouts                                |
+| Codex limits                       | Observed `token_count` quota snapshots in local rollouts; no authenticated polling                                                    |
 
 Costs are **estimates** based on API list prices. On a Pro/Max subscription you are not billed these amounts.
 
 ## Privacy and safety
 
-- **Read-only towards Claude Code.** ccstatusboard never writes inside `~/.claude`. Its writes are its own caches in `$XDG_CACHE_HOME/ccstatusboard/` if `XDG_CACHE_HOME` is set, otherwise `~/.cache/ccstatusboard/` on Linux and `~/Library/Caches/ccstatusboard/` on macOS, and the config file, which changes only when you edit an option or press `t` / `T`.
+- **Read-only towards Claude Code and Codex.** ccstatusboard never writes inside their data directories. Its writes are its own caches in `$XDG_CACHE_HOME/ccstatusboard/` if `XDG_CACHE_HOME` is set, otherwise `~/.cache/ccstatusboard/` on Linux and `~/Library/Caches/ccstatusboard/` on macOS, and the config file, which changes only when you edit an option or press `t` / `T`.
 - It reads your Claude Code OAuth access token (from `~/.claude/.credentials.json`, or on macOS the Keychain entry `Claude Code-credentials`) **only** to call Anthropic's usage endpoint. It never refreshes, stores or sends the token anywhere else. Use `--no-usage-api` to turn this off.
 - It never opens the per-session `*.key` files.
 - The only network requests are to `api.anthropic.com` (usage) and `raw.githubusercontent.com` (LiteLLM prices).
+- Codex caches retain monitoring metadata and usage observations, not prompts, tool output, or credentials. Compressed rollouts are decoded without writing into Codex's directory.
 
 ## Caveats
 
 The session registry, transcript format and usage endpoint are **undocumented Claude Code internals**, verified against Claude Code 2.1.x. A future Claude Code release may change them. ccstatusboard skips records it can't parse and shows `⚠ untested Claude Code vX` when it sees an unverified version. Please open an issue if something looks wrong.
+
+Codex rollout formats are also evolving internals. Compatibility fixtures cover legacy `token_count` and newer per-response `token_usage_record` forms researched against OpenAI Codex source on November 6, 2026. Unknown records are skipped; compatible local rollout files are required. Dashboard totals reflect locally available history within the scan horizon, not a billing statement.
 
 ## Development
 
