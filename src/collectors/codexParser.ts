@@ -94,7 +94,7 @@ function parseLimits(v: unknown): { limits?: Limit[]; limitBucket?: string } {
     const reset = positive(window.resets_at);
     limits.push({
       id: `${bucket}:${key}`,
-      label: `${name} ${minutes === undefined ? key : minutes % 1440 === 0 ? `${minutes / 1440}d` : minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes}m`}`,
+      label: `${name} ${key}`,
       percent: window.used_percent,
       ...(minutes === undefined ? {} : { windowMinutes: minutes, durationMs: minutes * 60_000 }),
       ...(reset === undefined ? {} : { resetsAt: reset * 1000 }),

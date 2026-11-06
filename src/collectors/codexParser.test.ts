@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { codexLimits, parseCodexLine, parseCodexRecord, projectCodexSession } from './codexParser.js';
 import type { CodexObservation } from './codexParser.js';
 
+// Synthetic fixtures follow OpenAI Codex protocol/rollout source at commit
+// 814347ecd21b49d25479f5499f168b9f7b7e1803 (2026-11-06); no real session data.
 const TS = Date.parse('2026-11-06T12:00:00Z');
 const raw = (type: string, payload: unknown, t = TS) => ({
   type,
@@ -247,6 +249,7 @@ describe('Codex rollout parser', () => {
     expect(limits.windows?.map((w) => w.percent)).toEqual([20, 60]);
     expect(limits.windows?.[0]).toMatchObject({
       id: 'codex:primary',
+      label: 'codex primary',
       windowMinutes: 300,
       durationMs: 18000000,
     });
