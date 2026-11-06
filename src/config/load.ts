@@ -12,6 +12,8 @@ export interface CliFlags {
   endedHours?: string;
   sort?: string;
   claudeDir?: string;
+  codexDir?: string;
+  provider?: string;
   usageApi?: boolean;
   config?: string;
 }
@@ -58,6 +60,10 @@ function flagOverrides(flags: CliFlags): Record<string, unknown> {
   if (flags.endedHours !== undefined) o.endedWindowHours = Number(flags.endedHours);
   if (flags.sort !== undefined) o.sort = flags.sort;
   if (flags.claudeDir !== undefined) o.claudeDir = flags.claudeDir;
+  if (flags.codexDir !== undefined) o.codexDir = flags.codexDir;
+  if (flags.provider !== undefined) {
+    o.providers = flags.provider === 'all' ? ['claude', 'codex'] : [flags.provider];
+  }
   if (flags.usageApi !== undefined) o.usageApi = flags.usageApi;
   return o;
 }
@@ -96,6 +102,8 @@ export function parseCliArgs(argv: string[]): { flags: CliFlags; help: boolean; 
         'ended-hours': { type: 'string' },
         sort: { type: 'string' },
         'claude-dir': { type: 'string' },
+        'codex-dir': { type: 'string' },
+        provider: { type: 'string' },
         'no-usage-api': { type: 'boolean' },
         config: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
@@ -116,6 +124,8 @@ export function parseCliArgs(argv: string[]): { flags: CliFlags; help: boolean; 
   set('endedHours', str('ended-hours'));
   set('sort', str('sort'));
   set('claudeDir', str('claude-dir'));
+  set('codexDir', str('codex-dir'));
+  set('provider', str('provider'));
   set('config', str('config'));
   if (values['no-usage-api'] === true) flags.usageApi = false;
   return { flags, help: values.help === true, version: values.version === true };

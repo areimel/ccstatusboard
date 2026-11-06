@@ -27,6 +27,7 @@ export interface Runtime {
 export interface RuntimeOptions {
   config: Config;
   claudeDir: string;
+  codexDir?: string;
   cacheDir: string;
   version: string;
   now?: () => number;

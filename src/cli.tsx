@@ -3,7 +3,7 @@ import { render, type Instance } from 'ink';
 import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './config/load.js';
 import { createConfigSaver } from './config/save.js';
 import { THEME_NAMES, type Config } from './domain/types.js';
-import { cacheDir, resolveClaudeDir } from './core/paths.js';
+import { cacheDir, resolveClaudeDir, resolveCodexDir } from './core/paths.js';
 import { createRuntime } from './app/runtime.js';
 import { superviseInk } from './app/supervise.js';
 import { App } from './ui/App.js';
@@ -30,7 +30,7 @@ function wrapNames(names: readonly string[], indent: string, width: number): str
 
 const HELP = `Usage: ccstatusboard [options]
 
-htop-style dashboard for all Claude Code sessions, usage limits and costs.
+htop-style dashboard for Claude Code and Codex sessions, usage limits and costs.
 
 Options:
   --theme <name>        start theme (t / T cycles; saved to config)
@@ -39,12 +39,14 @@ ${wrapNames(THEME_NAMES, ' '.repeat(24), 78)}
   --ended-hours <n>     keep exited sessions listed for n hours (default 0 = remove)
   --sort <key>          project | status | activity | cost | ctx | name
   --claude-dir <path>   Claude Code config dir (default $CLAUDE_CONFIG_DIR or ~/.claude)
+  --codex-dir <path>    Codex data dir (default $CODEX_HOME or ~/.codex)
+  --provider <name>     all | claude | codex (default all)
   --no-usage-api        do not call the Anthropic usage API (limits show "disabled")
   --config <path>       config file (default ~/.config/ccstatusboard/config.json)
   -v, --version         print version
   -h, --help            print this help
 
-Keys: ↑↓/jk select  ⏎ detail  s sort  f filter  / search  ? help  q quit
+Keys: ↑↓/jk select  ⏎ detail  s sort  f filter  p provider  P usage  / search  ? help  q quit
 `;
 
 const ENTER_ALT = '\u001b[?1049h\u001b[H';
@@ -94,7 +96,8 @@ async function main(argv: string[]): Promise<number | undefined> {
 
   const saveConfig = createConfigSaver({ path: resolveConfigPath(parsed.flags) });
   const claudeDir = resolveClaudeDir({ flag: parsed.flags.claudeDir ?? null, config: config.claudeDir });
-  const runtime = createRuntime({ config, claudeDir, cacheDir: cacheDir(), version: VERSION });
+  const codexDir = resolveCodexDir({ flag: parsed.flags.codexDir ?? null, config: config.codexDir });
+  const runtime = createRuntime({ config, claudeDir, codexDir, cacheDir: cacheDir(), version: VERSION });
 
   const ink: { instance?: Instance } = {};
   let restored = false;

@@ -9,6 +9,7 @@ import {
   findTranscript,
   projectsDir,
   resolveClaudeDir,
+  resolveCodexDir,
   sessionIdFromTranscriptPath,
   sessionsDir,
   subagentsDir,
@@ -31,6 +32,18 @@ describe('resolveClaudeDir', () => {
     expect(resolveClaudeDir({ flag: '', config: '', env: { CLAUDE_CONFIG_DIR: '' }, home })).toBe(
       '/home/u/.claude',
     );
+  });
+});
+
+describe('resolveCodexDir', () => {
+  it('uses flag > config > CODEX_HOME > home and expands tilde', () => {
+    const opts = { env: { CODEX_HOME: '/env/codex' }, home: '/h' };
+    expect(resolveCodexDir({ ...opts, flag: '/flag', config: '/config' })).toBe('/flag');
+    expect(resolveCodexDir({ ...opts, config: '/config' })).toBe('/config');
+    expect(resolveCodexDir(opts)).toBe('/env/codex');
+    expect(resolveCodexDir({ env: {}, home: '/h' })).toBe('/h/.codex');
+    expect(resolveCodexDir({ ...opts, flag: '~/custom' })).toBe('/h/custom');
+    expect(resolveCodexDir({ env: { CODEX_HOME: '' }, home: '/h', flag: '', config: '' })).toBe('/h/.codex');
   });
 });
 

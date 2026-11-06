@@ -70,6 +70,34 @@ describe('loadConfig', () => {
     ).rejects.toThrow(ConfigError);
   });
 
+  it('provider and Codex directory flags override the file without changing Claude controls', async () => {
+    const flags = parseCliArgs(['--provider', 'codex', '--codex-dir', '/flag/codex']).flags;
+    const cfg = await loadConfig({
+      flags,
+      env,
+      home,
+      readFile: fakeFs({
+        [defaultPath]: JSON.stringify({ providers: ['claude'], codexDir: '/file', usageApi: false }),
+      }),
+    });
+    expect(cfg).toMatchObject({ providers: ['codex'], codexDir: '/flag/codex', usageApi: false });
+    const all = await loadConfig({
+      flags: { provider: 'all' },
+      env,
+      home,
+      readFile: fakeFs({}),
+    });
+    expect(all.providers).toEqual(['claude', 'codex']);
+    await expect(
+      loadConfig({
+        flags: { provider: 'other' },
+        env,
+        home,
+        readFile: fakeFs({}),
+      }),
+    ).rejects.toThrow(ConfigError);
+  });
+
   it('throws ConfigError on invalid JSON with the path in the message', async () => {
     await expect(
       loadConfig({ flags: {}, env, home, readFile: fakeFs({ [defaultPath]: '{nope' }) }),

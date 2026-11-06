@@ -19,7 +19,10 @@ export const DEFAULT_CONFIG: Config = Object.freeze({
   columns: [...DEFAULT_COLUMNS],
   sort: 'project',
   showDetail: true,
+  providers: ['claude', 'codex'],
   claudeDir: null,
+  codexDir: null,
+  codexSubscriptionUSD: null,
   usageApi: true,
   subscriptionUSD: null,
   showSystem: true,
@@ -39,7 +42,14 @@ export const configSchema = z.strictObject({
     .default(() => [...DEFAULT_COLUMNS]),
   sort: z.enum(SORT_KEYS).default(DEFAULT_CONFIG.sort),
   showDetail: z.boolean().default(DEFAULT_CONFIG.showDetail),
+  providers: z
+    .array(z.enum(['claude', 'codex']))
+    .min(1)
+    .refine((providers) => new Set(providers).size === providers.length, 'Providers must be unique')
+    .default(() => [...DEFAULT_CONFIG.providers]),
   claudeDir: z.string().nullable().default(DEFAULT_CONFIG.claudeDir),
+  codexDir: z.string().nullable().default(DEFAULT_CONFIG.codexDir),
+  codexSubscriptionUSD: z.number().positive().nullable().default(DEFAULT_CONFIG.codexSubscriptionUSD),
   usageApi: z.boolean().default(DEFAULT_CONFIG.usageApi),
   subscriptionUSD: z.number().positive().nullable().default(DEFAULT_CONFIG.subscriptionUSD),
   showSystem: z.boolean().default(DEFAULT_CONFIG.showSystem),
