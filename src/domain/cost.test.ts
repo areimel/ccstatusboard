@@ -29,6 +29,14 @@ describe('recordCost', () => {
     // 0.005 + 0.05 + 0.025 + 0.00625 + 0.005
     expect(recordCost(tokens, noOneHour)).toBeCloseTo(0.09125, 10);
   });
+  it('does not price used cache buckets whose rates are unavailable', () => {
+    expect(recordCost(tokens, { ...opus, cacheReadUnpriced: true })).toBeNull();
+    expect(recordCost(tokens, { ...opus, cacheWriteUnpriced: true })).toBeNull();
+    expect(recordCost({ ...tokens, cacheRead: 0 }, { ...opus, cacheReadUnpriced: true })).toBeCloseTo(0.09);
+    expect(
+      recordCost({ ...tokens, cacheWrite5m: 0, cacheWrite1h: 0 }, { ...opus, cacheWriteUnpriced: true }),
+    ).toBeCloseTo(0.06);
+  });
   it('returns null for an unknown model (price undefined)', () => {
     expect(recordCost(tokens, undefined)).toBeNull();
   });

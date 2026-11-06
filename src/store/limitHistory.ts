@@ -31,6 +31,7 @@ export class LimitHistory {
       [...buf.samples].sort((a, b) => a.t - b.t),
       Math.max(now, t),
       kind,
+      limit.durationMs ?? (limit.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000),
     );
   }
 

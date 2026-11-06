@@ -39,6 +39,7 @@ export type TranscriptEvent =
       version?: string;
       model?: string;
       contextWindow?: number;
+      contextTokens?: number;
       startedAt?: number;
       observedStatus?: DisplayStatus;
       accountingIncomplete?: boolean;
@@ -63,6 +64,8 @@ export interface RegistryEntry {
 }
 
 export interface ModelPrice {
+  cacheReadUnpriced?: boolean;
+  cacheWriteUnpriced?: boolean;
   /** USD per token. */
   input: number;
   output: number;
@@ -76,6 +79,8 @@ export type PriceLookup = (model: string, provider?: Provider) => ModelPrice | u
 export type PricingStatus = 'loading' | 'ok' | 'stale' | 'unavailable';
 
 export interface Limit {
+  id?: string;
+  windowMinutes?: number;
   durationMs?: number;
   label: string;
   /** 0–100 */
@@ -94,7 +99,8 @@ export interface ExtraUsage {
 export type LimitsStatus = 'loading' | 'ok' | 'stale' | 'no-credentials' | 'expired' | 'error' | 'disabled';
 
 export interface LimitsState {
-  source?: 'api' | 'transcript';
+  source?: 'api' | 'observed';
+  windows?: Limit[];
   observedAt?: number;
   status: LimitsStatus;
   block?: Limit;
@@ -106,6 +112,7 @@ export interface LimitsState {
 }
 
 export interface ModelTotals {
+  costIncomplete?: boolean;
   costUSD: number | null;
   tokens: TokenCounts;
 }

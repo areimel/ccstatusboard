@@ -19,20 +19,32 @@ export function totalsForWindow(
   const totals: WindowTotals = { costUSD: lookup ? 0 : null, tokens: { ...ZERO_TOKENS }, byModel: {} };
   for (const r of records) {
     if (r.timestamp < w.start || r.timestamp > w.end) continue;
-    const price = lookup?.(r.model);
+    const price = lookup?.(r.model, r.provider);
     const cost = lookup ? recordCost(r.tokens, price) : null;
 
     let m: ModelTotals | undefined = totals.byModel[r.model];
     if (!m) {
-      m = { costUSD: price ? 0 : null, tokens: { ...ZERO_TOKENS } };
+      m = { costUSD: cost !== null ? 0 : null, tokens: { ...ZERO_TOKENS } };
       totals.byModel[r.model] = m;
     }
     m.tokens = addTokens(m.tokens, r.tokens);
     totals.tokens = addTokens(totals.tokens, r.tokens);
+    if (cost === null && r.provider === 'codex') {
+      totals.costIncomplete = true;
+      m.costIncomplete = true;
+    }
     if (cost !== null) {
       m.costUSD = (m.costUSD ?? 0) + cost;
       totals.costUSD = (totals.costUSD ?? 0) + cost;
     }
+  }
+  if (
+    totals.costIncomplete &&
+    Object.values(totals.byModel).every(
+      (model) => model.costUSD === null || (model.costIncomplete && model.costUSD === 0),
+    )
+  ) {
+    totals.costUSD = null;
   }
   return totals;
 }
@@ -40,12 +52,12 @@ export function totalsForWindow(
 export function unknownModelsIn(records: Iterable<UsageRecord>, lookup: PriceLookup | null): string[] {
   if (!lookup) return [];
   const unknown = new Set<string>();
-  for (const r of records) if (!lookup(r.model)) unknown.add(r.model);
+  for (const r of records) if (!lookup(r.model, r.provider)) unknown.add(r.model);
   return [...unknown].sort();
 }
 
 function pricedCost(r: UsageRecord, lookup: PriceLookup): number {
-  return recordCost(r.tokens, lookup(r.model)) ?? 0;
+  return recordCost(r.tokens, lookup(r.model, r.provider)) ?? 0;
 }
 
 /** Cost of records in (now - 60 min, now], i.e. $/h. */
