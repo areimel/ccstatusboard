@@ -1,6 +1,8 @@
 // Shared contract for ccstatusboard. Every module imports types from here.
 // All timestamps are epoch milliseconds.
 
+export type Provider = 'claude' | 'codex';
+
 export interface TokenCounts {
   input: number;
   output: number;
@@ -11,6 +13,7 @@ export interface TokenCounts {
 
 /** One deduplicatable API response's usage. */
 export interface UsageRecord {
+  provider?: Provider;
   /** Dedup key: `${messageId}:${requestId}` or `${messageId}`. */
   key: string;
   sessionId: string;
@@ -34,6 +37,12 @@ export type TranscriptEvent =
       gitBranch?: string;
       cwd?: string;
       version?: string;
+      model?: string;
+      contextWindow?: number;
+      startedAt?: number;
+      observedStatus?: DisplayStatus;
+      accountingIncomplete?: boolean;
+      parentSessionId?: string;
     };
 
 /** Parsed `<claude>/sessions/<pid>.json`. */
@@ -63,10 +72,11 @@ export interface ModelPrice {
   maxInputTokens?: number;
 }
 
-export type PriceLookup = (model: string) => ModelPrice | undefined;
+export type PriceLookup = (model: string, provider?: Provider) => ModelPrice | undefined;
 export type PricingStatus = 'loading' | 'ok' | 'stale' | 'unavailable';
 
 export interface Limit {
+  durationMs?: number;
   label: string;
   /** 0–100 */
   percent: number;
@@ -84,6 +94,8 @@ export interface ExtraUsage {
 export type LimitsStatus = 'loading' | 'ok' | 'stale' | 'no-credentials' | 'expired' | 'error' | 'disabled';
 
 export interface LimitsState {
+  source?: 'api' | 'transcript';
+  observedAt?: number;
   status: LimitsStatus;
   block?: Limit;
   weekly?: Limit;
@@ -113,7 +125,7 @@ export interface ScanProgress {
   filesTotal: number;
 }
 
-export type DisplayStatus = 'waiting' | 'busy' | 'idle' | 'ended';
+export type DisplayStatus = 'waiting' | 'busy' | 'idle' | 'ended' | 'unknown';
 
 /** An active subagent of a live session. */
 export interface SubagentView {
@@ -124,6 +136,13 @@ export interface SubagentView {
 }
 
 export interface SessionView {
+  provider?: Provider;
+  /** Provider-qualified identity for selection and rendering. */
+  key?: string;
+  activityConfidence?: 'observed' | 'confirmed' | 'unknown';
+  recentlyObserved?: boolean;
+  accountingIncomplete?: boolean;
+  parentSessionId?: string;
   sessionId: string;
   pid?: number;
   live: boolean;
@@ -260,7 +279,21 @@ export interface BurnProjection {
   hitWindowPct?: number;
 }
 
+export interface ProviderSnapshot {
+  dir: string;
+  found: boolean;
+  enabled: boolean;
+  limits: LimitsState;
+  costs: Snapshot['costs'];
+  burn: Snapshot['burn'];
+  scan: ScanProgress;
+  unknownModels: string[];
+  pricingStatus: PricingStatus;
+  accountingIncomplete?: boolean;
+}
+
 export interface Snapshot {
+  providers?: Partial<Record<Provider, ProviderSnapshot>>;
   now: number;
   claudeDirFound: boolean;
   claudeDir: string;
@@ -321,6 +354,9 @@ export const SORT_KEYS = ['project', 'status', 'activity', 'cost', 'ctx', 'name'
 export type SortKey = (typeof SORT_KEYS)[number];
 
 export interface Config {
+  providers: Provider[];
+  codexDir: string | null;
+  codexSubscriptionUSD: number | null;
   theme: ThemeName;
   refreshMs: number;
   usagePollSeconds: number;
