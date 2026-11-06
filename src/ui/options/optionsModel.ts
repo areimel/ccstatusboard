@@ -57,6 +57,18 @@ export const OPTIONS: OptionDescriptor[] = [
   { key: 'usagePollSeconds', label: 'Usage poll', kind: 'number', min: 30, step: 30, suffix: ' s' },
   { key: 'claudeDir', label: 'Claude dir', kind: 'readonly' },
   { key: 'usageApi', label: 'Usage API', kind: 'readonly' },
+  { key: 'providers', label: 'Providers', kind: 'readonly' },
+  {
+    key: 'codexSubscriptionUSD',
+    label: 'Codex plan',
+    kind: 'number',
+    min: 10,
+    step: 10,
+    nullable: true,
+    prefix: '$',
+    suffix: '/mo',
+  },
+  { key: 'codexDir', label: 'Codex dir', kind: 'readonly' },
 ];
 
 export function findOption(key: keyof Config): OptionDescriptor | undefined {
@@ -79,6 +91,8 @@ export function formatMinutes(m: number): string {
 
 export function formatValue(config: Config, desc: OptionDescriptor): string {
   const v = config[desc.key];
+  if (desc.key === 'providers')
+    return config.providers.length === 2 ? 'both' : (config.providers[0] ?? 'none');
   switch (desc.kind) {
     case 'bool':
       return v ? 'on' : 'off';

@@ -9,6 +9,11 @@ export function headerWarnings(snapshot: Snapshot): string[] {
   const out: string[] = [];
   if (snapshot.pricingStatus === 'stale') out.push('⚠ pricing stale');
   if (snapshot.unknownModels.length > 0) out.push(`⚠ unpriced: ${snapshot.unknownModels.join(', ')}`);
+  const codex = snapshot.providers?.codex;
+  if (codex?.enabled && codex.pricingStatus === 'stale') out.push('⚠ Codex pricing stale');
+  if (codex?.enabled && codex.unknownModels.length)
+    out.push(`⚠ Codex unpriced: ${codex.unknownModels.join(', ')}`);
+  if (codex?.accountingIncomplete) out.push('⚠ Codex costs partial');
   out.push(...snapshot.warnings);
   return out;
 }
@@ -16,7 +21,8 @@ export function headerWarnings(snapshot: Snapshot): string[] {
 export function Header({ snapshot }: { snapshot: Snapshot }): JSX.Element {
   const theme = useTheme();
   const live = snapshot.sessions.filter((s) => s.live).length;
-  const ended = snapshot.sessions.length - live;
+  const observed = snapshot.sessions.filter((s) => !s.live && s.recentlyObserved).length;
+  const ended = snapshot.sessions.filter((s) => s.status === 'ended').length;
   const warnings = headerWarnings(snapshot);
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -26,7 +32,7 @@ export function Header({ snapshot }: { snapshot: Snapshot }): JSX.Element {
         </Gradient>
         <Text color={theme.dim}> · </Text>
         <Text color={theme.text}>
-          {live} live / {ended} ended
+          {live} live{observed > 0 ? ` / ${observed} recent` : ''} / {ended} ended
         </Text>
         <Text color={theme.dim}> · </Text>
         <Text color={theme.text}>{formatClock(snapshot.now)}</Text>

@@ -29,6 +29,9 @@ describe('optionsModel', () => {
       'usagePollSeconds',
       'claudeDir',
       'usageApi',
+      'providers',
+      'codexSubscriptionUSD',
+      'codexDir',
     ]);
   });
   it('labels the idle and keep-exited options', () => {

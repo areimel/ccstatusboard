@@ -66,6 +66,7 @@ export function DetailPane({
   const line1 = [
     ...(s.provider === 'codex' ? ['Codex · observed activity'] : []),
     statusText(s, now),
+    s.parentSessionId ? `parent ${s.parentSessionId}` : undefined,
     s.cwd,
     s.permissionMode ? `${s.permissionMode} mode` : undefined,
     s.version ? `v${s.version}` : undefined,
@@ -102,9 +103,10 @@ export function DetailPane({
             {up}
             {' · '}
             {formatUSD(s.costUSD, s.costApprox)}
-            {s.accountingIncomplete ? ' partial' : ''}
+            {s.accountingIncomplete ? '*' : ''}
           </Text>
           <Text color={theme.dim} wrap="truncate-end">
+            {s.provider === 'codex' && s.model ? `${s.model} · ` : ''}
             {agents}
           </Text>
         </Box>
@@ -118,7 +120,9 @@ export function DetailPane({
               format={(v) => formatUSD(v)}
             />
           ) : (
-            <Text color={theme.dim}>no model costs yet</Text>
+            <Text color={theme.dim}>
+              {s.accountingIncomplete || s.costUSD === null ? 'model costs unknown' : 'no model costs yet'}
+            </Text>
           )}
         </Box>
       </Box>

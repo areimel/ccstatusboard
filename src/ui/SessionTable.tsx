@@ -92,7 +92,7 @@ function cellText(col: ColumnKey, s: SessionView, now: number, nameW: number): s
     case 'mem':
       return s.live ? formatBytes(s.memBytes) : '—';
     case 'cost':
-      return formatUSD(s.costUSD, s.costApprox);
+      return `${formatUSD(s.costUSD, s.costApprox)}${s.accountingIncomplete && s.costUSD !== null ? '*' : ''}`;
     case 'last':
       return formatAgo(s.lastActivity, now);
     case 'uptime':
