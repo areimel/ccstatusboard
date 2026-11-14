@@ -11,3 +11,40 @@ brag-output/
 brag-output-*/work/
 brag-output-*/tui-export/tui-frames.json
 brag-output-*/composition/.hyperframes/
+
+# Browser automation / test artifacts
+.playwright-mcp/
+.playwright/
+playwright-report/
+test-results/
+blob-report/
+.vitest/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# Caches
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# Local Claude settings
+.claude/settings.local.json
