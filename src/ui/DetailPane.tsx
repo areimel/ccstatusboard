@@ -28,6 +28,8 @@ export function groupNames(names: readonly string[]): string {
 
 function statusText(s: SessionView, now: number): string {
   switch (s.status) {
+    case 'unknown':
+      return 'status unknown';
     case 'waiting':
       return s.waitingFor ? `waiting: ${s.waitingFor}` : 'waiting';
     case 'busy':
@@ -62,7 +64,9 @@ export function DetailPane({
   const chartWidth = Math.max(16, Math.min(36, Math.floor(width / 3)));
   const leftWidth = Math.max(20, width - 4 - chartWidth - 2);
   const line1 = [
+    ...(s.provider === 'codex' ? ['Codex · observed activity'] : []),
     statusText(s, now),
+    s.parentSessionId ? `parent ${s.parentSessionId}` : undefined,
     s.cwd,
     s.permissionMode ? `${s.permissionMode} mode` : undefined,
     s.version ? `v${s.version}` : undefined,
@@ -75,7 +79,7 @@ export function DetailPane({
   )}  cache-r ${formatTokens(t.cacheRead)}`;
   const ctx =
     s.contextTokens !== undefined && s.contextWindow !== undefined
-      ? `ctx ${formatTokens(s.contextTokens)} / ${formatTokens(s.contextWindow)} (${s.contextPercent ?? 0}%)`
+      ? `ctx ${formatTokens(s.contextTokens)} / ${formatTokens(s.contextWindow)} (${s.contextPercent === undefined ? '—' : s.contextPercent}%)`
       : 'ctx —';
   const up = s.live && s.startedAt !== undefined ? ` · up ${formatDuration(now - s.startedAt)}` : '';
   const agents =
@@ -99,8 +103,10 @@ export function DetailPane({
             {up}
             {' · '}
             {formatUSD(s.costUSD, s.costApprox)}
+            {s.accountingIncomplete ? '*' : ''}
           </Text>
           <Text color={theme.dim} wrap="truncate-end">
+            {s.provider === 'codex' && s.model ? `${s.model} · ` : ''}
             {agents}
           </Text>
         </Box>
@@ -114,7 +120,9 @@ export function DetailPane({
               format={(v) => formatUSD(v)}
             />
           ) : (
-            <Text color={theme.dim}>no model costs yet</Text>
+            <Text color={theme.dim}>
+              {s.accountingIncomplete || s.costUSD === null ? 'model costs unknown' : 'no model costs yet'}
+            </Text>
           )}
         </Box>
       </Box>

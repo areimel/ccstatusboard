@@ -6,7 +6,7 @@ import {
   writeFile as fsWriteFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ModelPrice, PriceLookup, PricingStatus } from '../domain/types.js';
+import type { ModelPrice, PriceLookup, PricingStatus, Provider } from '../domain/types.js';
 
 export const LITELLM_URL =
   'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
@@ -30,11 +30,16 @@ export function buildPriceTable(json: unknown): Map<string, ModelPrice> {
     const input = numOrUndef(entry.input_cost_per_token);
     const output = numOrUndef(entry.output_cost_per_token);
     if (input === undefined || output === undefined) continue;
+    const anthropic = name.startsWith('claude-') || name.startsWith('anthropic/');
+    const cacheWrite = numOrUndef(entry.cache_creation_input_token_cost);
+    const cacheRead = numOrUndef(entry.cache_read_input_token_cost);
     const price: ModelPrice = {
       input,
       output,
-      cacheWrite: numOrUndef(entry.cache_creation_input_token_cost) ?? input * CACHE_WRITE_MULTIPLIER,
-      cacheRead: numOrUndef(entry.cache_read_input_token_cost) ?? input * CACHE_READ_MULTIPLIER,
+      cacheWrite: cacheWrite ?? (anthropic ? input * CACHE_WRITE_MULTIPLIER : 0),
+      cacheRead: cacheRead ?? (anthropic ? input * CACHE_READ_MULTIPLIER : 0),
+      ...(!anthropic && cacheWrite === undefined ? { cacheWriteUnpriced: true } : {}),
+      ...(!anthropic && cacheRead === undefined ? { cacheReadUnpriced: true } : {}),
     };
     const cacheWrite1h = numOrUndef(entry.cache_creation_input_token_cost_above_1hr);
     if (cacheWrite1h !== undefined) price.cacheWrite1h = cacheWrite1h;
@@ -45,25 +50,27 @@ export function buildPriceTable(json: unknown): Map<string, ModelPrice> {
   return table;
 }
 
-function candidates(model: string): string[] {
+function candidates(model: string, provider: Provider): string[] {
   const stripDate = (s: string) => s.replace(/-\d{8}$/, '');
   const base = model.replace(/\[1m\]$/i, '');
   const names = [model, stripDate(model), base, stripDate(base)];
-  return [...new Set(names.flatMap((n) => [n, `anthropic/${n}`]))];
+  const prefix = provider === 'codex' ? 'openai/' : 'anthropic/';
+  return [...new Set(names.flatMap((n) => [n, `${prefix}${n}`]))];
 }
 
 export function makeLookup(table: Map<string, ModelPrice>): PriceLookup {
   const memo = new Map<string, ModelPrice | undefined>();
-  return (model: string) => {
-    if (memo.has(model)) return memo.get(model);
+  return (model: string, provider: Provider = 'claude') => {
+    const key = `${provider}:${model}`;
+    if (memo.has(key)) return memo.get(key);
     let found: ModelPrice | undefined;
     if (model !== '') {
-      for (const name of candidates(model)) {
+      for (const name of candidates(model, provider)) {
         found = table.get(name);
         if (found) break;
       }
     }
-    memo.set(model, found);
+    memo.set(key, found);
     return found;
   };
 }

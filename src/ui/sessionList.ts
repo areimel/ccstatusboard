@@ -1,3 +1,4 @@
+import type { ProviderFilter } from './uiState.js';
 import type { ColumnKey, DisplayStatus, SessionView, SortKey, SubagentView } from '../domain/types.js';
 
 export const COLUMN_WIDTHS: Record<ColumnKey, number> = {
@@ -37,7 +38,7 @@ export function nameWidth(columns: ColumnKey[], width: number): number {
   return Math.min(NAME_MAX_WIDTH, COLUMN_WIDTHS.name + Math.max(0, spare));
 }
 
-const STATUS_RANK: Record<DisplayStatus, number> = { waiting: 0, busy: 1, idle: 2, ended: 3 };
+const STATUS_RANK: Record<DisplayStatus, number> = { waiting: 0, busy: 1, idle: 2, ended: 3, unknown: 4 };
 
 const byActivity = (a: SessionView, b: SessionView) => b.lastActivity - a.lastActivity;
 const desc = (a: number | null | undefined, b: number | null | undefined) => {
@@ -100,10 +101,12 @@ export function filterSessions(
   sessions: SessionView[],
   filter: 'all' | 'live',
   search: string,
+  provider: ProviderFilter = 'all',
 ): SessionView[] {
   const q = search.trim().toLowerCase();
   return sessions.filter((s) => {
-    if (filter === 'live' && !s.live) return false;
+    if (provider !== 'all' && (s.provider ?? 'claude') !== provider) return false;
+    if (filter === 'live' && !s.live && !s.recentlyObserved) return false;
     if (q === '') return true;
     return s.name.toLowerCase().includes(q) || (s.cwd ?? '').toLowerCase().includes(q);
   });

@@ -46,8 +46,8 @@ describe('OptionsMenu', () => {
     await vi.waitFor(() => expect(frame()).toContain('Options'));
     expect(frame()).toContain('Theme');
     expect(frame()).toContain('Usage API');
-    expect(frame().match(/restart/gi)).toHaveLength(2);
-    expect(frame().match(/restart/gi)).toHaveLength(2);
+    expect(frame().match(/restart/gi)).toHaveLength(4);
+    expect(frame().match(/restart/gi)).toHaveLength(4);
   });
   it('Esc closes', async () => {
     const { press, onClose } = setup();

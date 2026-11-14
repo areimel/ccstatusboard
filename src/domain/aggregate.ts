@@ -16,23 +16,39 @@ export function totalsForWindow(
   w: TimeWindow,
   lookup: PriceLookup | null,
 ): WindowTotals {
-  const totals: WindowTotals = { costUSD: lookup ? 0 : null, tokens: { ...ZERO_TOKENS }, byModel: {} };
+  const totals: WindowTotals = {
+    costUSD: lookup ? 0 : null,
+    tokens: { ...ZERO_TOKENS },
+    byModel: Object.create(null) as Record<string, ModelTotals>,
+  };
   for (const r of records) {
     if (r.timestamp < w.start || r.timestamp > w.end) continue;
-    const price = lookup?.(r.model);
+    const price = lookup?.(r.model, r.provider);
     const cost = lookup ? recordCost(r.tokens, price) : null;
 
     let m: ModelTotals | undefined = totals.byModel[r.model];
     if (!m) {
-      m = { costUSD: price ? 0 : null, tokens: { ...ZERO_TOKENS } };
+      m = { costUSD: cost !== null ? 0 : null, tokens: { ...ZERO_TOKENS } };
       totals.byModel[r.model] = m;
     }
     m.tokens = addTokens(m.tokens, r.tokens);
     totals.tokens = addTokens(totals.tokens, r.tokens);
+    if (cost === null && r.provider === 'codex') {
+      totals.costIncomplete = true;
+      m.costIncomplete = true;
+    }
     if (cost !== null) {
       m.costUSD = (m.costUSD ?? 0) + cost;
       totals.costUSD = (totals.costUSD ?? 0) + cost;
     }
+  }
+  if (
+    totals.costIncomplete &&
+    Object.values(totals.byModel).every(
+      (model) => model.costUSD === null || (model.costIncomplete && model.costUSD === 0),
+    )
+  ) {
+    totals.costUSD = null;
   }
   return totals;
 }
@@ -40,12 +56,8 @@ export function totalsForWindow(
 export function unknownModelsIn(records: Iterable<UsageRecord>, lookup: PriceLookup | null): string[] {
   if (!lookup) return [];
   const unknown = new Set<string>();
-  for (const r of records) if (!lookup(r.model)) unknown.add(r.model);
+  for (const r of records) if (!lookup(r.model, r.provider)) unknown.add(r.model);
   return [...unknown].sort();
-}
-
-function pricedCost(r: UsageRecord, lookup: PriceLookup): number {
-  return recordCost(r.tokens, lookup(r.model)) ?? 0;
 }
 
 /** Cost of records in (now - 60 min, now], i.e. $/h. */
@@ -57,7 +69,11 @@ export function burnRatePerHour(
   if (!lookup) return null;
   let sum = 0;
   for (const r of records) {
-    if (r.timestamp > now - HOUR_MS && r.timestamp <= now) sum += pricedCost(r, lookup);
+    if (r.timestamp > now - HOUR_MS && r.timestamp <= now) {
+      const cost = recordCost(r.tokens, lookup(r.model, r.provider));
+      if (cost === null && r.provider === 'codex') return null;
+      sum += cost ?? 0;
+    }
   }
   return sum;
 }
@@ -76,7 +92,9 @@ export function hourlySparkline(
     if (age < 0) continue;
     const i = age === 0 ? hours - 1 : hours - Math.ceil(age / HOUR_MS);
     if (i < 0 || i >= hours) continue;
-    buckets[i] = (buckets[i] ?? 0) + pricedCost(r, lookup);
+    const cost = recordCost(r.tokens, lookup(r.model, r.provider));
+    if (cost === null && r.provider === 'codex') return [];
+    buckets[i] = (buckets[i] ?? 0) + (cost ?? 0);
   }
   return buckets;
 }

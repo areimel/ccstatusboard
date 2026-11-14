@@ -12,16 +12,26 @@ function expandHome(p: string, home: string): string {
   return p;
 }
 
-export function resolveClaudeDir(opts: {
+interface DataDirectoryOptions {
   flag?: string | null;
   config?: string | null;
   env?: NodeJS.ProcessEnv;
   home?: string;
-}): string {
+}
+
+function resolveDataDirectory(opts: DataDirectoryOptions, envKey: string, fallback: string): string {
   const home = opts.home ?? homedir();
   const env = opts.env ?? process.env;
-  const chosen = [opts.flag, opts.config, env.CLAUDE_CONFIG_DIR].find(nonEmpty);
-  return chosen ? expandHome(chosen, home) : join(home, '.claude');
+  const chosen = [opts.flag, opts.config, env[envKey]].find(nonEmpty);
+  return chosen ? expandHome(chosen, home) : join(home, fallback);
+}
+
+export function resolveClaudeDir(opts: DataDirectoryOptions): string {
+  return resolveDataDirectory(opts, 'CLAUDE_CONFIG_DIR', '.claude');
+}
+
+export function resolveCodexDir(opts: DataDirectoryOptions): string {
+  return resolveDataDirectory(opts, 'CODEX_HOME', '.codex');
 }
 
 export function encodeProjectDir(cwd: string): string {

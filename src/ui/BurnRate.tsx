@@ -69,10 +69,12 @@ export function BurnRate({
   burn,
   now,
   width,
+  labels,
 }: {
   burn: Snapshot['burn'];
   now: number;
   width: number;
+  labels?: { block: string; week: string } | undefined;
 }): JSX.Element {
   const theme = useTheme();
   return (
@@ -80,8 +82,8 @@ export function BurnRate({
       <Text color={theme.accent} bold wrap="truncate-end">
         Burn Rate
       </Text>
-      <Row label="5h" kind="block" p={burn.block} now={now} />
-      <Row label="Week" kind="week" p={burn.week} now={now} />
+      <Row label={labels?.block ?? '5h'} kind="block" p={burn.block} now={now} />
+      <Row label={labels?.week ?? 'Week'} kind="week" p={burn.week} now={now} />
     </Box>
   );
 }

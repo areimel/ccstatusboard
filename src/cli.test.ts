@@ -41,6 +41,8 @@ describe('cli', () => {
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('Usage: ccstatusboard');
     expect(r.stdout).toContain('--no-usage-api');
+    expect(r.stdout).toContain('--codex-dir');
+    expect(r.stdout).toContain('--provider');
     for (const name of THEME_NAMES) expect(r.stdout).toContain(name);
     const themeLines = r.stdout.split('\n').filter((l) => l.startsWith(' '.repeat(24)));
     for (const line of themeLines) expect(line.length).toBeLessThanOrEqual(80);

@@ -32,7 +32,7 @@ export function sanitizeOptional(s: string | undefined): string | undefined {
 
 /** Sanitizes model-name keys; keys that collide after sanitizing are merged (tokens added, costs via sumCost). */
 export function sanitizeKeys(byModel: Record<string, ModelTotals>): Record<string, ModelTotals> {
-  const out: Record<string, ModelTotals> = {};
+  const out = Object.create(null) as Record<string, ModelTotals>;
   for (const [model, totals] of Object.entries(byModel)) {
     const key = sanitizeText(model);
     const prev = out[key];
@@ -123,6 +123,7 @@ export function sanitizeLimits(l: LimitsState): LimitsState {
     ...(l.block ? { block: sanitizeLimit(l.block) } : {}),
     ...(l.weekly ? { weekly: sanitizeLimit(l.weekly) } : {}),
     perModelWeekly: l.perModelWeekly.map(sanitizeLimit),
+    ...(l.windows ? { windows: l.windows.map(sanitizeLimit) } : {}),
     ...(l.extra ? { extra: { ...l.extra, currency: sanitizeOptional(l.extra.currency) } } : {}),
     ...(l.error !== undefined ? { error: sanitizeText(l.error) } : {}),
   };

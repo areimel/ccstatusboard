@@ -4,12 +4,12 @@ export const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
 export const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
-export function blockWindowFromLimit(resetsAt: number, now: number): TimeWindow {
-  return { start: resetsAt - FIVE_HOURS_MS, end: now };
+export function blockWindowFromLimit(resetsAt: number, now: number, durationMs = FIVE_HOURS_MS): TimeWindow {
+  return { start: resetsAt - durationMs, end: now };
 }
 
-export function weekWindowFromLimit(resetsAt: number, now: number): TimeWindow {
-  return { start: resetsAt - SEVEN_DAYS_MS, end: now };
+export function weekWindowFromLimit(resetsAt: number, now: number, durationMs = SEVEN_DAYS_MS): TimeWindow {
+  return { start: resetsAt - durationMs, end: now };
 }
 
 export function todayWindow(now: number): TimeWindow {

@@ -7,7 +7,8 @@ import { ThemeProvider } from '@inkjs/ui';
 import { THEMES, ThemeContext, cycleTheme, inkUiTheme } from './theme.js';
 import { Panel } from './Panel.js';
 import { Header, headerWarnings } from './Header.js';
-import { UsagePanel, usagePanelRows } from './UsagePanel.js';
+import { usageLayout } from './providerUsage.js';
+import { UsagePanel } from './UsagePanel.js';
 import { Footer } from './Footer.js';
 import { SessionTable, filterSessions, sortSessions } from './SessionTable.js';
 import { DetailPane } from './DetailPane.js';
@@ -48,8 +49,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   const inkTheme = useMemo(() => inkUiTheme(theme), [theme]);
 
   const visible = useMemo(
-    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search), cfg.sort),
-    [snapshot.sessions, ui.filter, ui.search, cfg.sort],
+    () => sortSessions(filterSessions(snapshot.sessions, ui.filter, ui.search, ui.providerFilter), cfg.sort),
+    [snapshot.sessions, ui.filter, ui.search, ui.providerFilter, cfg.sort],
   );
   const selected = clamp(ui.selectedIndex, visible.length);
   // Re-clamp against the current list so a stale index never leaks into the reducer.
@@ -74,7 +75,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   const headerRows = 1 + (headerWarnings(snapshot).length > 0 ? 1 : 0);
   const overlay = ui.mode === 'help' || ui.mode === 'options';
   const systemShown = cfg.showSystem && rows >= SYSTEM_MIN_ROWS && !overlay;
-  const usageRows = usagePanelRows(snapshot, cfg.subscriptionUSD);
+  const usage = usageLayout(snapshot, cfg, ui.providerFilter, ui.usageProvider, columns, rows, headerRows);
+  const usageRows = usage.height;
   const systemGroups =
     systemShown && snapshot.system
       ? visibleSystemGroups(
@@ -96,8 +98,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
   });
   const emptyMessage =
     cfg.endedWindowHours === 0
-      ? 'No live Claude Code sessions'
-      : `No Claude Code sessions in the last ${cfg.endedWindowHours}h`;
+      ? 'No live or recently observed sessions'
+      : `No sessions in the last ${cfg.endedWindowHours}h`;
   if (tooSmall) {
     return <Text>Terminal too small</Text>;
   }
@@ -115,10 +117,14 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
         onClose={() => reduce({ type: 'closeOptions' })}
       />
     );
-  } else if (!snapshot.claudeDirFound) {
+  } else if (
+    !snapshot.claudeDirFound &&
+    !snapshot.providers?.codex?.found &&
+    snapshot.sessions.length === 0
+  ) {
     body = (
       <Panel title="Sessions" width={columns}>
-        <Text>Claude Code data not found at {snapshot.claudeDir}</Text>
+        <Text>Session data not found</Text>
       </Panel>
     );
   } else if (snapshot.sessions.length === 0 || visible.length === 0) {
@@ -139,6 +145,8 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
           now={snapshot.now}
           sort={cfg.sort}
           filter={ui.filter}
+          providerFilter={ui.providerFilter}
+          showProvider={new Set(snapshot.sessions.map((s) => s.provider ?? 'claude')).size > 1}
           idleCutoffMinutes={cfg.idleCutoffMinutes}
           emptyMessage={emptyMessage}
         />
@@ -154,11 +162,26 @@ export function App({ store, config, onQuit, onConfigChange, size }: AppProps): 
         <Box flexDirection="column" width={columns} maxHeight={rows - SPARE_ROWS} overflow="hidden">
           <Header snapshot={snapshot} />
           {!overlay && (
-            <UsagePanel snapshot={snapshot} width={columns} subscriptionUSD={cfg.subscriptionUSD} />
+            <Box flexDirection={usage.horizontal ? 'row' : 'column'} columnGap={usage.horizontal ? 2 : 0}>
+              {usage.entries.map((entry) => (
+                <UsagePanel
+                  key={entry.provider}
+                  snapshot={entry.snapshot}
+                  width={entry.width}
+                  subscriptionUSD={entry.subscriptionUSD}
+                  provider={entry.provider}
+                />
+              ))}
+            </Box>
           )}
           {systemShown && <SystemPanel snapshot={snapshot} width={columns} groups={systemGroups} />}
           {body}
-          <Footer mode={ui.mode === 'search' ? 'search' : 'normal'} search={ui.search} width={columns} />
+          <Footer
+            mode={ui.mode === 'search' ? 'search' : 'normal'}
+            search={ui.search}
+            width={columns}
+            providers={Boolean(snapshot.providers?.codex?.enabled)}
+          />
         </Box>
       </ThemeProvider>
     </ThemeContext.Provider>

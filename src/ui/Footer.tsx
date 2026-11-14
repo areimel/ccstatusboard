@@ -52,9 +52,10 @@ interface FooterProps {
   search: string;
   /** Terminal width; optional hints are omitted when they would not fit. Undefined means always show. */
   width?: number;
+  providers?: boolean;
 }
 
-export function Footer({ mode, search, width }: FooterProps): JSX.Element {
+export function Footer({ mode, search, width, providers }: FooterProps): JSX.Element {
   const theme = useTheme();
   if (mode === 'search') {
     return (
@@ -72,7 +73,25 @@ export function Footer({ mode, search, width }: FooterProps): JSX.Element {
   const fits = (v: { theme: boolean; esc: boolean }): boolean =>
     hintsWidth(normalHints(v.theme ? LONGEST_THEME : undefined, v.esc)) <= (width ?? Infinity);
   const v = VARIANTS.find(fits) ?? { theme: false, esc: false };
-  const hints = normalHints(v.theme ? theme.name : undefined, v.esc);
+  let hints = normalHints(v.theme ? theme.name : undefined, v.esc);
+  if (providers) {
+    const providerHints: Hint[] = [
+      ...normalHints(undefined, false).slice(0, -1),
+      ['p', 'Provider'],
+      ['P', 'Usage'],
+      ['q', 'Quit'],
+    ];
+    hints =
+      hintsWidth(providerHints) <= (width ?? Infinity)
+        ? providerHints
+        : [
+            ['?', 'Help'],
+            ['↑↓', 'Select'],
+            ['p', 'Provider'],
+            ['P', 'Usage'],
+            ['q', 'Quit'],
+          ];
+  }
   return (
     <Box paddingX={PADDING_X} columnGap={COLUMN_GAP}>
       {hints.map(([key, label]) => (

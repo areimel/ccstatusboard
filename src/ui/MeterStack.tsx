@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import { Box } from 'ink';
+import { truncateDisplay } from '../domain/format.js';
 import { Meter } from './Meter.js';
 
 export const SUFFIX_WIDTH = 18;
@@ -21,14 +22,17 @@ export function MeterStack({
   /** Aligns the labels with a row drawn outside the stack. */
   minLabelWidth?: number;
 }): JSX.Element {
-  const labelWidth = Math.max(minLabelWidth, ...rows.map((r) => r.label.length));
+  const labelWidth = Math.min(
+    Math.max(1, leftWidth - 12),
+    Math.max(minLabelWidth, ...rows.map((r) => r.label.length)),
+  );
   const meterWidth = Math.max(10, Math.min(60, leftWidth - labelWidth - 1 - SUFFIX_WIDTH - 1));
   return (
     <Box flexDirection="column">
       {rows.map((r) => (
         <Meter
           key={r.label}
-          label={r.label}
+          label={truncateDisplay(r.label, labelWidth)}
           labelWidth={labelWidth}
           percent={r.percent}
           width={meterWidth}

@@ -97,6 +97,35 @@ describe('makeLookup', () => {
     expect(lookup('claude-mystery-9')).toBeUndefined();
     expect(lookup('')).toBeUndefined();
   });
+
+  it('keeps provider lookup namespaces separate and resolves OpenAI model aliases', () => {
+    const lookup = makeLookup(
+      buildPriceTable({
+        'openai/gpt-test': {
+          input_cost_per_token: 2e-6,
+          output_cost_per_token: 8e-6,
+          cache_read_input_token_cost: 0.2e-6,
+        },
+        'anthropic/gpt-test': { input_cost_per_token: 9e-6, output_cost_per_token: 10e-6 },
+      }),
+    );
+    expect(lookup('gpt-test', 'claude')?.input).toBe(9e-6);
+    expect(lookup('gpt-test', 'codex')?.input).toBe(2e-6);
+    expect(lookup('gpt-test', 'codex')?.cacheRead).toBe(0.2e-6);
+    expect(lookup('gpt-test-20261106', 'codex')?.input).toBe(2e-6);
+  });
+
+  it('marks missing OpenAI cache rates unpriced instead of using Anthropic multipliers', () => {
+    const lookup = makeLookup(
+      buildPriceTable({
+        'openai/gpt-test': { input_cost_per_token: 2e-6, output_cost_per_token: 8e-6 },
+      }),
+    );
+    expect(lookup('gpt-test', 'codex')).toMatchObject({
+      cacheReadUnpriced: true,
+      cacheWriteUnpriced: true,
+    });
+  });
 });
 
 describe('PricingProvider', () => {

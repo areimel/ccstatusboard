@@ -3,6 +3,7 @@ import { totalsForWindow } from '../domain/aggregate.js';
 import { contextPercent, contextWindowFor, currentContextTokens } from '../domain/context.js';
 import type {
   DisplayStatus,
+  Provider,
   PriceLookup,
   RegistryEntry,
   SessionView,
@@ -17,6 +18,7 @@ const ALL_TIME: TimeWindow = { start: 0, end: Number.MAX_SAFE_INTEGER };
 
 export interface SessionState {
   sessionId: string;
+  provider: Provider;
   live: boolean;
   registry?: RegistryEntry;
   /** Deduplicated usage records owned by this session (main + subagents). */
@@ -27,19 +29,20 @@ export interface SessionState {
   aiTitle?: string;
   agentName?: string;
   permissionMode?: string;
-  meta: { timestamp: number; gitBranch?: string; cwd?: string; version?: string };
+  meta: Extract<TranscriptEvent, { kind: 'meta' }>;
   lastEventTs: number;
   /** When the store saw the session end (process exit); keeps it visible for endedWindowHours. */
   endedAt?: number;
   agents: { activeCount: number; names: string[]; list?: SubagentView[] };
 }
 
-export function createSessionState(sessionId: string): SessionState {
+export function createSessionState(sessionId: string, provider: Provider = 'claude'): SessionState {
   return {
     sessionId,
+    provider,
     live: false,
     records: [],
-    meta: { timestamp: 0 },
+    meta: { kind: 'meta', timestamp: 0, isSidechain: false },
     lastEventTs: 0,
     agents: { activeCount: 0, names: [] },
   };
@@ -84,6 +87,8 @@ export function applySessionEvent(s: SessionState, e: TranscriptEvent, isNewUsag
       bumpActivity(s, e.timestamp);
       if (e.isSidechain || e.timestamp < s.meta.timestamp) return;
       s.meta = {
+        ...s.meta,
+        ...e,
         timestamp: e.timestamp,
         gitBranch: e.gitBranch ?? s.meta.gitBranch,
         cwd: e.cwd ?? s.meta.cwd,
@@ -94,6 +99,7 @@ export function applySessionEvent(s: SessionState, e: TranscriptEvent, isNewUsag
 }
 
 export function displayStatus(s: SessionState): { status: DisplayStatus; rawStatus?: string } {
+  if (s.provider === 'codex') return { status: s.meta.observedStatus ?? 'unknown' };
   if (!s.live) return { status: 'ended' };
   const raw = s.registry?.status;
   if (raw === 'waiting') return { status: 'waiting' };
@@ -124,14 +130,24 @@ export function sessionVersion(s: SessionState): string | undefined {
 
 /** Builds the UI view. Every disk-sourced string is sanitized here so the UI never sees control chars. */
 export function buildSessionView(s: SessionState, lookup: PriceLookup | null): SessionView {
-  const totals = totalsForWindow(s.records, ALL_TIME, lookup);
+  const providerLookup = lookup ? (model: string) => lookup(model, s.provider) : null;
+  const totals = totalsForWindow(s.records, ALL_TIME, providerLookup);
   const fallback = totals.costUSD === null ? s.costState : undefined;
-  const model = s.lastUsage?.model;
-  const contextTokens = currentContextTokens({ lastUsage: s.lastUsage, lastCompact: s.lastCompact });
+  const model = s.meta.model ?? s.lastUsage?.model;
+  const contextTokens =
+    s.meta.contextTokens ?? currentContextTokens({ lastUsage: s.lastUsage, lastCompact: s.lastCompact });
   const contextWindow =
-    contextTokens === undefined ? undefined : contextWindowFor(model, model ? lookup?.(model) : undefined);
+    contextTokens === undefined
+      ? undefined
+      : (s.meta.contextWindow ??
+        contextWindowFor(model, model ? providerLookup?.(model) : undefined, s.provider));
   const { status, rawStatus } = displayStatus(s);
   return {
+    provider: s.provider,
+    key: `${s.provider}:${s.sessionId}`,
+    activityConfidence: s.live ? 'confirmed' : s.provider === 'codex' ? 'observed' : 'unknown',
+    accountingIncomplete: s.meta.accountingIncomplete || totals.costIncomplete || undefined,
+    parentSessionId: s.meta.parentSessionId,
     sessionId: s.sessionId, // identity key, kept raw; never rendered directly
     pid: s.registry?.pid,
     live: s.live,
@@ -159,7 +175,7 @@ export function buildSessionView(s: SessionState, lookup: PriceLookup | null): S
     costApprox: fallback !== undefined,
     tokens: totals.tokens,
     byModel: sanitizeKeys(totals.byModel),
-    startedAt: s.registry?.startedAt,
+    startedAt: s.registry?.startedAt ?? s.meta.startedAt,
     lastActivity: lastActivityOf(s),
     permissionMode: sanitizeOptional(s.permissionMode),
     version: sanitizeOptional(sessionVersion(s)),

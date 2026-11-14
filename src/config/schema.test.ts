@@ -16,7 +16,10 @@ describe('configSchema', () => {
       columns: ['status', 'project', 'name', 'model', 'ctx', 'cpu', 'mem', 'cost', 'last', 'uptime'],
       sort: 'project',
       showDetail: true,
+      providers: ['claude', 'codex'],
       claudeDir: null,
+      codexDir: null,
+      codexSubscriptionUSD: null,
       usageApi: true,
       subscriptionUSD: null,
       showSystem: true,
@@ -62,6 +65,21 @@ describe('configSchema', () => {
 
   it('rejects unknown keys', () => {
     expect(configSchema.safeParse({ colour: 'red' }).success).toBe(false);
+  });
+
+  it('adds provider defaults to old configs and rejects invalid provider settings', () => {
+    expect(configSchema.parse({ claudeDir: '/old' }).providers).toEqual(['claude', 'codex']);
+    expect(configSchema.parse({ providers: ['codex'], codexSubscriptionUSD: 20 })).toMatchObject({
+      providers: ['codex'],
+      codexSubscriptionUSD: 20,
+    });
+    for (const providers of [[], ['other'], ['codex', 'codex']]) {
+      expect(configSchema.safeParse({ providers }).success).toBe(false);
+    }
+    expect(configSchema.safeParse({ codexSubscriptionUSD: 0 }).success).toBe(false);
+    const parsed = configSchema.parse({});
+    parsed.providers.pop();
+    expect(configSchema.parse({}).providers).toEqual(['claude', 'codex']);
   });
 
   it('accepts a full valid config', () => {

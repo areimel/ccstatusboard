@@ -123,7 +123,7 @@ describe('SessionTable', () => {
     expect(await frame([], { emptyMessage: 'No Claude Code sessions in the last 6h' })).toContain(
       'No Claude Code sessions in the last 6h',
     );
-    expect(await frame([])).toContain('No Claude Code sessions in the last 24h');
+    expect(await frame([])).toContain('No sessions in the last 24h');
   });
 
   it('renders group headers (not selectable) when sorted by project', async () => {

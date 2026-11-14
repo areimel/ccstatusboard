@@ -5,6 +5,7 @@ import type { BurnWindowKind, Limit, LimitSample } from '../domain/types.js';
 const NEW_WINDOW_MS = 60_000;
 
 interface Buffer {
+  id?: string;
   resetsAt: number | undefined;
   samples: LimitSample[];
 }
@@ -22,6 +23,9 @@ export class LimitHistory {
     if (!limit || limit.resetsAt === undefined || !Number.isFinite(limit.percent) || !Number.isFinite(t)) {
       return;
     }
+    const id = limit.id ?? limit.label;
+    if (buf.id !== undefined && buf.id !== id) buf.samples = [];
+    buf.id = id;
     if (buf.resetsAt !== undefined && Math.abs(limit.resetsAt - buf.resetsAt) > NEW_WINDOW_MS) {
       buf.samples = [];
     }
@@ -31,6 +35,7 @@ export class LimitHistory {
       [...buf.samples].sort((a, b) => a.t - b.t),
       Math.max(now, t),
       kind,
+      limit.durationMs ?? (limit.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000),
     );
   }
 

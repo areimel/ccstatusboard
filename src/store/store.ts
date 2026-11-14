@@ -3,11 +3,13 @@ import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } fr
 import { DedupSet } from '../domain/dedup.js';
 import { projectBurn } from '../domain/burn-rate-formula.js';
 import {
-  type BurnProjection,
+  emptyWindowTotals,
   type LimitsState,
   type PriceLookup,
   type PricingStatus,
   type ProcStats,
+  type Provider,
+  type ProviderSnapshot,
   type RegistryEntry,
   type ScanProgress,
   type SessionView,
@@ -42,6 +44,7 @@ export interface StoreOptions {
   now: () => number;
   refreshMs: number;
   endedWindowHours: number;
+  idleCutoffMinutes?: number;
   claudeDir: string;
   claudeDirFound: boolean;
 }
@@ -56,21 +59,27 @@ function pushCapped(arr: number[], v: number): void {
 
 export class Store {
   private readonly sessions = new Map<string, SessionState>();
-  private readonly dedup = new DedupSet();
+  private dedup = new DedupSet();
   private readonly records: UsageRecord[] = [];
-  /** Usage timestamps, kept sorted ascending as records arrive. */
-  private readonly sortedTs: number[] = [];
-  private limits: LimitsState = { status: 'loading', perModelWeekly: [] };
+  private readonly providerState = new Map<
+    Provider,
+    {
+      dir: string;
+      found: boolean;
+      enabled: boolean;
+      limits: LimitsState;
+      scan: ScanProgress;
+      history: LimitHistory;
+    }
+  >();
   private lookup: PriceLookup | null = null;
   private pricingStatus: PricingStatus = 'loading';
-  private scan: ScanProgress = { done: false, filesDone: 0, filesTotal: 0 };
   private claudeDirFound: boolean;
   private readonly listeners = new Set<() => void>();
   private snapshot: Snapshot;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
-  private readonly limitHistory = new LimitHistory();
   private system: SystemStats | undefined;
   private readonly sysHistory: SystemHistory = { cpu: [], rx: [], tx: [] };
   private procStats = new Map<number, ProcStats>();
@@ -82,18 +91,19 @@ export class Store {
   constructor(opts: StoreOptions) {
     this.opts = { ...opts };
     this.claudeDirFound = opts.claudeDirFound;
+    this.setProviderStateDefaults('claude', opts.claudeDir, opts.claudeDirFound);
     this.snapshot = this.compute();
   }
 
-  applyEvents(sessionId: string, events: TranscriptEvent[]): void {
-    const s = this.session(sessionId);
-    for (const e of events) {
+  applyEvents(sessionId: string, events: TranscriptEvent[], provider: Provider = 'claude'): void {
+    const s = this.session(sessionId, provider);
+    for (let e of events) {
       let isNew = false;
       if (e.kind === 'usage') {
-        isNew = this.dedup.add(e.record.key);
+        isNew = this.dedup.add(`${provider}:${e.record.key}`);
         if (isNew) {
+          e = { ...e, record: { ...e.record, provider } };
           this.records.push(e.record);
-          insertSorted(this.sortedTs, e.record.timestamp);
         }
       }
       applySessionEvent(s, e, isNew);
@@ -109,7 +119,7 @@ export class Store {
   }
 
   markEnded(sessionId: string): void {
-    const s = this.sessions.get(sessionId);
+    const s = this.sessions.get(`claude:${sessionId}`);
     if (!s) return;
     s.live = false;
     s.endedAt = this.opts.now();
@@ -134,12 +144,13 @@ export class Store {
     this.markDirty();
   }
 
-  setLimits(l: LimitsState): void {
-    this.limits = sanitizeLimits(l);
+  setLimits(l: LimitsState, provider: Provider = 'claude'): void {
+    const state = this.provider(provider);
+    state.limits = sanitizeLimits(l);
     const now = this.opts.now();
-    const t = l.fetchedAt ?? now;
-    this.limitHistory.record('block', this.limits.block, t, now);
-    this.limitHistory.record('week', this.limits.weekly, t, now);
+    const t = l.observedAt ?? l.fetchedAt ?? now;
+    state.history.record('block', state.limits.block, state.limits.block?.observedAt ?? t, now);
+    state.history.record('week', state.limits.weekly, state.limits.weekly?.observedAt ?? t, now);
     this.markDirty();
   }
 
@@ -160,7 +171,8 @@ export class Store {
   }
 
   /** Applies live config changes; a new refreshMs restarts the flush interval. */
-  setOptions(patch: { refreshMs?: number; endedWindowHours?: number }): void {
+  setOptions(patch: { refreshMs?: number; endedWindowHours?: number; idleCutoffMinutes?: number }): void {
+    if (patch.idleCutoffMinutes !== undefined) this.opts.idleCutoffMinutes = patch.idleCutoffMinutes;
     if (patch.endedWindowHours !== undefined) this.opts.endedWindowHours = patch.endedWindowHours;
     if (patch.refreshMs !== undefined && patch.refreshMs !== this.opts.refreshMs) {
       this.opts.refreshMs = patch.refreshMs;
@@ -178,13 +190,14 @@ export class Store {
     this.markDirty();
   }
 
-  setScanProgress(p: ScanProgress): void {
-    this.scan = { ...p };
+  setScanProgress(p: ScanProgress, provider: Provider = 'claude'): void {
+    this.provider(provider).scan = { ...p };
     this.markDirty();
   }
 
   setClaudeDirFound(found: boolean): void {
     this.claudeDirFound = found;
+    this.provider('claude').found = found;
     this.markDirty();
   }
 
@@ -224,11 +237,12 @@ export class Store {
     }
   }
 
-  private session(sessionId: string): SessionState {
-    let s = this.sessions.get(sessionId);
+  private session(sessionId: string, provider: Provider = 'claude'): SessionState {
+    const key = `${provider}:${sessionId}`;
+    let s = this.sessions.get(key);
     if (!s) {
-      s = createSessionState(sessionId);
-      this.sessions.set(sessionId, s);
+      s = createSessionState(sessionId, provider);
+      this.sessions.set(key, s);
     }
     return s;
   }
@@ -241,21 +255,108 @@ export class Store {
     }, this.opts.refreshMs);
   }
 
-  private blockWindow(now: number): TimeWindow {
-    const resetsAt = this.limits.block?.resetsAt;
-    if (resetsAt !== undefined) return blockWindowFromLimit(resetsAt, now);
-    return deriveCurrentBlock(this.sortedTs, now) ?? { start: now, end: now };
+  private setProviderStateDefaults(provider: Provider, dir = '', found = false): void {
+    this.providerState.set(provider, {
+      dir,
+      found,
+      enabled: true,
+      limits: { status: 'loading', perModelWeekly: [] },
+      scan: { done: false, filesDone: 0, filesTotal: 0 },
+      history: new LimitHistory(),
+    });
   }
 
-  private weekWindow(now: number): TimeWindow {
-    const resetsAt = this.limits.weekly?.resetsAt;
-    return resetsAt !== undefined ? weekWindowFromLimit(resetsAt, now) : rollingWeekWindow(now);
+  private provider(provider: Provider) {
+    if (!this.providerState.has(provider)) this.setProviderStateDefaults(provider);
+    return this.providerState.get(provider)!;
   }
 
-  private burn(now: number): { block?: BurnProjection; week?: BurnProjection } {
-    const block = projectBurn(this.limits.block, this.limitHistory.samples('block'), now, 'block');
-    const week = projectBurn(this.limits.weekly, this.limitHistory.samples('week'), now, 'week');
-    return { ...(block ? { block } : {}), ...(week ? { week } : {}) };
+  setProviderDirectory(provider: Provider, dir: string, found: boolean): void {
+    Object.assign(this.provider(provider), { dir, found });
+    if (provider === 'claude') this.claudeDirFound = found;
+    this.markDirty();
+  }
+
+  setProviderEnabled(provider: Provider, enabled: boolean): void {
+    this.provider(provider).enabled = enabled;
+    this.markDirty();
+  }
+
+  /** Replace a normalized rollout after appended data changes provisional accounting. */
+  replaceProviderSession(sessionId: string, events: TranscriptEvent[], provider: Provider = 'codex'): void {
+    this.provider(provider);
+    const key = `${provider}:${sessionId}`;
+    this.sessions.delete(key);
+    for (let i = this.records.length - 1; i >= 0; i--) {
+      const record = this.records[i]!;
+      if ((record.provider ?? 'claude') === provider && record.sessionId === sessionId)
+        this.records.splice(i, 1);
+    }
+    this.dedup = new DedupSet();
+    for (const record of this.records) this.dedup.add(`${record.provider ?? 'claude'}:${record.key}`);
+    this.applyEvents(sessionId, events, provider);
+  }
+
+  private providerSnapshot(provider: Provider, now: number): ProviderSnapshot {
+    const state = this.provider(provider);
+    const records = this.records.filter((record) => (record.provider ?? 'claude') === provider);
+    const lookup = this.lookup ? (model: string) => this.lookup!(model, provider) : null;
+    const limitDuration = (limit: LimitsState['block']) =>
+      limit?.durationMs ?? (limit?.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);
+    const block = state.limits.block?.resetsAt;
+    const week = state.limits.weekly?.resetsAt;
+    const validCodexBlock =
+      provider !== 'codex' || (block !== undefined && (limitDuration(state.limits.block) ?? 0) > 0);
+    const blockWindow: TimeWindow =
+      block === undefined
+        ? (deriveCurrentBlock(
+            records.map((record) => record.timestamp).sort((a, b) => a - b),
+            now,
+          ) ?? { start: now, end: now })
+        : blockWindowFromLimit(block, now, limitDuration(state.limits.block));
+    const weekWindow =
+      week === undefined
+        ? rollingWeekWindow(now)
+        : weekWindowFromLimit(week, now, limitDuration(state.limits.weekly));
+    const canProject = (limit: LimitsState['block']) => {
+      if (provider === 'claude') return true;
+      const observedAt = limit?.observedAt ?? state.limits.observedAt;
+      return (
+        state.limits.status === 'ok' &&
+        limit?.resetsAt !== undefined &&
+        limit.resetsAt > now &&
+        (observedAt === undefined || now - observedAt <= 5 * 60_000)
+      );
+    };
+    const blockBurn = canProject(state.limits.block)
+      ? projectBurn(state.limits.block, state.history.samples('block'), now, 'block')
+      : undefined;
+    const weekBurn = canProject(state.limits.weekly)
+      ? projectBurn(state.limits.weekly, state.history.samples('week'), now, 'week')
+      : undefined;
+    return {
+      dir: sanitizeText(state.dir),
+      found: state.found,
+      enabled: state.enabled,
+      limits: state.limits,
+      costs: {
+        block: validCodexBlock
+          ? sanitizeWindowTotals(totalsForWindow(records, blockWindow, lookup))
+          : { ...emptyWindowTotals(), costUSD: null },
+        today: sanitizeWindowTotals(totalsForWindow(records, todayWindow(now), lookup)),
+        week: sanitizeWindowTotals(totalsForWindow(records, weekWindow, lookup)),
+        month: sanitizeWindowTotals(totalsForWindow(records, monthWindow(now), lookup)),
+        burnRatePerHour: burnRatePerHour(records, now, lookup),
+        hourlySparkline: hourlySparkline(records, now, lookup),
+      },
+      pricingStatus: this.pricingStatus,
+      unknownModels: unknownModelsIn(records, lookup).map(sanitizeText),
+      scan: state.scan,
+      burn: { ...(blockBurn ? { block: blockBurn } : {}), ...(weekBurn ? { week: weekBurn } : {}) },
+      accountingIncomplete: [...this.sessions.values()].some(
+        (session) => session.provider === provider && session.meta.accountingIncomplete,
+      ),
+    };
   }
 
   private compute(): Snapshot {
@@ -265,17 +366,27 @@ export class Store {
     const sessions: SessionView[] = [];
     const warnings: string[] = [];
     for (const s of this.sessions.values()) {
-      if (s.live) {
+      if (!this.provider(s.provider).enabled) continue;
+      if (s.live && s.provider === 'claude') {
         const v = sessionVersion(s);
         const warning = v && !isTestedVersion(v) ? `⚠ untested Claude Code v${sanitizeText(v)}` : null;
         if (warning && !warnings.includes(warning)) warnings.push(warning);
       }
       // endedWindowHours === 0 means "remove on exit": ended and history-only sessions are hidden.
+      const recentlyObserved =
+        s.provider === 'codex' &&
+        s.meta.observedStatus !== 'ended' &&
+        lastActivityOf(s) >= now - (this.opts.idleCutoffMinutes ?? 60) * 60_000;
       const visible =
         s.live ||
+        recentlyObserved ||
         (this.opts.endedWindowHours > 0 && (lastActivityOf(s) >= cutoff || (s.endedAt ?? 0) >= cutoff));
       if (!visible) continue;
       const view = buildSessionView(s, lookup);
+      view.recentlyObserved = recentlyObserved;
+      if (s.provider === 'codex' && !recentlyObserved) {
+        view.status = s.meta.observedStatus === 'ended' ? 'ended' : 'unknown';
+      }
       if (view.cwd) view.project = sanitizeText(this.projects.get(view.cwd) ?? basename(view.cwd));
       const proc = s.live && s.registry ? this.procStats.get(s.registry.pid) : undefined;
       if (proc) {
@@ -284,22 +395,20 @@ export class Store {
       }
       sessions.push(view);
     }
+    const providers: Partial<Record<Provider, ProviderSnapshot>> = {};
+    for (const provider of this.providerState.keys())
+      providers[provider] = this.providerSnapshot(provider, now);
+    const claude = providers.claude!;
     return {
+      providers,
       now,
       claudeDirFound: this.claudeDirFound,
-      claudeDir: sanitizeText(this.opts.claudeDir),
-      limits: this.limits,
-      costs: {
-        block: sanitizeWindowTotals(totalsForWindow(this.records, this.blockWindow(now), lookup)),
-        today: sanitizeWindowTotals(totalsForWindow(this.records, todayWindow(now), lookup)),
-        week: sanitizeWindowTotals(totalsForWindow(this.records, this.weekWindow(now), lookup)),
-        month: sanitizeWindowTotals(totalsForWindow(this.records, monthWindow(now), lookup)),
-        burnRatePerHour: burnRatePerHour(this.records, now, lookup),
-        hourlySparkline: hourlySparkline(this.records, now, lookup),
-      },
-      pricingStatus: this.pricingStatus,
-      unknownModels: unknownModelsIn(this.records, lookup).map(sanitizeText),
-      scan: this.scan,
+      claudeDir: claude.dir,
+      limits: claude.limits,
+      costs: claude.costs,
+      pricingStatus: claude.pricingStatus,
+      unknownModels: claude.unknownModels,
+      scan: claude.scan,
       sessions,
       warnings,
       ...(this.system ? { system: this.system } : {}),
@@ -308,7 +417,7 @@ export class Store {
         rx: [...this.sysHistory.rx],
         tx: [...this.sysHistory.tx],
       },
-      burn: this.burn(now),
+      burn: claude.burn,
     };
   }
 }
@@ -316,21 +425,4 @@ export class Store {
 function isTestedVersion(version: string): boolean {
   const [major, minor] = version.split('.');
   return `${major}.${minor}` === TESTED_MAJOR_MINOR;
-}
-
-/** Inserts `v` into ascending `arr`: O(1) append for in-order data, binary search otherwise. */
-function insertSorted(arr: number[], v: number): void {
-  const last = arr[arr.length - 1];
-  if (last === undefined || v >= last) {
-    arr.push(v);
-    return;
-  }
-  let lo = 0;
-  let hi = arr.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if ((arr[mid] ?? 0) <= v) lo = mid + 1;
-    else hi = mid;
-  }
-  arr.splice(lo, 0, v);
 }

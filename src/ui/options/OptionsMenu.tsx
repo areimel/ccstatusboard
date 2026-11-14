@@ -49,6 +49,14 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<Mode>('nav');
   const desc = OPTIONS[index]!;
+  const editorRows =
+    mode === 'columns' || mode === 'metrics'
+      ? Math.min(mode === 'columns' ? COLUMN_KEYS.length : SYSTEM_METRIC_KEYS.length, maxListRows)
+      : 0;
+  const optionCount =
+    maxHeight === undefined ? OPTIONS.length : Math.max(1, maxHeight - CHROME_ROWS - editorRows);
+  const start = Math.max(0, Math.min(index - optionCount + 1, OPTIONS.length - optionCount));
+  const shown = OPTIONS.slice(start, start + optionCount);
 
   useInput((input, key) => {
     if (mode !== 'nav') {
@@ -128,8 +136,8 @@ export function OptionsMenu({ config, width, maxHeight, onChange, onClose }: Opt
           : 'Enter confirm · Space toggle · Esc cancel'
       }
     >
-      {OPTIONS.map((o, i) => {
-        const selected = i === index;
+      {shown.map((o) => {
+        const selected = o.key === desc.key;
         const fg = selected ? theme.selectedFg : theme.text;
         const editing = selected && mode !== 'nav';
         return (

@@ -3,6 +3,8 @@ import type { ModelPrice, TokenCounts } from './types.js';
 /** USD cost of one usage record; null when the model has no known price. */
 export function recordCost(tokens: TokenCounts, price: ModelPrice | undefined): number | null {
   if (!price) return null;
+  if (tokens.cacheRead > 0 && price.cacheReadUnpriced) return null;
+  if ((tokens.cacheWrite5m > 0 || tokens.cacheWrite1h > 0) && price.cacheWriteUnpriced) return null;
   return (
     tokens.input * price.input +
     tokens.output * price.output +

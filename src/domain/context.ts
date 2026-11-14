@@ -1,11 +1,15 @@
-import type { ModelPrice } from './types.js';
+import type { ModelPrice, Provider } from './types.js';
 
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 const ONE_MILLION = 1_000_000;
 
-export function contextWindowFor(model: string | undefined, price: ModelPrice | undefined): number {
+export function contextWindowFor(
+  model: string | undefined,
+  price: ModelPrice | undefined,
+  provider: Provider = 'claude',
+): number | undefined {
   if (model?.endsWith('[1m]')) return ONE_MILLION;
-  return price?.maxInputTokens ?? DEFAULT_CONTEXT_WINDOW;
+  return price?.maxInputTokens ?? (provider === 'claude' ? DEFAULT_CONTEXT_WINDOW : undefined);
 }
 
 export function contextPercent(tokens: number, window: number): number {

@@ -84,7 +84,11 @@ describe('App height with value-less limit messages (sized stdout)', () => {
 describe('App root height backstop (sized stdout)', () => {
   it('clips unexpected overflow but keeps the footer visible', async () => {
     const size = { columns: 60, rows: 16 };
-    const snap = makeSnapshot({ claudeDirFound: false, claudeDir: `/${'very-long-dir/'.repeat(60)}` });
+    const snap = makeSnapshot({
+      claudeDirFound: false,
+      sessions: [],
+      claudeDir: `/${'very-long-dir/'.repeat(60)}`,
+    });
     const r = renderSized(
       <App store={fakeStore(snap)} config={DEFAULT_CONFIG} onQuit={vi.fn()} size={size} />,
       size,

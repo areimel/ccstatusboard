@@ -66,9 +66,10 @@ export function averageRate(
   start: number,
   now: number,
   kind: BurnWindowKind,
+  durationMs = WINDOW_MS[kind],
 ): number | undefined {
   const elapsed = now - start;
-  if (elapsed < MIN_AVERAGE_ELAPSED_MS[kind]) return undefined;
+  if (elapsed < MIN_AVERAGE_ELAPSED_MS[kind] * (durationMs / WINDOW_MS[kind])) return undefined;
   return pct / (elapsed / HOUR_MS);
 }
 
@@ -128,8 +129,9 @@ export function timeToLimit(
   now: number,
   start: number,
   kind: BurnWindowKind,
+  durationMs?: number,
 ): { hitAt: number; hitWindowPct: number } | undefined {
-  const duration = WINDOW_MS[kind];
+  const duration = durationMs ?? WINDOW_MS[kind];
   const toWindowPct = (t: number) => ((t - start) / duration) * 100;
   if (pct >= 100) return { hitAt: now, hitWindowPct: toWindowPct(now) };
   if (!(rate > 0)) return undefined;
@@ -146,9 +148,16 @@ export function projectBurn(
   kind: BurnWindowKind,
 ): BurnProjection | undefined {
   if (!limit || limit.resetsAt === undefined) return undefined;
-  const start = windowStart(limit.resetsAt, kind);
+  const duration =
+    limit.durationMs ??
+    (limit.windowMinutes === undefined ? WINDOW_MS[kind] : limit.windowMinutes * MINUTE_MS);
+  if (!(duration > 0) || !Number.isFinite(duration)) return undefined;
+  const start = limit.resetsAt - duration;
   const rate =
-    blendedRate(averageRate(limit.percent, start, now, kind), recentRate(samples, now, kind, start)) ?? 0;
+    blendedRate(
+      averageRate(limit.percent, start, now, kind, duration),
+      recentRate(samples, now, kind, start),
+    ) ?? 0;
   const remainingHours = Math.max(0, limit.resetsAt - now) / HOUR_MS;
   const projectedPct = limit.percent + rate * remainingHours;
   return {
@@ -156,7 +165,7 @@ export function projectBurn(
     ratePctPerHour: rate,
     projectedPct,
     band: classifyBand(projectedPct),
-    ...timeToLimit(limit.percent, rate, now, start, kind),
+    ...timeToLimit(limit.percent, rate, now, start, kind, duration),
   };
 }
 
@@ -165,8 +174,9 @@ export function trimSamples(
   samples: readonly LimitSample[],
   now: number,
   kind: BurnWindowKind,
+  durationMs = WINDOW_MS[kind],
 ): LimitSample[] {
-  const from = now - WINDOW_MS[kind];
+  const from = now - durationMs;
   const kept = samples.filter((s) => s.t >= from && s.t <= now);
   return kept.length > MAX_SAMPLES ? kept.slice(kept.length - MAX_SAMPLES) : kept;
 }

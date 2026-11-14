@@ -2,7 +2,8 @@ import type { JSX } from 'react';
 import { Box, Text } from 'ink';
 import { Sparkline } from '@pppp606/ink-chart';
 import { Spinner } from '@inkjs/ui';
-import type { Limit, LimitsState, Snapshot } from '../domain/types.js';
+import type { Limit, LimitsState, Provider } from '../domain/types.js';
+import type { UsageSnapshot } from './providerUsage.js';
 import { formatDuration, formatResetsAt, formatUSD } from '../domain/format.js';
 import { KeyValue } from './KeyValue.js';
 import { BURN_RATE_ROWS, BurnRate } from './BurnRate.js';
@@ -22,15 +23,19 @@ const STATUS_MESSAGE: Partial<Record<LimitsState['status'], string>> = {
   error: 'limits unavailable',
 };
 
-function meterRows(limits: LimitsState, now: number): MeterRow[] {
+function meterRows(limits: LimitsState, now: number, provider: Provider = 'claude'): MeterRow[] {
   const toRow = (l: Limit): MeterRow => ({
     label: l.label,
     percent: l.percent,
     ...(l.resetsAt === undefined ? {} : { suffix: formatResetsAt(l.resetsAt, now) }),
   });
+  if (provider === 'codex' && limits.windows?.length)
+    return limits.windows.map((limit) => ({ ...toRow(limit), label: limitLabel(limit), suffix: undefined }));
   const rows: MeterRow[] = [];
-  if (limits.block) rows.push(toRow({ ...limits.block, label: '5h' }));
-  if (limits.weekly) rows.push(toRow({ ...limits.weekly, label: 'Week' }));
+  if (limits.block)
+    rows.push(toRow({ ...limits.block, label: provider === 'claude' ? '5h' : limitLabel(limits.block) }));
+  if (limits.weekly)
+    rows.push(toRow({ ...limits.weekly, label: provider === 'claude' ? 'Week' : limitLabel(limits.weekly) }));
   for (const l of limits.perModelWeekly) rows.push(toRow(l));
   const extra = limits.extra;
   if (extra?.enabled) {
@@ -43,52 +48,116 @@ function meterRows(limits: LimitsState, now: number): MeterRow[] {
   return rows;
 }
 
+function limitLabel(limit: Limit): string {
+  const duration =
+    limit.durationMs ?? (limit.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);
+  return duration ? `${formatDuration(duration)} ${limit.label}` : limit.label;
+}
+
 const hasLimitValues = (limits: LimitsState): boolean =>
+  limits.block !== undefined || limits.weekly !== undefined || Boolean(limits.windows?.length);
+const hasBurnWindows = (limits: LimitsState): boolean =>
   limits.block !== undefined || limits.weekly !== undefined;
+const separateAge = (limits: LimitsState, provider: Provider): boolean =>
+  provider === 'codex' ? !limits.windows?.length : isLimitsStale(limits);
 const isLimitsStale = (limits: LimitsState): boolean =>
   limits.status === 'stale' || limits.status === 'error' || limits.status === 'expired';
 
 /** Month cost as a multiple of the subscription price; undefined when not computable. */
-function planRatio(snapshot: Snapshot, subscriptionUSD: number | null | undefined): number | undefined {
+function planRatio(snapshot: UsageSnapshot, subscriptionUSD: number | null | undefined): number | undefined {
   const month = snapshot.costs.month.costUSD;
-  if (subscriptionUSD == null || subscriptionUSD <= 0 || month === null) return undefined;
+  if (
+    subscriptionUSD == null ||
+    subscriptionUSD <= 0 ||
+    month === null ||
+    snapshot.accountingIncomplete ||
+    snapshot.costs.month.costIncomplete
+  )
+    return undefined;
   return month / subscriptionUSD;
 }
 
 /** Exact rendered height of <UsagePanel>: 2 border rows + the taller of its two columns. */
-export function usagePanelRows(snapshot: Snapshot, subscriptionUSD?: number | null): number {
+export function usagePanelRows(
+  snapshot: UsageSnapshot,
+  subscriptionUSD?: number | null,
+  provider: Provider = 'claude',
+): number {
   const { limits, scan } = snapshot;
   const limitLines = hasLimitValues(limits)
-    ? meterRows(limits, snapshot.now).length + (isLimitsStale(limits) ? 1 : 0)
+    ? meterRows(limits, snapshot.now, provider).length *
+        (provider === 'codex' && limits.windows?.length ? 2 : 1) +
+      (separateAge(limits, provider) ? 1 : 0)
     : 1;
-  const left = limitLines + (hasLimitValues(limits) ? BURN_RATE_ROWS : 0) + 1; // + burn/sparkline row
+  const left =
+    limitLines +
+    (!snapshot.hideBurn && hasBurnWindows(limits) ? BURN_RATE_ROWS : 0) +
+    1 +
+    (snapshot.hiddenLimitCount ? 1 : 0); // + burn/sparkline row
   const right = 4 + (planRatio(snapshot, subscriptionUSD) === undefined ? 0 : 1) + (scan.done ? 0 : 1);
   return 2 + Math.max(left, right);
 }
 
-function LimitsBlock({ limits, now, leftWidth }: { limits: LimitsState; now: number; leftWidth: number }) {
+function LimitsBlock({
+  limits,
+  now,
+  leftWidth,
+  provider,
+}: {
+  limits: LimitsState;
+  now: number;
+  leftWidth: number;
+  provider: Provider;
+}) {
   const theme = useTheme();
   const hasValues = hasLimitValues(limits);
-  const message = STATUS_MESSAGE[limits.status];
+  const message =
+    provider === 'codex'
+      ? limits.status === 'loading'
+        ? 'loading…'
+        : limits.status === 'disabled'
+          ? 'disabled'
+          : 'limits unavailable'
+      : STATUS_MESSAGE[limits.status];
   if (!hasValues) {
     return (
       <Text wrap="truncate-end">
         <Text color={theme.accent} bold>
-          5h / Week{' '}
+          {provider === 'codex' ? 'Limits ' : '5h / Week '}
         </Text>
         <Text color={limits.status === 'disabled' ? theme.dim : theme.warn}>{message ?? 'no data'}</Text>
       </Text>
     );
   }
-  const rows = meterRows(limits, now);
-  const isStale = isLimitsStale(limits);
+  const rows = meterRows(limits, now, provider);
+  const isStale =
+    isLimitsStale(limits) ||
+    (provider === 'codex' && (limits.fetchedAt === undefined || now - limits.fetchedAt > 300_000));
   return (
     <Box flexDirection="column">
-      <MeterStack rows={rows} leftWidth={leftWidth} />
-      {isStale ? (
+      {provider === 'codex' && limits.windows?.length ? (
+        limits.windows.map((limit, index) => {
+          const observedAt = limit.observedAt ?? limits.observedAt ?? limits.fetchedAt;
+          const stale = observedAt === undefined || now - observedAt > 300_000;
+          return (
+            <Box key={limit.id ?? `${limit.label}:${index}`} flexDirection="column">
+              <MeterStack rows={[rows[index]!]} leftWidth={leftWidth} />
+              <Text color={stale ? theme.warn : theme.dim} wrap="truncate-end">
+                {stale ? 'stale' : 'observed'}{' '}
+                {observedAt === undefined ? 'unknown' : formatDuration(now - observedAt)}
+                {limit.resetsAt === undefined ? '' : ` · ${formatResetsAt(limit.resetsAt, now)}`}
+              </Text>
+            </Box>
+          );
+        })
+      ) : (
+        <MeterStack rows={rows} leftWidth={leftWidth} />
+      )}
+      {separateAge(limits, provider) ? (
         <Text color={theme.dim} wrap="truncate-end">
-          stale {limits.fetchedAt === undefined ? '?' : formatDuration(now - limits.fetchedAt)}
-          {limits.status === 'expired' ? ` · ${STATUS_MESSAGE.expired}` : ''}
+          {isStale ? 'stale' : 'observed'}{' '}
+          {limits.fetchedAt === undefined ? '?' : formatDuration(now - limits.fetchedAt)}
+          {provider === 'claude' && limits.status === 'expired' ? ` · ${STATUS_MESSAGE.expired}` : ''}
         </Text>
       ) : null}
     </Box>
@@ -99,22 +168,27 @@ function CostColumn({
   snapshot,
   subscriptionUSD,
 }: {
-  snapshot: Snapshot;
+  snapshot: UsageSnapshot;
   subscriptionUSD: number | null | undefined;
 }) {
   const theme = useTheme();
   const ratio = planRatio(snapshot, subscriptionUSD);
   const { costs, scan } = snapshot;
-  const rows: Array<[string, number | null]> = [
-    ['block', costs.block.costUSD],
-    ['week', costs.week.costUSD],
-    ['today', costs.today.costUSD],
-    ['month', costs.month.costUSD],
+  const rows: Array<[string, number | null, boolean | undefined]> = [
+    ['block', costs.block.costUSD, costs.block.costIncomplete],
+    ['week', costs.week.costUSD, costs.week.costIncomplete],
+    ['today', costs.today.costUSD, costs.today.costIncomplete],
+    ['month', costs.month.costUSD, costs.month.costIncomplete],
   ];
   return (
     <Box flexDirection="column" width={RIGHT_WIDTH}>
-      {rows.map(([label, v]) => (
-        <KeyValue key={label} label={label} value={formatUSD(v)} labelWidth={COST_LABEL_WIDTH} />
+      {rows.map(([label, v, incomplete]) => (
+        <KeyValue
+          key={label}
+          label={label}
+          value={`${formatUSD(v)}${(snapshot.accountingIncomplete || incomplete) && v !== null ? '*' : ''}`}
+          labelWidth={COST_LABEL_WIDTH}
+        />
       ))}
       {ratio === undefined ? null : (
         <KeyValue
@@ -133,10 +207,12 @@ export function UsagePanel({
   snapshot,
   width,
   subscriptionUSD,
+  provider = 'claude',
 }: {
-  snapshot: Snapshot;
+  snapshot: UsageSnapshot;
   width: number;
   subscriptionUSD?: number | null;
+  provider?: Provider;
 }): JSX.Element {
   const theme = useTheme();
   const { leftWidth } = splitColumns(width, RIGHT_WIDTH);
@@ -144,12 +220,47 @@ export function UsagePanel({
   const burnText = burn === null ? 'burn —' : `burn ${formatUSD(burn)}/h`;
   const sparkWidth = Math.max(8, Math.min(48, leftWidth - burnText.length - 8));
   return (
-    <Panel title="Usage" width={width}>
+    <Panel
+      title={`Usage · ${provider === 'codex' ? 'Codex' : 'Claude'} · estimated USD${snapshot.accountingIncomplete || Object.values(snapshot.costs).some((v) => typeof v === 'object' && v !== null && 'costIncomplete' in v && v.costIncomplete) ? ' · partial*' : ''}`}
+      width={width}
+    >
       <Box flexDirection="row" columnGap={2}>
         <Box flexDirection="column" width={leftWidth}>
-          <LimitsBlock limits={snapshot.limits} now={snapshot.now} leftWidth={leftWidth} />
-          {hasLimitValues(snapshot.limits) ? (
-            <BurnRate burn={snapshot.burn} now={snapshot.now} width={leftWidth} />
+          <LimitsBlock
+            limits={snapshot.limits}
+            now={snapshot.now}
+            leftWidth={leftWidth}
+            provider={provider}
+          />
+          {!snapshot.hideBurn && hasBurnWindows(snapshot.limits) ? (
+            <BurnRate
+              burn={snapshot.burn}
+              now={snapshot.now}
+              width={leftWidth}
+              labels={
+                provider === 'codex'
+                  ? {
+                      block: snapshot.limits.block
+                        ? formatDuration(
+                            snapshot.limits.block.durationMs ??
+                              (snapshot.limits.block.windowMinutes ?? 0) * 60_000,
+                          )
+                        : '—',
+                      week: snapshot.limits.weekly
+                        ? formatDuration(
+                            snapshot.limits.weekly.durationMs ??
+                              (snapshot.limits.weekly.windowMinutes ?? 0) * 60_000,
+                          )
+                        : '—',
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
+          {snapshot.hiddenLimitCount ? (
+            <Text wrap="truncate-end">
+              +{snapshot.hiddenLimitCount} more quota windows · enlarge terminal
+            </Text>
           ) : null}
           <Box columnGap={1}>
             <Text color={theme.text}>{burnText}</Text>

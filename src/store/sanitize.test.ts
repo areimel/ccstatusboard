@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { ZERO_TOKENS } from '../domain/types.js';
 import { makeFullSystemStats, makeSystemStats } from '../../test/helpers/system.js';
-import { sanitizeSystem, sanitizeText } from './sanitize.js';
+import { sanitizeKeys, sanitizeLimits, sanitizeSystem, sanitizeText } from './sanitize.js';
 
 describe('sanitizeText', () => {
   it('strips ESC from SGR sequences', () => {
@@ -95,5 +96,30 @@ describe('sanitizeSystem extra metrics', () => {
     ] as const) {
       expect(s[k]).toBeUndefined();
     }
+  });
+});
+
+describe('untrusted monitoring identifiers', () => {
+  it('retains model names matching prototype properties and merges sanitized collisions', () => {
+    const byModel = Object.fromEntries([
+      ['__proto__', { costUSD: 1, tokens: { ...ZERO_TOKENS, input: 2 } }],
+      ['__proto__\x00', { costUSD: 2, tokens: { ...ZERO_TOKENS, input: 3 } }],
+      ['constructor', { costUSD: 4, tokens: { ...ZERO_TOKENS, input: 5 } }],
+    ]);
+    const sanitized = sanitizeKeys(byModel);
+    expect(Object.getPrototypeOf(sanitized)).toBeNull();
+    expect(sanitized['__proto__']).toMatchObject({ costUSD: 3, tokens: { input: 5 } });
+    expect(sanitized['constructor']).toMatchObject({ costUSD: 4, tokens: { input: 5 } });
+    expect(Object.keys(sanitized)).toEqual(['__proto__', 'constructor']);
+  });
+
+  it('strips terminal controls from arbitrary provider quota bucket labels', () => {
+    const limits = sanitizeLimits({
+      status: 'ok',
+      source: 'observed',
+      perModelWeekly: [],
+      windows: [{ id: '__proto__:primary', label: 'bucket\x1b]0;title\x07\n300m', percent: 20 }],
+    });
+    expect(limits.windows?.[0]).toMatchObject({ label: 'bucket]0;title300m', percent: 20 });
   });
 });

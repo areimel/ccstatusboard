@@ -8,7 +8,8 @@ const KEYS: Array<[string, string]> = [
   ['⏎', 'Toggle detail pane'],
   ['g / G', 'Top / bottom'],
   ['s', 'Cycle sort (project → status → … → name)'],
-  ['f', 'Toggle filter (all / live)'],
+  ['f', 'Toggle filter (all / live or recent)'],
+  ['p / P', 'Session provider / usage provider'],
   ['/', 'Search by name or cwd (Esc clears)'],
   ['Esc', 'Options (outside search)'],
   ['? / F1', 'Toggle this help'],
@@ -18,7 +19,11 @@ const KEYS: Array<[string, string]> = [
 
 const LEGEND = ['● waiting', '◐ busy', '○ idle', '· ended'];
 
-const NOTES = ['Dimmed rows are idle past the cutoff.', 'j/k skip group headers and subagent rows.'];
+const NOTES = [
+  'Dimmed rows are idle past the cutoff.',
+  'j/k skip group headers and subagent rows.',
+  'C = Claude · X = Codex · ? = unknown status.',
+];
 
 /** `width` defaults to 64; App passes `Math.min(64, columns)` so the border fits narrow terminals. */
 export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
