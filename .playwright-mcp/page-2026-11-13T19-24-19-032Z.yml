@@ -1,0 +1,245 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "AI Hub home" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: AI HUB.
+        - generic [ref=e8]: ALEC REIMELWORKING FILES
+      - generic [ref=e9]:
+        - button "Switch to light theme" [ref=e10] [cursor=pointer]
+        - button "Open navigation" [ref=e17] [cursor=pointer]
+  - main [ref=e19]:
+    - generic [ref=e21]:
+      - paragraph [ref=e23]: Alec Reimel / AI working files
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "Working tools. Yours to copy." [level=1] [ref=e26]:
+            - text: Working tools.
+            - generic [ref=e27]: Yours to copy.
+          - paragraph [ref=e28]: "A small collection of AI prompts, custom agents and skills, kept in one place. Copy what is useful: fill in the blanks on prompt templates and paste them into your AI tool, or save agent and skill files into a Claude Code project."
+          - generic [ref=e29]:
+            - link "Browse prompts" [ref=e30] [cursor=pointer]:
+              - /url: /prompts
+            - link "See custom agents" [ref=e31] [cursor=pointer]:
+              - /url: /custom-agents
+        - img [aria-hidden] [ref=e33]:
+          - generic [ref=e38]:
+            - generic [ref=e39]: AI HUB / PROMPT RESEARCH BUREAU
+            - generic [ref=e40]: AI HUB
+            - generic [ref=e41]: INDEX
+            - generic [ref=e42]: 0000000025 / 75%
+          - generic [ref=e222]:
+            - generic [ref=e223]: FIG. 01 / RADAR TELEMETRY
+            - generic [ref=e224]: SCAN 360° / SYSTEM ACTIVE
+          - generic [ref=e225]: AI HUB
+          - generic [ref=e295]:
+            - generic [ref=e296]: PROMPT + AGENT + SKILL
+            - generic [ref=e297]: ALEC REIMEL
+    - generic [ref=e304]:
+      - link "Prompts Prompts for coding, writing, analysis and more. Filter by category or AI tool." [ref=e305] [cursor=pointer]:
+        - /url: /prompts
+        - img [aria-hidden] [ref=e307]:
+          - generic [ref=e312]:
+            - generic [ref=e313]: AI HUB / PROMPT RESEARCH BUREAU
+            - generic [ref=e314]: PROMPTS
+            - generic [ref=e315]: PROMPTS
+            - generic [ref=e316]: 0000000007 / 75%
+          - generic [ref=e496]:
+            - generic [ref=e497]: FIG. 01 / RADAR TELEMETRY
+            - generic [ref=e498]: SCAN 360° / SYSTEM ACTIVE
+          - generic [ref=e499]: PROMPTS
+          - generic [ref=e569]:
+            - generic [ref=e570]: WORKING FILES
+            - generic [ref=e571]: ALEC REIMEL
+        - generic [ref=e576]:
+          - generic [ref=e577]: Prompts
+          - generic [ref=e578]: Prompts for coding, writing, analysis and more. Filter by category or AI tool.
+      - link "Custom Agents Subagent files for Claude Code. Save one into your project's .claude/agents folder and ask for it by name." [ref=e579] [cursor=pointer]:
+        - /url: /custom-agents
+        - img [aria-hidden] [ref=e581]:
+          - generic [ref=e586]:
+            - generic [ref=e587]: AI HUB / PROMPT RESEARCH BUREAU
+            - generic [ref=e588]: CUSTOM AGENTS
+            - generic [ref=e589]: AGENTS
+            - generic [ref=e590]: 0000000011 / 75%
+          - generic [ref=e692]:
+            - generic [ref=e693]: FIG. 01 / GRID TELEMETRY
+            - generic [ref=e694]: SCAN 360° / SYSTEM ACTIVE
+          - generic [ref=e695]: AGENTS
+          - generic [ref=e765]:
+            - generic [ref=e766]: WORKING FILES
+            - generic [ref=e767]: ALEC REIMEL
+        - generic [ref=e772]:
+          - generic [ref=e773]: Custom Agents
+          - generic [ref=e774]: Subagent files for Claude Code. Save one into your project's .claude/agents folder and ask for it by name.
+      - link "Skills & Plugins Skills and plugins for Claude Code. Save a skill into .claude/skills, or assemble a plugin folder by hand." [ref=e775] [cursor=pointer]:
+        - /url: /skills-plugins
+        - img [aria-hidden] [ref=e777]:
+          - generic [ref=e782]:
+            - generic [ref=e783]: AI HUB / PROMPT RESEARCH BUREAU
+            - generic [ref=e784]: SKILLS & PLUGINS
+            - generic [ref=e785]: SKILLS
+            - generic [ref=e786]: 0000000013 / 75%
+          - generic [ref=e798]:
+            - generic [ref=e799]: FIG. 01 / WAVE TELEMETRY
+            - generic [ref=e800]: SCAN 360° / SYSTEM ACTIVE
+          - generic [ref=e801]: SKILLS
+          - generic [ref=e871]:
+            - generic [ref=e872]: WORKING FILES
+            - generic [ref=e873]: ALEC REIMEL
+        - generic [ref=e878]:
+          - generic [ref=e879]: Skills & Plugins
+          - generic [ref=e880]: Skills and plugins for Claude Code. Save a skill into .claude/skills, or assemble a plugin folder by hand.
+    - generic [ref=e882]:
+      - paragraph [ref=e883]: Latest
+      - heading "Recently added" [level=2] [ref=e884]
+      - list [ref=e885]:
+        - listitem [ref=e886]:
+          - link "Nov 13, 2026 Coding Checkpoint Commits" [ref=e887] [cursor=pointer]:
+            - /url: /prompts/checkpoint-commits
+            - time [ref=e888]: Nov 13, 2026
+            - generic [ref=e889]: Coding
+            - generic [ref=e890]: Checkpoint Commits
+        - listitem [ref=e891]:
+          - link "Nov 13, 2026 Coding DRY Coding Principles" [ref=e892] [cursor=pointer]:
+            - /url: /prompts/dry-coding-principles
+            - time [ref=e893]: Nov 13, 2026
+            - generic [ref=e894]: Coding
+            - generic [ref=e895]: DRY Coding Principles
+        - listitem [ref=e896]:
+          - link "Nov 13, 2026 Coding Git Worktree Workflow" [ref=e897] [cursor=pointer]:
+            - /url: /prompts/git-worktree-workflow
+            - time [ref=e898]: Nov 13, 2026
+            - generic [ref=e899]: Coding
+            - generic [ref=e900]: Git Worktree Workflow
+        - listitem [ref=e901]:
+          - link "Nov 13, 2026 Coding Issue Report Table" [ref=e902] [cursor=pointer]:
+            - /url: /prompts/issue-report-table
+            - time [ref=e903]: Nov 13, 2026
+            - generic [ref=e904]: Coding
+            - generic [ref=e905]: Issue Report Table
+        - listitem [ref=e906]:
+          - 'link "Nov 13, 2026 Coding Parallel Dev: 15-Agent Opus-Led Teams" [ref=e907] [cursor=pointer]':
+            - /url: /prompts/parallel-agent-teams
+            - time [ref=e908]: Nov 13, 2026
+            - generic [ref=e909]: Coding
+            - generic [ref=e910]: "Parallel Dev: 15-Agent Opus-Led Teams"
+        - listitem [ref=e911]:
+          - 'link "Nov 13, 2026 Coding Parallel Dev: 5 Haiku Subagents" [ref=e912] [cursor=pointer]':
+            - /url: /prompts/parallel-haiku-subagents
+            - time [ref=e913]: Nov 13, 2026
+            - generic [ref=e914]: Coding
+            - generic [ref=e915]: "Parallel Dev: 5 Haiku Subagents"
+    - generic [ref=e917]:
+      - paragraph [ref=e918]: How it works
+      - heading "Find it, fill it in, copy it." [level=2] [ref=e919]
+      - list [ref=e920]:
+        - listitem [ref=e921]:
+          - generic [ref=e922]: Step 01
+          - heading "Find" [level=3] [ref=e923]
+          - paragraph [ref=e924]: Browse by category or search by keyword. Prompts can also be filtered by AI tool.
+        - listitem [ref=e925]:
+          - generic [ref=e926]: Step 02
+          - heading "Fill in" [level=3] [ref=e927]
+          - paragraph [ref=e928]: Some prompts are templates with blanks. Type your details in and the prompt updates as you go. Agents and skills have no blanks, but you can edit their files.
+        - listitem [ref=e929]:
+          - generic [ref=e930]: Step 03
+          - heading "Copy" [level=3] [ref=e931]
+          - paragraph [ref=e932]: Press copy. Paste a prompt into ChatGPT, Claude, Gemini or whichever tool you use, or paste an agent or skill into the file its page names.
+    - generic [ref=e935]:
+      - img [aria-hidden] [ref=e937]:
+        - generic [ref=e942]:
+          - generic [ref=e943]: AI HUB / PROMPT RESEARCH BUREAU
+          - generic [ref=e944]: ABOUT
+          - generic [ref=e945]: ABOUT
+          - generic [ref=e946]: 0000000003 / 75%
+        - generic [ref=e958]:
+          - generic [ref=e959]: FIG. 01 / WAVE TELEMETRY
+          - generic [ref=e960]: SCAN 360° / SYSTEM ACTIVE
+        - generic [ref=e961]: ALEC
+        - generic [ref=e1031]:
+          - generic [ref=e1032]: ALEC REIMEL
+          - generic [ref=e1033]: AI HUB
+      - generic [ref=e1038]:
+        - paragraph [ref=e1039]: About
+        - heading "Hi, I'm Alec." [level=2] [ref=e1040]
+        - paragraph [ref=e1041]: I made AI Hub to keep my prompts, custom agents and skills in one place and to share them. It is a personal project, so the collection is small and changes when I add to it.
+        - paragraph [ref=e1042]: If you have a prompt that works well, you can send it in.
+        - link "Submit a prompt" [ref=e1043] [cursor=pointer]:
+          - /url: /submit-prompt
+    - generic [ref=e1046]:
+      - generic [ref=e1047]:
+        - paragraph [ref=e1048]: FAQ
+        - heading "Questions" [level=2] [ref=e1049]
+        - generic [ref=e1051]:
+          - heading [level=3] [ref=e1053]:
+            - button "What is this?" [ref=e1054] [cursor=pointer]
+          - heading [level=3] [ref=e1056]:
+            - button "How do I use a prompt?" [ref=e1057] [cursor=pointer]
+          - heading [level=3] [ref=e1059]:
+            - button "Are the prompts free to use?" [ref=e1060] [cursor=pointer]
+          - heading [level=3] [ref=e1062]:
+            - button "Which AI tools do the prompts work with?" [ref=e1063] [cursor=pointer]
+          - heading [level=3] [ref=e1065]:
+            - button "What do agents and skills work with?" [ref=e1066] [cursor=pointer]
+          - heading [level=3] [ref=e1068]:
+            - button "Can I contribute a prompt?" [ref=e1069] [cursor=pointer]
+          - heading [level=3] [ref=e1071]:
+            - button "Can I ask for a prompt?" [ref=e1072] [cursor=pointer]
+          - heading [level=3] [ref=e1074]:
+            - button "Can I run my own copy of this site?" [ref=e1075] [cursor=pointer]
+      - generic [ref=e1076]:
+        - paragraph [ref=e1077]: Contact
+        - heading "Get in touch" [level=2] [ref=e1078]
+        - paragraph [ref=e1079]: A question, feedback or a prompt request. I will reply when I can.
+        - generic [ref=e1080]:
+          - generic [ref=e1081]:
+            - generic [ref=e1082]: Full name
+            - textbox "Full name" [ref=e1083]
+            - text: "Error:"
+          - generic [ref=e1084]:
+            - generic [ref=e1085]: Email address
+            - textbox "Email address" [ref=e1086]
+            - text: "Error:"
+          - generic [ref=e1087]:
+            - generic [ref=e1088]: Message
+            - textbox "Message" [ref=e1089]
+            - text: "Error:"
+          - button "Send message" [ref=e1090] [cursor=pointer]
+          - status [ref=e1091]
+  - contentinfo [ref=e1092]:
+    - generic [ref=e1093]:
+      - generic [ref=e1094]:
+        - generic [ref=e1095]:
+          - paragraph [ref=e1096]: Alec Reimel / Working files
+          - paragraph [ref=e1097]: A personal collection of AI prompts, custom agents and skills. Copy what is useful.
+        - navigation "Footer" [ref=e1098]:
+          - link "Prompts" [ref=e1099] [cursor=pointer]:
+            - /url: /prompts
+          - link "Custom Agents" [ref=e1103] [cursor=pointer]:
+            - /url: /custom-agents
+          - link "Skills & Plugins" [ref=e1107] [cursor=pointer]:
+            - /url: /skills-plugins
+      - navigation "More" [ref=e1111]:
+        - link "DIY Prompt Library" [ref=e1112] [cursor=pointer]:
+          - /url: /diy-prompt-library
+        - link "Submit a prompt" [ref=e1113] [cursor=pointer]:
+          - /url: /submit-prompt
+        - link "Alec's website" [ref=e1114] [cursor=pointer]:
+          - /url: https://alecreimel.com/
+        - link "GitHub repo" [ref=e1115] [cursor=pointer]:
+          - /url: https://github.com/areimel/alec-ai-hub
+        - link "Privacy" [ref=e1116] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms" [ref=e1117] [cursor=pointer]:
+          - /url: /terms
+        - link "CCPA" [ref=e1118] [cursor=pointer]:
+          - /url: /ccpa
+      - link "AI Hub home" [ref=e1119] [cursor=pointer]:
+        - /url: /
+        - text: AI HUB.
+      - generic [ref=e1120]:
+        - generic [ref=e1121]: © 2026 Alec Reimel
+        - generic [ref=e1122]: Prompts, agents and skills, free to copy
