@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } from '../domain/aggregate.js';
+import { type ProviderAggregates } from '../domain/aggregate.js';
 import { DedupSet } from '../domain/dedup.js';
 import { projectBurn } from '../domain/burn-rate-formula.js';
 import {
@@ -19,17 +19,16 @@ import {
   type SystemStats,
   type TimeWindow,
   type TranscriptEvent,
-  type UsageRecord,
 } from '../domain/types.js';
 import {
   blockWindowFromLimit,
-  deriveCurrentBlock,
   monthWindow,
   RETENTION_MS,
   rollingWeekWindow,
   todayWindow,
   weekWindowFromLimit,
 } from '../domain/windows.js';
+import { ProviderRecords } from './providerRecords.js';
 import { LimitHistory } from './limitHistory.js';
 import { nonNeg, sanitizeLimits, sanitizeSystem, sanitizeText, sanitizeWindowTotals } from './sanitize.js';
 import {
@@ -59,11 +58,23 @@ function pushCapped(arr: number[], v: number): void {
   if (arr.length > SYSTEM_HISTORY_POINTS) arr.splice(0, arr.length - SYSTEM_HISTORY_POINTS);
 }
 
+interface AggCache {
+  version: number;
+  lookup: PriceLookup | null;
+  minute: number;
+  blockStart: number;
+  weekStart: number;
+  todayStart: number;
+  monthStart: number;
+  agg: ProviderAggregates;
+}
+
 export class Store {
   private readonly sessions = new Map<string, SessionState>();
   private readonly dedup = new DedupSet();
   /** Usage records partitioned per provider. */
-  private readonly records = new Map<Provider, UsageRecord[]>();
+  private readonly records = new Map<Provider, ProviderRecords>();
+  private readonly aggCache = new Map<Provider, AggCache>();
   private lastPruneAt: number;
   private readonly providerState = new Map<
     Provider,
@@ -111,7 +122,7 @@ export class Store {
         isNew = this.dedup.add(`${provider}:${e.record.key}`);
         if (isNew) {
           e = { ...e, record: { ...e.record, provider } };
-          this.recordsOf(provider).push(e.record);
+          this.recordsOf(provider).add(e.record);
         }
       }
       applySessionEvent(s, e, isNew);
@@ -246,10 +257,10 @@ export class Store {
     }
   }
 
-  private recordsOf(provider: Provider): UsageRecord[] {
-    let list = this.records.get(provider);
-    if (!list) this.records.set(provider, (list = []));
-    return list;
+  private recordsOf(provider: Provider): ProviderRecords {
+    let p = this.records.get(provider);
+    if (!p) this.records.set(provider, (p = new ProviderRecords()));
+    return p;
   }
 
   /** At most once an hour: drops records past retention (and their dedup keys) and evicts stale sessions. */
@@ -258,20 +269,14 @@ export class Store {
     if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
     this.lastPruneAt = now;
     const horizon = now - RETENTION_MS;
-    for (const [provider, list] of this.records) {
-      let w = 0;
-      for (const r of list) {
-        if (r.timestamp < horizon) this.dedup.delete(`${provider}:${r.key}`);
-        else list[w++] = r;
-      }
-      list.length = w;
-    }
+    for (const [provider, p] of this.records)
+      for (const r of p.prune(horizon)) this.dedup.delete(`${provider}:${r.key}`);
     const sessionHorizon = now - Math.max(RETENTION_MS, this.opts.endedWindowHours * 3_600_000);
     for (const [key, s] of this.sessions) {
       if (!s.live && lastActivityOf(s) < sessionHorizon && (s.endedAt ?? 0) < sessionHorizon)
         this.sessions.delete(key);
-      else if (s.records.some((r) => r.timestamp < horizon))
-        s.records = s.records.filter((r) => r.timestamp >= horizon);
+      else if (s.owned.some((r) => r.timestamp < horizon))
+        s.owned = s.owned.filter((r) => r.timestamp >= horizon);
     }
   }
 
@@ -327,19 +332,46 @@ export class Store {
     const old = this.sessions.get(key);
     this.sessions.delete(key);
     if (old) {
-      for (const r of old.records) this.dedup.delete(`${provider}:${r.key}`);
-      const gone = new Set(old.records);
-      const list = this.recordsOf(provider);
-      let w = 0;
-      for (const r of list) if (!gone.has(r)) list[w++] = r;
-      list.length = w;
+      for (const r of old.owned) this.dedup.delete(`${provider}:${r.key}`);
+      const gone = new Set(old.owned);
+      this.recordsOf(provider).remove(gone);
     }
     this.applyEvents(sessionId, events, provider);
   }
 
+  private derivedBlock(provider: Provider, now: number): TimeWindow | null {
+    const start = this.recordsOf(provider).derivedBlockStart(now);
+    return start === null ? null : { start, end: now };
+  }
+
+  /** One-pass aggregates, cached while records, pricing and window starts are unchanged within the same minute. */
+  private aggregates(
+    provider: Provider,
+    now: number,
+    lookup: ((model: string) => ReturnType<PriceLookup>) | null,
+    windows: { block: TimeWindow; today: TimeWindow; week: TimeWindow; month: TimeWindow },
+    blockFloating: boolean,
+    weekFloating: boolean,
+  ): ProviderAggregates {
+    const version = this.recordsOf(provider).version;
+    const key = {
+      version,
+      lookup: this.lookup,
+      minute: Math.floor(now / 60_000),
+      blockStart: blockFloating ? -1 : windows.block.start,
+      weekStart: weekFloating ? -1 : windows.week.start,
+      todayStart: windows.today.start,
+      monthStart: windows.month.start,
+    };
+    const c = this.aggCache.get(provider);
+    if (c && (Object.keys(key) as (keyof typeof key)[]).every((k) => c[k] === key[k])) return c.agg;
+    const agg = this.recordsOf(provider).aggregates(provider, windows, now, lookup);
+    this.aggCache.set(provider, { ...key, agg });
+    return agg;
+  }
+
   private providerSnapshot(provider: Provider, now: number): ProviderSnapshot {
     const state = this.provider(provider);
-    const records = this.records.get(provider) ?? [];
     const lookup = this.lookup ? (model: string) => this.lookup!(model, provider) : null;
     const limitDuration = (limit: LimitsState['block']) =>
       limit?.durationMs ?? (limit?.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);
@@ -349,10 +381,7 @@ export class Store {
       provider !== 'codex' || (block !== undefined && (limitDuration(state.limits.block) ?? 0) > 0);
     const blockWindow: TimeWindow =
       block === undefined
-        ? (deriveCurrentBlock(
-            records.map((record) => record.timestamp).sort((a, b) => a - b),
-            now,
-          ) ?? { start: now, end: now })
+        ? (this.derivedBlock(provider, now) ?? { start: now, end: now })
         : blockWindowFromLimit(block, now, limitDuration(state.limits.block));
     const weekWindow =
       week === undefined
@@ -374,23 +403,34 @@ export class Store {
     const weekBurn = canProject(state.limits.weekly)
       ? projectBurn(state.limits.weekly, state.history.samples('week'), now, 'week')
       : undefined;
+    const agg = this.aggregates(
+      provider,
+      now,
+      lookup,
+      {
+        block: blockWindow,
+        today: todayWindow(now),
+        week: weekWindow,
+        month: monthWindow(now),
+      },
+      block === undefined && blockWindow.start === now,
+      week === undefined,
+    );
     return {
       dir: sanitizeText(state.dir),
       found: state.found,
       enabled: state.enabled,
       limits: state.limits,
       costs: {
-        block: validCodexBlock
-          ? sanitizeWindowTotals(totalsForWindow(records, blockWindow, lookup))
-          : { ...emptyWindowTotals(), costUSD: null },
-        today: sanitizeWindowTotals(totalsForWindow(records, todayWindow(now), lookup)),
-        week: sanitizeWindowTotals(totalsForWindow(records, weekWindow, lookup)),
-        month: sanitizeWindowTotals(totalsForWindow(records, monthWindow(now), lookup)),
-        burnRatePerHour: burnRatePerHour(records, now, lookup),
-        hourlySparkline: hourlySparkline(records, now, lookup),
+        block: validCodexBlock ? sanitizeWindowTotals(agg.block) : { ...emptyWindowTotals(), costUSD: null },
+        today: sanitizeWindowTotals(agg.today),
+        week: sanitizeWindowTotals(agg.week),
+        month: sanitizeWindowTotals(agg.month),
+        burnRatePerHour: agg.burnRatePerHour,
+        hourlySparkline: agg.hourlySparkline,
       },
       pricingStatus: this.pricingStatus,
-      unknownModels: unknownModelsIn(records, lookup).map(sanitizeText),
+      unknownModels: agg.unknownModels.map(sanitizeText),
       scan: state.scan,
       burn: { ...(blockBurn ? { block: blockBurn } : {}), ...(weekBurn ? { week: weekBurn } : {}) },
       accountingIncomplete: [...this.sessions.values()].some(

@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { totalsForWindow } from '../domain/aggregate.js';
+import { UsageAccumulator } from '../domain/aggregate.js';
 import { contextPercent, contextWindowFor, currentContextTokens } from '../domain/context.js';
 import type {
   DisplayStatus,
@@ -8,21 +8,24 @@ import type {
   RegistryEntry,
   SessionView,
   SubagentView,
-  TimeWindow,
+  WindowTotals,
   TranscriptEvent,
   UsageRecord,
 } from '../domain/types.js';
 import { sanitizeKeys, sanitizeOptional, sanitizeText } from './sanitize.js';
-
-const ALL_TIME: TimeWindow = { start: 0, end: Number.MAX_SAFE_INTEGER };
 
 export interface SessionState {
   sessionId: string;
   provider: Provider;
   live: boolean;
   registry?: RegistryEntry;
-  /** Deduplicated usage records owned by this session (main + subagents). */
-  records: UsageRecord[];
+  /** Running per-model usage of everything ingested for this session (main + subagents); never shrinks on prune. */
+  usage: UsageAccumulator;
+  /** Bumped per ingested record; invalidates `totalsCache`. */
+  usageVersion: number;
+  totalsCache?: { version: number; lookup: PriceLookup | null; totals: WindowTotals };
+  /** Records this session added to the store's global lists (so replace can remove exactly them). Trimmed on prune. */
+  owned: UsageRecord[];
   lastUsage?: { timestamp: number; contextTokens: number; model: string };
   lastCompact?: { timestamp: number; postTokens: number };
   costState?: { timestamp: number; totalCostUSD: number };
@@ -41,7 +44,9 @@ export function createSessionState(sessionId: string, provider: Provider = 'clau
     sessionId,
     provider,
     live: false,
-    records: [],
+    usage: new UsageAccumulator(),
+    usageVersion: 0,
+    owned: [],
     meta: { kind: 'meta', timestamp: 0, isSidechain: false },
     lastEventTs: 0,
     agents: { activeCount: 0, names: [] },
@@ -58,7 +63,9 @@ export function applySessionEvent(s: SessionState, e: TranscriptEvent, isNewUsag
     case 'usage': {
       if (!isNewUsage) return;
       const r = e.record;
-      s.records.push(r);
+      s.usage.add(r);
+      s.usageVersion++;
+      s.owned.push(r);
       bumpActivity(s, r.timestamp);
       if (!r.isSidechain && (!s.lastUsage || r.timestamp >= s.lastUsage.timestamp)) {
         s.lastUsage = { timestamp: r.timestamp, contextTokens: e.contextTokens, model: r.model };
@@ -131,7 +138,12 @@ export function sessionVersion(s: SessionState): string | undefined {
 /** Builds the UI view. Every disk-sourced string is sanitized here so the UI never sees control chars. */
 export function buildSessionView(s: SessionState, lookup: PriceLookup | null): SessionView {
   const providerLookup = lookup ? (model: string) => lookup(model, s.provider) : null;
-  const totals = totalsForWindow(s.records, ALL_TIME, providerLookup);
+  let cache = s.totalsCache;
+  if (!cache || cache.version !== s.usageVersion || cache.lookup !== lookup) {
+    cache = { version: s.usageVersion, lookup, totals: s.usage.totals(lookup, s.provider) };
+    s.totalsCache = cache;
+  }
+  const totals = cache.totals;
   const fallback = totals.costUSD === null ? s.costState : undefined;
   const model = s.meta.model ?? s.lastUsage?.model;
   const contextTokens =

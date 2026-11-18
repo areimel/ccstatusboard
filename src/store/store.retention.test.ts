@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RETENTION_MS } from '../domain/windows.js';
-import { HOUR, lookup, makeStore, NOW, reg, usage } from './testFixtures.js';
+import { HOUR, lookup, PRICE, makeStore, NOW, reg, usage } from './testFixtures.js';
 
 const DAY = 24 * HOUR;
 
@@ -27,16 +27,41 @@ describe('Store retention', () => {
     const ts = NOW - 34 * DAY;
     store.applyEvents('s1', [usage('k1', ts)]);
     store.flush();
+    const month = () => store.getSnapshot().providers?.claude?.costs.month.tokens.input;
     expect(store.getSnapshot().sessions[0]?.tokens.input).toBe(1000);
     clock.now = NOW + 2 * DAY; // record now past the horizon
     store.flush(); // prune runs
-    expect(store.getSnapshot().sessions[0]?.tokens.input).toBe(0);
+    expect(month()).toBe(0);
+    // Session running totals keep everything ingested for the session.
+    expect(store.getSnapshot().sessions[0]?.tokens.input).toBe(1000);
     // Re-ingesting the pruned record is ignored (too old)...
     store.applyEvents('s1', [usage('k1', ts)]);
     // ...and the pruned key does not block a fresh record reusing it.
     store.applyEvents('s1', [usage('k1', clock.now - HOUR)]);
     store.flush();
-    expect(store.getSnapshot().sessions[0]?.tokens.input).toBe(1000);
+    expect(month()).toBe(1000);
+    expect(store.getSnapshot().sessions[0]?.tokens.input).toBe(2000);
+  });
+
+  it('invalidates the provider aggregate cache on a new record and on setPricing', () => {
+    const { store } = clocked();
+    store.applyEvents('s1', [usage('a', NOW - 1000)]);
+    store.flush();
+    const cost = () => store.getSnapshot().providers?.claude?.costs.today.costUSD;
+    expect(cost()).toBeCloseTo(0.0045, 6);
+    store.applyEvents('s1', [usage('b', NOW - 500)]);
+    store.flush();
+    expect(cost()).toBeCloseTo(0.009, 6);
+    store.setPricing(
+      (m) => (m === 'claude-opus-5-5' ? { ...PRICE, input: PRICE.input * 2 } : undefined),
+      'ok',
+    );
+    store.flush();
+    expect(cost()).toBeGreaterThan(0.0135);
+    store.setPricing(null, 'ok');
+    store.flush();
+    expect(cost()).toBeNull();
+    expect(store.getSnapshot().sessions[0]?.costUSD).toBeNull();
   });
 
   it('does not prune more than once per hour', () => {
