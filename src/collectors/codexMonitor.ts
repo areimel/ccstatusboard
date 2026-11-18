@@ -124,8 +124,9 @@ export class CodexMonitor {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
-    // Best-effort final flush; the write is fire-and-forget because stop() is synchronous.
-    void this.saveCache(true);
+    // Best-effort final flush; the write is fire-and-forget because stop() is synchronous. Skipped
+    // mid-scan: appends reuse cached observation arrays, so this.files may be half-updated.
+    if (!this.pending) void this.saveCache(true);
   }
 
   /** Concurrent polls share a pass; stop suppresses callbacks from in-flight I/O. */
@@ -386,7 +387,10 @@ export class CodexMonitor {
       }
     }
     // Forks depend on their parent's turn ids, so a changed parent re-projects its children.
-    const toProject = new Set([...dirty].filter((id) => owners.has(id)));
+    // The first emission (e.g. after a restart with a warm cache) has no dirty files, so it projects all.
+    const toProject = this.initialScanDone
+      ? new Set([...dirty].filter((id) => owners.has(id)))
+      : new Set(owners.keys());
     for (const [child, parent] of this.sessionParents) {
       if (dirty.has(parent) && owners.has(child)) toProject.add(child);
     }

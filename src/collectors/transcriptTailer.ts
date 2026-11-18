@@ -97,7 +97,8 @@ export class TranscriptTailer {
     if (!state) return false;
     try {
       const { size } = await this.stat(file);
-      return size === state.offset && this.files.get(file) === state;
+      // A buffered partial line would be lost if the file were released and resumed at offset.
+      return size === state.offset && state.splitter.pending === '' && this.files.get(file) === state;
     } catch {
       return false;
     }

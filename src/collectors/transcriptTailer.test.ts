@@ -189,4 +189,13 @@ describe('TranscriptTailer watch debounce and release helpers', () => {
     expect(await t.isCaughtUp(file)).toBe(false);
     expect(await t.isCaughtUp(join(dir, 'missing.jsonl'))).toBe(false);
   });
+
+  it('is not caught up while a partial line is buffered', async () => {
+    await writeFile(file, '{"a":1}\n{"a":');
+    const t = make({ onLines: collect });
+    t.add(file);
+    await t.pollOnce();
+    expect(t.offsetOf(file)).toBe(13);
+    expect(await t.isCaughtUp(file)).toBe(false);
+  });
 });

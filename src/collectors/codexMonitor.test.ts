@@ -183,6 +183,7 @@ describe('passive Codex monitor', () => {
     const cache = await readFile(join(f.cacheDir, 'codex-scan-cache.json'), 'utf8');
     expect(cache).not.toContain('DO NOT CACHE THIS');
     f.readRange.mockClear();
+    f.sessions.clear(); // the restarted monitor must re-emit cached sessions by itself
     const restarted = new CodexMonitor(f.options);
     await restarted.pollOnce();
     expect(f.readRange).not.toHaveBeenCalled();
