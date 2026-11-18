@@ -19,6 +19,10 @@ export class DedupSet {
     return true;
   }
 
+  delete(key: string): boolean {
+    return this.keys.delete(key);
+  }
+
   get size(): number {
     return this.keys.size;
   }

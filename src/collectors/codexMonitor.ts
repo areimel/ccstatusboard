@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { RETENTION_DAYS } from '../domain/windows.js';
 import { lstat, mkdir, readdir, readFile, stat as fsStat, writeFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { decompress } from 'fzstd';
@@ -243,7 +244,7 @@ export class CodexMonitor {
   }
 
   private async discoverFiles(): Promise<string[]> {
-    const cutoff = this.deps.now() - (this.options.maxAgeDays ?? 35) * DAY_MS;
+    const cutoff = this.deps.now() - (this.options.maxAgeDays ?? RETENTION_DAYS) * DAY_MS;
     const candidates = new Set<string>();
     const walk = async (directory: string, depth: number): Promise<void> => {
       let names: string[];

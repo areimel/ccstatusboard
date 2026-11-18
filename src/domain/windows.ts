@@ -2,6 +2,9 @@ import type { TimeWindow } from './types.js';
 
 export const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
 export const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+/** Usage history kept in memory: covers the month window (<=31d) and the rolling week. */
+export const RETENTION_DAYS = 35;
+export const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 export function blockWindowFromLimit(resetsAt: number, now: number, durationMs = FIVE_HOURS_MS): TimeWindow {

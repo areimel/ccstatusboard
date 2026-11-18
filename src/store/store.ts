@@ -25,6 +25,7 @@ import {
   blockWindowFromLimit,
   deriveCurrentBlock,
   monthWindow,
+  RETENTION_MS,
   rollingWeekWindow,
   todayWindow,
   weekWindowFromLimit,
@@ -51,6 +52,7 @@ export interface StoreOptions {
 
 const TESTED_MAJOR_MINOR = '2.1';
 const SYSTEM_HISTORY_POINTS = 60;
+const PRUNE_INTERVAL_MS = 3_600_000;
 
 function pushCapped(arr: number[], v: number): void {
   arr.push(v);
@@ -59,8 +61,10 @@ function pushCapped(arr: number[], v: number): void {
 
 export class Store {
   private readonly sessions = new Map<string, SessionState>();
-  private dedup = new DedupSet();
-  private readonly records: UsageRecord[] = [];
+  private readonly dedup = new DedupSet();
+  /** Usage records partitioned per provider. */
+  private readonly records = new Map<Provider, UsageRecord[]>();
+  private lastPruneAt: number;
   private readonly providerState = new Map<
     Provider,
     {
@@ -91,19 +95,23 @@ export class Store {
   constructor(opts: StoreOptions) {
     this.opts = { ...opts };
     this.claudeDirFound = opts.claudeDirFound;
+    this.lastPruneAt = opts.now();
     this.setProviderStateDefaults('claude', opts.claudeDir, opts.claudeDirFound);
     this.snapshot = this.compute();
   }
 
   applyEvents(sessionId: string, events: TranscriptEvent[], provider: Provider = 'claude'): void {
     const s = this.session(sessionId, provider);
+    const horizon = this.opts.now() - RETENTION_MS;
     for (let e of events) {
       let isNew = false;
       if (e.kind === 'usage') {
+        // Records past the retention horizon are never ingested (they would only be pruned again).
+        if (e.record.timestamp < horizon) continue;
         isNew = this.dedup.add(`${provider}:${e.record.key}`);
         if (isNew) {
           e = { ...e, record: { ...e.record, provider } };
-          this.records.push(e.record);
+          this.recordsOf(provider).push(e.record);
         }
       }
       applySessionEvent(s, e, isNew);
@@ -223,6 +231,7 @@ export class Store {
   }
 
   flush(): void {
+    this.pruneIfDue();
     if (this.pending) {
       clearTimeout(this.pending);
       this.pending = null;
@@ -234,6 +243,35 @@ export class Store {
       } catch {
         // One misbehaving subscriber must not starve the others.
       }
+    }
+  }
+
+  private recordsOf(provider: Provider): UsageRecord[] {
+    let list = this.records.get(provider);
+    if (!list) this.records.set(provider, (list = []));
+    return list;
+  }
+
+  /** At most once an hour: drops records past retention (and their dedup keys) and evicts stale sessions. */
+  private pruneIfDue(): void {
+    const now = this.opts.now();
+    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    this.lastPruneAt = now;
+    const horizon = now - RETENTION_MS;
+    for (const [provider, list] of this.records) {
+      let w = 0;
+      for (const r of list) {
+        if (r.timestamp < horizon) this.dedup.delete(`${provider}:${r.key}`);
+        else list[w++] = r;
+      }
+      list.length = w;
+    }
+    const sessionHorizon = now - Math.max(RETENTION_MS, this.opts.endedWindowHours * 3_600_000);
+    for (const [key, s] of this.sessions) {
+      if (!s.live && lastActivityOf(s) < sessionHorizon && (s.endedAt ?? 0) < sessionHorizon)
+        this.sessions.delete(key);
+      else if (s.records.some((r) => r.timestamp < horizon))
+        s.records = s.records.filter((r) => r.timestamp >= horizon);
     }
   }
 
@@ -286,20 +324,22 @@ export class Store {
   replaceProviderSession(sessionId: string, events: TranscriptEvent[], provider: Provider = 'codex'): void {
     this.provider(provider);
     const key = `${provider}:${sessionId}`;
+    const old = this.sessions.get(key);
     this.sessions.delete(key);
-    for (let i = this.records.length - 1; i >= 0; i--) {
-      const record = this.records[i]!;
-      if ((record.provider ?? 'claude') === provider && record.sessionId === sessionId)
-        this.records.splice(i, 1);
+    if (old) {
+      for (const r of old.records) this.dedup.delete(`${provider}:${r.key}`);
+      const gone = new Set(old.records);
+      const list = this.recordsOf(provider);
+      let w = 0;
+      for (const r of list) if (!gone.has(r)) list[w++] = r;
+      list.length = w;
     }
-    this.dedup = new DedupSet();
-    for (const record of this.records) this.dedup.add(`${record.provider ?? 'claude'}:${record.key}`);
     this.applyEvents(sessionId, events, provider);
   }
 
   private providerSnapshot(provider: Provider, now: number): ProviderSnapshot {
     const state = this.provider(provider);
-    const records = this.records.filter((record) => (record.provider ?? 'claude') === provider);
+    const records = this.records.get(provider) ?? [];
     const lookup = this.lookup ? (model: string) => this.lookup!(model, provider) : null;
     const limitDuration = (limit: LimitsState['block']) =>
       limit?.durationMs ?? (limit?.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);

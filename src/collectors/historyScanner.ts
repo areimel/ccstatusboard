@@ -1,4 +1,5 @@
 // Startup scan of all recent transcripts, with an incremental on-disk cache so restarts only read new bytes.
+import { RETENTION_DAYS } from '../domain/windows.js';
 import {
   mkdir as fsMkdir,
   readdir as fsReaddir,
@@ -94,7 +95,7 @@ export class HistoryScanner {
   }
 
   async listFiles(): Promise<string[]> {
-    const cutoff = this.d.now() - (this.opts.maxAgeDays ?? 35) * DAY_MS;
+    const cutoff = this.d.now() - (this.opts.maxAgeDays ?? RETENTION_DAYS) * DAY_MS;
     const root = projectsDir(this.opts.claudeDir);
     const out: string[] = [];
     const recent = async (p: string) => {
