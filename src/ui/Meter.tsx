@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { memo, type JSX } from 'react';
 import { Text } from 'ink';
 import { levelColor, useTheme } from './theme.js';
 
@@ -12,7 +12,13 @@ export interface MeterProps {
 }
 
 /** htop-style meter: `Label [|||||||     58%] suffix`. */
-export function Meter({ label, percent, width, suffix, labelWidth }: MeterProps): JSX.Element {
+export const Meter = memo(function Meter({
+  label,
+  percent,
+  width,
+  suffix,
+  labelWidth,
+}: MeterProps): JSX.Element {
   const theme = useTheme();
   const inner = Math.max(6, width - 2);
   const labelText = label.padEnd(labelWidth ?? label.length);
@@ -57,4 +63,4 @@ export function Meter({ label, percent, width, suffix, labelWidth }: MeterProps)
       {suffixEl}
     </Text>
   );
-}
+});

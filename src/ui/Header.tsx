@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { useMemo, type JSX } from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
 import type { Snapshot } from '../domain/types.js';
@@ -24,12 +24,18 @@ export function Header({ snapshot }: { snapshot: Snapshot }): JSX.Element {
   const observed = snapshot.sessions.filter((s) => !s.live && s.recentlyObserved).length;
   const ended = snapshot.sessions.filter((s) => s.status === 'ended').length;
   const warnings = headerWarnings(snapshot);
+  const brand = useMemo(
+    () => (
+      <Gradient colors={theme.gradient}>
+        <Text bold>ccstatusboard</Text>
+      </Gradient>
+    ),
+    [theme.gradient],
+  );
   return (
     <Box flexDirection="column" paddingX={1}>
       <Text>
-        <Gradient colors={theme.gradient}>
-          <Text bold>ccstatusboard</Text>
-        </Gradient>
+        {brand}
         <Text color={theme.dim}> · </Text>
         <Text color={theme.text}>
           {live} live{observed > 0 ? ` / ${observed} recent` : ''} / {ended} ended

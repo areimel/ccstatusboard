@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { memo, type JSX } from 'react';
 import { Box, Text } from 'ink';
 import { displayWidth } from '../domain/format.js';
 import { THEME_NAMES } from '../domain/types.js';
@@ -55,7 +55,7 @@ interface FooterProps {
   providers?: boolean;
 }
 
-export function Footer({ mode, search, width, providers }: FooterProps): JSX.Element {
+export const Footer = memo(function Footer({ mode, search, width, providers }: FooterProps): JSX.Element {
   const theme = useTheme();
   if (mode === 'search') {
     return (
@@ -104,4 +104,4 @@ export function Footer({ mode, search, width, providers }: FooterProps): JSX.Ele
       ))}
     </Box>
   );
-}
+});
