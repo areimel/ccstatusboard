@@ -6,7 +6,7 @@ import { Store } from '../store/store.js';
 import { findTranscript } from '../core/paths.js';
 import { parseTranscriptLine } from '../collectors/transcriptParser.js';
 import { PricingProvider } from '../collectors/pricing.js';
-import { TranscriptTailer } from '../collectors/transcriptTailer.js';
+import { TranscriptTailer, type TailerDeps } from '../collectors/transcriptTailer.js';
 import { HistoryScanner } from '../collectors/historyScanner.js';
 import { SessionRegistry } from '../collectors/sessionRegistry.js';
 import { createProjectResolver } from '../collectors/projectName.js';
@@ -41,10 +41,21 @@ export interface RuntimeOptions {
   procStats?: false | Partial<ProcStatsDeps>;
   /** Credentials reader override (tests use it to keep off the real macOS Keychain). */
   readCredentials?: (claudeDir: string) => Promise<CredentialsResult>;
+  /** Agent-scan interval override (tests). */
+  agentScanMs?: number;
+  /** IO overrides for the agent scan (tests). */
+  agentDeps?: {
+    findTranscript?: typeof findTranscript;
+    scanSubagents?: typeof scanSubagents;
+    tailer?: TailerDeps;
+  };
 }
 
 const AGENT_SCAN_MS = 5_000;
 const PROC_SAMPLE_MS = 2_000;
+const SUBAGENT_IDLE_RELEASE_MS = 10 * 60_000;
+const FIND_BACKOFF_START_MS = 5_000;
+const FIND_BACKOFF_MAX_MS = 60_000;
 const PRICING_RELOAD_MS = 6 * 3_600_000; // load() itself honours the 24h TTL
 
 interface TrackedFile {
@@ -76,11 +87,17 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
     store.setLimits({ status: 'disabled', perModelWeekly: [] });
   }
 
+  const findTranscriptFn = opts.agentDeps?.findTranscript ?? findTranscript;
+  const scanSubagentsFn = opts.agentDeps?.scanSubagents ?? scanSubagents;
   const resolveProject = opts.resolveProject ?? createProjectResolver();
   const files = new Map<string, TrackedFile>();
   const live = new Map<string, RegistryEntry>();
   /** sessionId → main transcript path, once found. */
   const mainTranscript = new Map<string, string>();
+  /** Idle subagent files released from the tailer: remembered so a later write resumes at the offset. */
+  const released = new Map<string, { sessionId: string; offset: number; mtimeMs: number }>();
+  /** sessionId → retry schedule for findTranscript while no transcript exists yet. */
+  const findBackoff = new Map<string, { nextAt: number; delayMs: number }>();
   const timers: NodeJS.Timeout[] = [];
   const every = (fn: () => Promise<unknown>, ms: number): void => {
     timers.push(setInterval(() => void fn().catch(() => undefined), ms));
@@ -138,41 +155,84 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
         // Skip this batch; later lines still arrive.
       }
     },
+    ...(opts.agentDeps?.tailer ? { deps: opts.agentDeps.tailer } : {}),
   });
 
-  const track = (file: string, sessionId: string, isSubagent: boolean) => {
+  const track = (file: string, sessionId: string, isSubagent: boolean, startOffset = 0) => {
     if (files.has(file)) return;
     files.set(file, { sessionId, isSubagent });
-    tailer.add(file);
+    tailer.add(file, startOffset);
     void tailer.pollOnce(); // don't wait for the next interval tick
   };
 
   const attachTranscript = async (e: RegistryEntry) => {
     if (mainTranscript.has(e.sessionId)) return;
-    const path = await findTranscript(claudeDir, e.cwd, e.sessionId);
-    if (!path || stopped || !live.has(e.sessionId)) return;
+    const bo = findBackoff.get(e.sessionId);
+    if (bo && now() < bo.nextAt) return;
+    const path = await findTranscriptFn(claudeDir, e.cwd, e.sessionId);
+    if (stopped || !live.has(e.sessionId)) return;
+    if (!path) {
+      // Not written yet: back off so a long-lived session without a transcript doesn't rescan every tick.
+      const delayMs = bo ? Math.min(bo.delayMs * 2, FIND_BACKOFF_MAX_MS) : FIND_BACKOFF_START_MS;
+      findBackoff.set(e.sessionId, { nextAt: now() + delayMs, delayMs });
+      return;
+    }
+    findBackoff.delete(e.sessionId);
     mainTranscript.set(e.sessionId, path);
     track(path, e.sessionId, false);
   };
 
-  const scanAgents = async () => {
-    for (const e of [...live.values()]) {
-      if (stopped) return;
-      const main = mainTranscript.get(e.sessionId);
-      if (!main) {
-        await attachTranscript(e); // transcript may not exist yet right after a session starts
-        continue;
-      }
-      const activity = await scanSubagents(join(dirname(main), e.sessionId, 'subagents'), now());
-      if (stopped || !live.has(e.sessionId)) continue;
-      store.setAgents(e.sessionId, {
-        activeCount: activity.activeCount,
-        names: activity.names,
-        agents: activity.agents,
-      });
-      for (const f of activity.files) track(f, e.sessionId, true);
+  /** Release idle, fully-read subagent files; resume released ones from their offset if they grow. */
+  const syncSubagentFile = async (
+    f: string,
+    sessionId: string,
+    mtimeMs: number | undefined,
+  ): Promise<void> => {
+    if (files.has(f)) {
+      if (mtimeMs === undefined || now() - mtimeMs < SUBAGENT_IDLE_RELEASE_MS) return;
+      if (!(await tailer.isCaughtUp(f)) || stopped || !files.has(f)) return;
+      const offset = tailer.offsetOf(f);
+      if (offset === undefined) return;
+      tailer.remove(f);
+      files.delete(f);
+      released.set(f, { sessionId, offset, mtimeMs });
+      return;
     }
-    if (!stopped) store.setClaudeDirFound(existsSync(claudeDir));
+    const rel = released.get(f);
+    if (!rel) return track(f, sessionId, true);
+    if (mtimeMs === undefined || mtimeMs <= rel.mtimeMs) return;
+    released.delete(f);
+    track(f, sessionId, true, rel.offset);
+  };
+
+  let scanningAgents = false;
+  const scanAgents = async () => {
+    if (scanningAgents) return;
+    scanningAgents = true;
+    try {
+      for (const e of [...live.values()]) {
+        if (stopped) return;
+        const main = mainTranscript.get(e.sessionId);
+        if (!main) {
+          await attachTranscript(e); // transcript may not exist yet right after a session starts
+          continue;
+        }
+        const activity = await scanSubagentsFn(join(dirname(main), e.sessionId, 'subagents'), now());
+        if (stopped || !live.has(e.sessionId)) continue;
+        store.setAgents(e.sessionId, {
+          activeCount: activity.activeCount,
+          names: activity.names,
+          agents: activity.agents,
+        });
+        for (const f of activity.files) {
+          if (stopped || !live.has(e.sessionId)) break;
+          await syncSubagentFile(f, e.sessionId, activity.mtimes[f]);
+        }
+      }
+      if (!stopped) store.setClaudeDirFound(existsSync(claudeDir));
+    } finally {
+      scanningAgents = false;
+    }
   };
 
   const registry = new SessionRegistry({
@@ -192,6 +252,8 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
       store.markEnded(sessionId);
       live.delete(sessionId);
       mainTranscript.delete(sessionId);
+      findBackoff.delete(sessionId);
+      for (const [file, r] of released) if (r.sessionId === sessionId) released.delete(file);
       for (const [file, t] of files) {
         if (t.sessionId === sessionId) {
           tailer.remove(file);
@@ -280,7 +342,7 @@ export function createRuntime(opts: RuntimeOptions): Runtime {
         void scanner.run().catch(() => {
           if (!stopped) store.setScanProgress({ done: true, filesDone: 0, filesTotal: 0 });
         });
-        every(scanAgents, AGENT_SCAN_MS);
+        every(scanAgents, opts.agentScanMs ?? AGENT_SCAN_MS);
       }
       every(loadPricing, PRICING_RELOAD_MS);
       await Promise.all([

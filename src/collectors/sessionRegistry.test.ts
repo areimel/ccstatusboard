@@ -22,6 +22,10 @@ function fakeFs(files: Record<string, string>, alive: Set<number>) {
     readdir: vi.fn(async () => Object.keys(files)),
     readFile,
     isAlive: vi.fn((pid: number) => alive.has(pid)),
+    // No stat by default: forces the compare-file-text path (and avoids real IO under fake timers).
+    stat: vi.fn(async () => {
+      throw new Error('no stat');
+    }),
   };
   return { deps, readFile };
 }
@@ -105,12 +109,17 @@ describe('SessionRegistry.scanOnce', () => {
     expect(upserts.map((e) => e.sessionId)).toEqual(['s1']);
   });
 
-  it('upserts live entries on every scan', async () => {
-    const { deps } = fakeFs({ '100.json': entry(100, 's1') }, new Set([100]));
+  it('upserts a live entry once, and again only when it changes', async () => {
+    const files: Record<string, string> = { '100.json': entry(100, 's1') };
+    const { deps } = fakeFs(files, new Set([100]));
     const { reg, upserts } = makeRegistry(deps);
     await reg.scanOnce();
     await reg.scanOnce();
+    expect(upserts).toHaveLength(1);
+    files['100.json'] = JSON.stringify({ ...JSON.parse(files['100.json']!), status: 'busy' });
+    await reg.scanOnce();
     expect(upserts).toHaveLength(2);
+    expect(upserts[1]).toMatchObject({ status: 'busy' });
     expect(upserts[0]).toMatchObject({ pid: 100, sessionId: 's1', cwd: '/work/proj', procStart: '1000' });
   });
 
@@ -265,12 +274,14 @@ describe('SessionRegistry.start/stop', () => {
     reg.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(upserts).toHaveLength(1);
+    expect(deps.readdir).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(2000);
-    expect(upserts).toHaveLength(2);
+    expect(deps.readdir).toHaveBeenCalledTimes(2);
+    expect(upserts).toHaveLength(1); // unchanged entry: no re-emit
     reg.stop();
     expect(close).toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(upserts).toHaveLength(2);
+    expect(deps.readdir).toHaveBeenCalledTimes(2);
   });
 
   it('keeps polling when fs.watch throws', async () => {
@@ -289,7 +300,42 @@ describe('SessionRegistry.start/stop', () => {
     });
     expect(() => reg.start()).not.toThrow();
     await vi.advanceTimersByTimeAsync(1000);
-    expect(upserts.length).toBeGreaterThanOrEqual(2);
+    expect(deps.readdir).toHaveBeenCalledTimes(2);
+    expect(upserts).toHaveLength(1);
     reg.stop();
+  });
+});
+
+describe('SessionRegistry change detection', () => {
+  it('does not re-read or re-check a dead pid file while its mtime/size are unchanged', async () => {
+    const files: Record<string, string> = { '100.json': entry(100, 's1') };
+    const { deps, readFile } = fakeFs(files, new Set());
+    let mtimeMs = 1;
+    deps.stat = vi.fn(async () => ({ mtimeMs, size: 10 }));
+    const { reg, upserts } = makeRegistry(deps);
+    await reg.scanOnce();
+    await reg.scanOnce();
+    await reg.scanOnce();
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(deps.isAlive).toHaveBeenCalledTimes(1);
+    expect(upserts).toEqual([]);
+    mtimeMs = 2;
+    await reg.scanOnce();
+    expect(readFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips reading an unchanged live file but still checks liveness and ends it when the pid dies', async () => {
+    const files: Record<string, string> = { '100.json': entry(100, 's1') };
+    const alive = new Set([100]);
+    const { deps, readFile } = fakeFs(files, alive);
+    deps.stat = vi.fn(async () => ({ mtimeMs: 1, size: 10 }));
+    const { reg, upserts, ended } = makeRegistry(deps);
+    await reg.scanOnce();
+    await reg.scanOnce();
+    expect(readFile).toHaveBeenCalledTimes(1);
+    expect(upserts).toHaveLength(1);
+    alive.delete(100);
+    await reg.scanOnce();
+    expect(ended).toEqual([['s1', 100]]);
   });
 });

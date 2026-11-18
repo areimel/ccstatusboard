@@ -1,5 +1,8 @@
-import { appendFile, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AgentActivity } from '../collectors/subagents.js';
 import { createRuntime, type Runtime } from './runtime.js';
 import { DEFAULT_CONFIG } from '../config/schema.js';
 import { assistantLine } from '../../test/helpers/transcript.js';
@@ -216,5 +219,129 @@ describe('createRuntime resources', () => {
     vi.useRealTimers();
     expect(sample).toHaveBeenCalled();
     expect(String(sample.mock.calls[0]?.[1])).toContain(String(process.pid));
+  });
+
+  const baseOpts = () => ({
+    config: { ...DEFAULT_CONFIG, refreshMs: 250, usageApi: false },
+    claudeDir: fx!.claudeDir,
+    cacheDir: fx!.cacheDir,
+    version: '0.1.0-test',
+    fetch: makeFakeFetch({ usage: usageFixture(Date.now()), pricing: PRICING_FIXTURE }),
+    systemMonitor: false as const,
+    procStats: false as const,
+    agentScanMs: 10,
+  });
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const emptyActivity = (over: Partial<AgentActivity> = {}): AgentActivity => ({
+    activeCount: 0,
+    names: [],
+    files: [],
+    mtimes: {},
+    agents: [],
+    ...over,
+  });
+
+  it('never overlaps agent scans', async () => {
+    fx = await makeClaudeDir([liveSession([])]);
+    let active = 0;
+    let maxActive = 0;
+    let calls = 0;
+    rt = createRuntime({
+      ...baseOpts(),
+      agentDeps: {
+        findTranscript: async () => '/nowhere/sess-live.jsonl',
+        scanSubagents: async () => {
+          calls++;
+          active++;
+          maxActive = Math.max(maxActive, active);
+          await sleep(60); // much longer than the 10ms scan interval
+          active--;
+          return emptyActivity();
+        },
+      },
+    });
+    await rt.start();
+    await waitFor(() => (calls >= 3 ? true : undefined));
+    expect(maxActive).toBe(1);
+  });
+
+  it('backs off findTranscript for a session with no transcript (5s, 10s, ... capped)', async () => {
+    fx = await makeClaudeDir([liveSession([])]);
+    let t = 1_000_000;
+    let finds = 0;
+    rt = createRuntime({
+      ...baseOpts(),
+      now: () => t,
+      agentDeps: {
+        findTranscript: async () => {
+          finds++;
+          return null;
+        },
+      },
+    });
+    await rt.start();
+    await waitFor(() => (finds >= 1 ? true : undefined));
+    await sleep(100); // many scan ticks, but the clock has not moved
+    expect(finds).toBe(1);
+    t += 5_000;
+    await waitFor(() => (finds >= 2 ? true : undefined));
+    t += 5_000; // second delay is 10s
+    await sleep(100);
+    expect(finds).toBe(2);
+    t += 5_000;
+    await waitFor(() => (finds >= 3 ? true : undefined));
+    t += 59_000; // capped delay is 60s at most
+    await sleep(100);
+    const before = finds;
+    t += 61_000;
+    await waitFor(() => (finds > before ? true : undefined));
+  });
+
+  it('releases idle fully-read subagent files and resumes from the saved offset when they grow', async () => {
+    fx = await makeClaudeDir([liveSession([])]);
+    const dir = await mkdtemp(join(tmpdir(), 'ccsb-rt-'));
+    try {
+      const agent = join(dir, 'agent-a1.jsonl');
+      const line1 = assistantLine({ id: 'm1', requestId: 'r1', ts: iso(60_000), usage }) + '\n';
+      const line2 = assistantLine({ id: 'm2', requestId: 'r2', ts: iso(30_000), usage }) + '\n';
+      await writeFile(agent, line1);
+      let mtimeMs = Date.now() - 11 * 60_000;
+      let scans = 0;
+      const reads: Array<[number, number]> = [];
+      rt = createRuntime({
+        ...baseOpts(),
+        agentDeps: {
+          findTranscript: async () => join(dir, 'sess-live.jsonl'),
+          scanSubagents: async () => {
+            scans++;
+            return emptyActivity({ files: [agent], mtimes: { [agent]: mtimeMs } });
+          },
+          tailer: {
+            readRange: async (p, start, end) => {
+              if (p === agent) reads.push([start, end]);
+              const { readRangeFromDisk } = await import('../collectors/transcriptTailer.js');
+              return readRangeFromDisk(p, start, end);
+            },
+          },
+        },
+      });
+      await rt.start();
+      await waitFor(() => (reads.length >= 1 ? true : undefined));
+      expect(reads[0]).toEqual([0, line1.length]);
+      const seen = scans;
+      await waitFor(() => (scans >= seen + 2 ? true : undefined)); // released by now
+      await appendFile(agent, line2); // grows, but its reported mtime is still the old one
+      await sleep(100);
+      expect(reads).toHaveLength(1);
+      mtimeMs = Date.now(); // now active again
+      await waitFor(() => (reads.length >= 2 ? true : undefined));
+      expect(reads[1]).toEqual([line1.length, line1.length + line2.length]);
+      const s = await waitFor(() =>
+        rt!.store.getSnapshot().sessions.find((x) => x.sessionId === 'sess-live' && x.tokens.output >= 4000),
+      );
+      expect(s.tokens.output).toBe(4000);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

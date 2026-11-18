@@ -47,7 +47,7 @@ describe('SessionRegistry resilience', () => {
     t.failReaddir(null);
     await t.reg.scanOnce();
     expect(t.ended).toEqual([]);
-    expect(t.upserts).toHaveLength(2);
+    expect(t.upserts).toHaveLength(1); // unchanged entry is not re-emitted
   });
 
   it('a missing sessions dir (ENOENT) is empty and ends previously live sessions', async () => {
@@ -68,7 +68,7 @@ describe('SessionRegistry resilience', () => {
     files['100.json'] = entry(100, 'a');
     await t.reg.scanOnce();
     expect(t.ended).toEqual([]);
-    expect(t.upserts).toHaveLength(2);
+    expect(t.upserts).toHaveLength(1); // same content after the torn write: no re-emit
   });
 
   it('a half-written file for a pid that has died still ends the session', async () => {

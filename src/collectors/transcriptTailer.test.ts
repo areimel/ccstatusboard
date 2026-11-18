@@ -1,7 +1,7 @@
 import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TranscriptTailer } from './transcriptTailer.js';
 
 let dir: string;
@@ -139,5 +139,54 @@ describe('TranscriptTailer', () => {
     await appendFile(file, '{"live":2}\n');
     await new Promise((r) => setTimeout(r, 80));
     expect(got).toEqual(['{"live":1}']);
+  });
+});
+
+describe('TranscriptTailer watch debounce and release helpers', () => {
+  it('coalesces a burst of watch events into one trailing poll and clears the timer on stop', async () => {
+    vi.useFakeTimers();
+    try {
+      const listeners: Array<() => void> = [];
+      const stat = vi.fn(async () => ({ size: 0, mtimeMs: 0 }));
+      const t = make({
+        onLines: collect,
+        pollMs: 60_000,
+        debounceMs: 250,
+        deps: {
+          stat,
+          readRange: async () => Buffer.alloc(0),
+          watch: (_p, l) => {
+            listeners.push(l);
+            return { close() {} };
+          },
+        },
+      });
+      t.add(file);
+      t.start();
+      for (let i = 0; i < 50; i++) listeners[0]!();
+      await vi.advanceTimersByTimeAsync(249);
+      expect(stat).toHaveBeenCalledTimes(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(stat).toHaveBeenCalledTimes(1);
+      listeners[0]!();
+      t.stop();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(stat).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports offset and whether a file is fully consumed', async () => {
+    await writeFile(file, '{"a":1}\n');
+    const t = make({ onLines: collect });
+    t.add(file);
+    expect(await t.isCaughtUp(file)).toBe(false);
+    await t.pollOnce();
+    expect(t.offsetOf(file)).toBe(8);
+    expect(await t.isCaughtUp(file)).toBe(true);
+    await appendFile(file, '{"a":2}\n');
+    expect(await t.isCaughtUp(file)).toBe(false);
+    expect(await t.isCaughtUp(join(dir, 'missing.jsonl'))).toBe(false);
   });
 });
