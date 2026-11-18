@@ -1,9 +1,11 @@
 import React from 'react';
 import { render, type Instance } from 'ink';
+import { join } from 'node:path';
 import { ConfigError, loadConfig, parseCliArgs, resolveConfigPath } from './config/load.js';
 import { createConfigSaver } from './config/save.js';
 import { THEME_NAMES, type Config } from './domain/types.js';
 import { cacheDir, resolveClaudeDir, resolveCodexDir } from './core/paths.js';
+import { createCrashHandlers } from './app/crashLog.js';
 import { createRuntime } from './app/runtime.js';
 import { superviseInk } from './app/supervise.js';
 import { App } from './ui/App.js';
@@ -60,6 +62,21 @@ const leaveAltScreen = () => {
 };
 // Last line of defence: whatever path exits the process, the terminal comes back.
 process.on('exit', leaveAltScreen);
+
+// Crashes before main() has built the UI only need the alt screen left; main() swaps in full teardown.
+const crashLogFile = join(cacheDir(), 'crash.log');
+let fatalCrash = (err: unknown): void => {
+  leaveAltScreen();
+  process.stderr.write(
+    `ccstatusboard crashed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
+  process.stderr.write(`details written to ${crashLogFile}\n`);
+  process.exit(1);
+};
+// Installed before anything else so an early crash is logged too, with memory usage for leak triage.
+const crashLog = createCrashHandlers({ file: crashLogFile, onFatal: (err) => fatalCrash(err) });
+process.on('uncaughtException', crashLog.onUncaughtException);
+process.on('unhandledRejection', crashLog.onUnhandledRejection);
 
 async function main(argv: string[]): Promise<number | undefined> {
   let parsed: ReturnType<typeof parseCliArgs>;
@@ -126,13 +143,13 @@ async function main(argv: string[]): Promise<number | undefined> {
     process.stderr.write(
       `ccstatusboard crashed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
     );
+    process.stderr.write(`details written to ${crashLogFile}\n`);
     process.exit(1);
   };
+  fatalCrash = crash;
 
   process.on('SIGINT', () => shutdown(0));
   process.on('SIGTERM', () => shutdown(0));
-  process.on('uncaughtException', crash);
-  process.on('unhandledRejection', crash);
 
   process.stdout.write(ENTER_ALT);
   altActive = true;
@@ -151,7 +168,13 @@ async function main(argv: string[]): Promise<number | undefined> {
     },
   );
   // A render error unmounts Ink and only rejects waitUntilExit(): restore the terminal and exit 1.
-  superviseInk(ink.instance, { onExit: () => shutdown(0), onCrash: crash });
+  superviseInk(ink.instance, {
+    onExit: () => shutdown(0),
+    onCrash: (err) => {
+      crashLog.log('inkRender', err);
+      crash(err);
+    },
+  });
   await runtime.start(); // render first so the loading state is visible immediately
   return undefined; // keep running until quit
 }
