@@ -14,6 +14,7 @@ import {
 import { readRangeFromDisk } from './transcriptTailer.js';
 
 const DAY_MS = 86400000;
+const CACHE_SAVE_INTERVAL_MS = 60000;
 const CACHE_VERSION = 1;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const FILE_ID = new RegExp(`(${UUID})(?:_${UUID})?\\.jsonl(?:\\.zst)?$`, 'i');
@@ -75,6 +76,15 @@ export class CodexMonitor {
   private pending: Promise<void> | undefined;
   private readonly projections = new Map<string, string>();
   private limitObservations: CodexObservation[] = [];
+  private limitsSignature: string | undefined;
+  /** Parent session per projected session, for re-projecting forks when their parent changes. */
+  private readonly sessionParents = new Map<string, string>();
+  private readonly limitCache = new WeakMap<CacheEntry, Map<string, CodexObservation>>();
+  private initialScanDone = false;
+  private lastProgress: ScanProgress | undefined;
+  private cacheDirty = false;
+  private lastCacheSave = Number.NEGATIVE_INFINITY;
+  private cacheWrite: Promise<void> = Promise.resolve();
 
   constructor(options: CodexMonitorOptions) {
     this.options = options;
@@ -113,6 +123,8 @@ export class CodexMonitor {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    // Best-effort final flush; the write is fire-and-forget because stop() is synchronous.
+    void this.saveCache(true);
   }
 
   /** Concurrent polls share a pass; stop suppresses callbacks from in-flight I/O. */
@@ -145,15 +157,16 @@ export class CodexMonitor {
     if (this.stopped) return;
     this.options.onDirectory(directoryFound);
     if (unreadable) {
-      if (this.projections.size === 0) this.emitProjections();
-      else this.options.onLimits(codexLimits(this.limitObservations, this.deps.now()));
-      this.options.onProgress({ done: true, filesDone: 0, filesTotal: 0 });
+      if (this.projections.size === 0) this.emitProjections(new Set());
+      else this.emitLimits();
+      this.emitFinalProgress({ done: true, filesDone: 0, filesTotal: 0 });
       return;
     }
     const discovered = directoryFound ? await this.discoverFiles() : [];
     const next: Record<string, CacheEntry> = {};
     let filesDone = 0;
-    this.options.onProgress({ done: false, filesDone, filesTotal: discovered.length });
+    const reportProgress = !this.initialScanDone;
+    if (reportProgress) this.options.onProgress({ done: false, filesDone, filesTotal: discovered.length });
     for (const file of discovered) {
       if (this.stopped) return;
       try {
@@ -163,18 +176,70 @@ export class CodexMonitor {
         if (this.files[file]) next[file] = this.files[file]!;
       }
       filesDone++;
-      if (!this.stopped) this.options.onProgress({ done: false, filesDone, filesTotal: discovered.length });
+      if (reportProgress && !this.stopped)
+        this.options.onProgress({ done: false, filesDone, filesTotal: discovered.length });
       await new Promise<void>((done) => setImmediate(done));
     }
     if (this.stopped) return;
-    const changed =
-      Object.keys(this.files).length !== Object.keys(next).length ||
-      Object.entries(next).some(([file, entry]) => this.files[file] !== entry);
+    // Files that are new, rewritten/appended or removed; unchanged entries keep their identity.
+    const previousFiles = this.files;
+    const changedFiles: { file: string; before?: CacheEntry; after?: CacheEntry }[] = [];
+    for (const [file, entry] of Object.entries(next)) {
+      if (previousFiles[file] !== entry)
+        changedFiles.push({ file, before: previousFiles[file], after: entry });
+    }
+    for (const [file, entry] of Object.entries(previousFiles)) {
+      if (!(file in next)) changedFiles.push({ file, before: entry });
+    }
     this.files = next;
-    if (changed || this.projections.size === 0) this.emitProjections();
-    else this.options.onLimits(codexLimits(this.limitObservations, this.deps.now()));
-    this.options.onProgress({ done: true, filesDone, filesTotal: discovered.length });
-    if (changed) await this.saveCache();
+    const changed = changedFiles.length > 0;
+    if (changed) {
+      const dirty = new Set<string>();
+      for (const { file, before, after } of changedFiles) {
+        for (const entry of [before, after]) {
+          const id = entry && this.sessionIdOf(file, entry);
+          if (id) dirty.add(id);
+        }
+      }
+      this.emitProjections(dirty);
+      this.cacheDirty = true;
+    } else if (this.projections.size === 0) this.emitProjections(new Set());
+    else this.emitLimits();
+    this.initialScanDone = true;
+    this.emitFinalProgress({ done: true, filesDone, filesTotal: discovered.length });
+    if (this.cacheDirty && this.deps.now() - this.lastCacheSave >= CACHE_SAVE_INTERVAL_MS)
+      await this.saveCache();
+  }
+
+  /** After the initial scan, progress is only reported when its value actually changes. */
+  private emitFinalProgress(progress: ScanProgress): void {
+    const last = this.lastProgress;
+    if (
+      this.initialScanDone &&
+      last &&
+      last.done === progress.done &&
+      last.filesDone === progress.filesDone &&
+      last.filesTotal === progress.filesTotal
+    )
+      return;
+    this.lastProgress = progress;
+    this.options.onProgress(progress);
+  }
+
+  private emitLimits(): void {
+    if (this.stopped) return;
+    const state = codexLimits(this.limitObservations, this.deps.now());
+    const signature = JSON.stringify(state);
+    if (signature === this.limitsSignature) return;
+    this.limitsSignature = signature;
+    this.options.onLimits(state);
+  }
+
+  private sessionIdOf(file: string, entry: CacheEntry): string | undefined {
+    // Real rollouts use UUID filenames, allowing copied metadata to remain owned by its source.
+    return (
+      FILE_ID.exec(basename(file))?.[1] ?? entry.observations.find((o) => o.kind === 'session')?.sessionId
+    );
   }
 
   private async discoverFiles(): Promise<string[]> {
@@ -249,17 +314,19 @@ export class CodexMonitor {
     }
     const start = append ? previous!.offset : 0;
     const bytes = await this.deps.readRange(file, start, stat.size);
+    // Reads that can fail happen before the previous observation array is mutated in place.
     const lastNewline = bytes.lastIndexOf(0x0a);
-    const observations = append ? [...previous!.observations] : [];
-    const malformed =
-      lastNewline >= 0
-        ? this.parseLines(bytes.subarray(0, lastNewline + 1).toString('utf8'), observations)
-        : false;
     const offset = start + lastNewline + 1;
     const prefix =
       start === 0
         ? bytes.subarray(0, Math.min(offset, 256))
         : await this.deps.readRange(file, 0, Math.min(offset, 256));
+    // The superseded cache entry is discarded after this call, so its array can be reused.
+    const observations = append ? previous!.observations : [];
+    const malformed =
+      lastNewline >= 0
+        ? this.parseLines(bytes.subarray(0, lastNewline + 1).toString('utf8'), observations)
+        : false;
     return {
       size: stat.size,
       mtimeMs: stat.mtimeMs,
@@ -300,52 +367,66 @@ export class CodexMonitor {
     return malformed;
   }
 
-  private emitProjections(): void {
-    const sessions = new Map<
-      string,
-      { observations: CodexObservation[]; incomplete: boolean; archived: boolean }
-    >();
+  private emitProjections(dirty: ReadonlySet<string>): void {
+    // Cheap pass over file names only: which files belong to which session.
+    const owners = new Map<string, { entries: CacheEntry[]; archived: boolean }>();
     const limitBuckets = new Map<string, CodexObservation>();
+    const archivedRoot = join(this.root, 'archived_sessions') + sep;
     for (const [file, entry] of Object.entries(this.files)) {
-      // Real rollouts use UUID filenames, allowing copied metadata to remain owned by its source.
-      const sessionId =
-        FILE_ID.exec(basename(file))?.[1] ?? entry.observations.find((o) => o.kind === 'session')?.sessionId;
+      const sessionId = this.sessionIdOf(file, entry);
       if (!sessionId) continue;
-      const existing = sessions.get(sessionId) ?? { observations: [], incomplete: false, archived: true };
-      existing.observations.push(...entry.observations);
-      existing.incomplete ||= entry.incomplete;
-      existing.archived &&= file.startsWith(join(this.root, 'archived_sessions') + sep);
-      sessions.set(sessionId, existing);
-      for (const observation of entry.observations) {
-        if (observation.limitBucket === undefined) continue;
-        const existing = limitBuckets.get(observation.limitBucket);
-        if (!existing || observation.timestamp >= existing.timestamp)
-          limitBuckets.set(observation.limitBucket, observation);
+      const existing = owners.get(sessionId) ?? { entries: [], archived: true };
+      existing.entries.push(entry);
+      existing.archived &&= file.startsWith(archivedRoot);
+      owners.set(sessionId, existing);
+      for (const [bucket, observation] of this.latestLimits(entry)) {
+        const current = limitBuckets.get(bucket);
+        if (!current || observation.timestamp >= current.timestamp) limitBuckets.set(bucket, observation);
       }
     }
-    for (const [sessionId, session] of sessions) {
+    // Forks depend on their parent's turn ids, so a changed parent re-projects its children.
+    const toProject = new Set([...dirty].filter((id) => owners.has(id)));
+    for (const [child, parent] of this.sessionParents) {
+      if (dirty.has(parent) && owners.has(child)) toProject.add(child);
+    }
+    const merged = new Map<string, CodexObservation[]>();
+    const mergedFor = (sessionId: string): CodexObservation[] | undefined => {
+      const cached = merged.get(sessionId);
+      if (cached) return cached;
+      const owner = owners.get(sessionId);
+      if (!owner) return undefined;
       const seen = new Set<string>();
-      session.observations = session.observations
-        .filter((observation) => {
-          const key = JSON.stringify(observation);
-          if (seen.has(key)) return false;
+      const observations: CodexObservation[] = [];
+      for (const entry of owner.entries) {
+        for (const observation of entry.observations) {
+          const key = observationKey(observation);
+          if (seen.has(key)) continue;
           seen.add(key);
-          return true;
-        })
-        .sort((a, b) => a.timestamp - b.timestamp);
-      const sessionMeta = session.observations.find((o) => o.kind === 'session' && o.sessionId === sessionId);
+          observations.push(observation);
+        }
+      }
+      observations.sort((a, b) => a.timestamp - b.timestamp);
+      merged.set(sessionId, observations);
+      return observations;
+    };
+    for (const sessionId of toProject) {
+      const owner = owners.get(sessionId)!;
+      const observations = mergedFor(sessionId)!;
+      const sessionMeta = observations.find((o) => o.kind === 'session' && o.sessionId === sessionId);
       const parentId = sessionMeta?.forkedFromId ?? sessionMeta?.parentSessionId;
-      const parent = parentId ? sessions.get(parentId) : undefined;
+      if (parentId) this.sessionParents.set(sessionId, parentId);
+      else this.sessionParents.delete(sessionId);
+      const parentObservations = parentId ? mergedFor(parentId) : undefined;
       const parentTurnIds =
-        parent === undefined
+        parentObservations === undefined
           ? undefined
-          : new Set(parent.observations.flatMap((o) => (o.turnId ? [o.turnId] : [])));
-      const projection = projectCodexSession(session.observations, {
+          : new Set(parentObservations.flatMap((o) => (o.turnId ? [o.turnId] : [])));
+      const projection = projectCodexSession(observations, {
         sessionId,
         parentTurnIds,
-        incomplete: session.incomplete,
+        incomplete: owner.entries.some((entry) => entry.incomplete),
       });
-      if (session.archived) {
+      if (owner.archived) {
         projection.metadata.observedStatus = 'ended';
         for (const event of projection.events) {
           if (event.kind === 'meta') event.observedStatus = 'ended';
@@ -358,9 +439,10 @@ export class CodexMonitor {
       }
     }
     // Remove rows/usage when source files are actually removed or leave the retention window.
-    for (const sessionId of this.projections.keys()) {
-      if (sessions.has(sessionId) || this.stopped) continue;
+    for (const sessionId of [...this.projections.keys()]) {
+      if (owners.has(sessionId) || this.stopped) continue;
       this.projections.delete(sessionId);
+      this.sessionParents.delete(sessionId);
       this.options.onSession(sessionId, [], {
         lastActivity: 0,
         observedStatus: 'unknown',
@@ -369,7 +451,23 @@ export class CodexMonitor {
       });
     }
     this.limitObservations = [...limitBuckets.values()];
-    if (!this.stopped) this.options.onLimits(codexLimits(this.limitObservations, this.deps.now()));
+    this.emitLimits();
+  }
+
+  /** Latest observation per limit bucket for one file entry; entries are immutable once published. */
+  private latestLimits(entry: CacheEntry): Map<string, CodexObservation> {
+    let latest = this.limitCache.get(entry);
+    if (!latest) {
+      latest = new Map();
+      for (const observation of entry.observations) {
+        if (observation.limitBucket === undefined) continue;
+        const current = latest.get(observation.limitBucket);
+        if (!current || observation.timestamp >= current.timestamp)
+          latest.set(observation.limitBucket, observation);
+      }
+      this.limitCache.set(entry, latest);
+    }
+    return latest;
   }
 
   private async loadCache(): Promise<Record<string, CacheEntry>> {
@@ -422,20 +520,68 @@ export class CodexMonitor {
     }
   }
 
-  private async saveCache(): Promise<void> {
-    if (!this.cacheFile || this.stopped) return;
-    try {
-      await this.deps.mkdir(resolve(this.options.cacheDir));
-      await this.deps.writeFile(
-        this.cacheFile,
-        JSON.stringify({
-          version: CACHE_VERSION,
-          codexDir: this.root,
-          files: this.files,
-        } satisfies CachedFiles),
-      );
-    } catch {
-      /* Cache is only an optimization. */
-    }
+  /** Writes are debounced by the caller; `final` flushes even after stop(). Writes are serialized. */
+  private saveCache(final = false): Promise<void> {
+    if (!this.cacheFile || (this.stopped && !final) || !this.cacheDirty) return Promise.resolve();
+    this.cacheDirty = false;
+    this.lastCacheSave = this.deps.now();
+    const cacheFile = this.cacheFile;
+    const write = async (): Promise<void> => {
+      try {
+        await this.deps.mkdir(resolve(this.options.cacheDir));
+        await this.deps.writeFile(
+          cacheFile,
+          JSON.stringify({
+            version: CACHE_VERSION,
+            codexDir: this.root,
+            files: this.files,
+          } satisfies CachedFiles),
+        );
+      } catch {
+        /* Cache is only an optimization. */
+      }
+    };
+    this.cacheWrite = this.cacheWrite.then(write);
+    return this.cacheWrite;
   }
+}
+
+/** Equivalent to JSON.stringify(observation) for duplicate detection, without allocating the JSON. */
+function observationKey(o: CodexObservation): string {
+  const usage = (u: CodexObservation['usage']) =>
+    u ? `${u.input},${u.cached},${u.cacheWrite},${u.output},${u.reasoning},${u.total}` : '';
+  const limits = o.limits
+    ? JSON.stringify(
+        o.limits.map((l) => [
+          l.observedAt,
+          l.id,
+          l.windowMinutes,
+          l.durationMs,
+          l.label,
+          l.percent,
+          l.resetsAt,
+        ]),
+      )
+    : '';
+  // JSON-encode the free-text fields so separators inside values cannot create collisions.
+  return (
+    JSON.stringify([
+      o.timestamp,
+      o.kind,
+      o.sessionId,
+      o.parentSessionId,
+      o.forkedFromId,
+      o.cwd,
+      o.version,
+      o.gitBranch,
+      o.model,
+      o.startedAt,
+      o.contextWindow,
+      o.turnId,
+      o.responseId,
+      o.limitBucket,
+      o.status,
+    ]) +
+    `|${usage(o.usage)}|${usage(o.lastUsage)}|${o.limits ? limits : ''}|${o.usage ? 1 : 0}${o.lastUsage ? 1 : 0}${o.limits ? 1 : 0}`
+  );
 }

@@ -337,4 +337,65 @@ describe('passive Codex monitor', () => {
     await f.monitor.pollOnce();
     expect(f.onSession).not.toHaveBeenCalled();
   });
+
+  it('does not call onSession or onProgress on a steady-state poll', async () => {
+    const f = await fixture();
+    await f.write(meta() + context() + usage());
+    await f.monitor.pollOnce();
+    f.onSession.mockClear();
+    f.onProgress.mockClear();
+    await f.monitor.pollOnce();
+    await f.monitor.pollOnce();
+    expect(f.onSession).not.toHaveBeenCalled();
+    expect(f.onProgress).not.toHaveBeenCalled();
+  });
+
+  it('re-projects only the session whose file changed', async () => {
+    const f = await fixture();
+    const otherId = '00000000-0000-4000-8000-000000000002';
+    const other = join(f.path, '..', `rollout-2026-11-06T12-00-00-${otherId}.jsonl`);
+    const otherMeta = line('session_meta', {
+      id: otherId,
+      cwd: '/other',
+      timestamp: new Date(TS).toISOString(),
+    });
+    await f.write(meta() + context() + usage());
+    await f.write(otherMeta + usage(50), other);
+    await f.monitor.pollOnce();
+    f.onSession.mockClear();
+    await appendFile(f.path, usage(150));
+    await f.touch();
+    await f.monitor.pollOnce();
+    expect(f.onSession).toHaveBeenCalledTimes(1);
+    expect(f.onSession.mock.calls[0]![0]).toBe(ID);
+    expect(countUsage(f.sessions.get(ID)!.events)).toBe(120);
+  });
+
+  it('writes the cache at most once per 60s and flushes on stop', async () => {
+    const f = await fixture();
+    await f.write(meta() + context() + usage());
+    const writer = vi.fn(async (path: string, data: string) => {
+      await writeFile(path, data);
+    });
+    const monitor = new CodexMonitor({ ...f.options, deps: { ...f.options.deps, writeFile: writer } });
+    await monitor.pollOnce();
+    expect(writer).toHaveBeenCalledTimes(1);
+    await appendFile(f.path, usage(150));
+    await f.touch();
+    f.setNow(TS + 10000);
+    await monitor.pollOnce();
+    expect(writer).toHaveBeenCalledTimes(1);
+    f.setNow(TS + 61000);
+    await monitor.pollOnce();
+    expect(writer).toHaveBeenCalledTimes(2);
+    await appendFile(f.path, usage(200));
+    await f.touch();
+    f.setNow(TS + 62000);
+    await monitor.pollOnce();
+    expect(writer).toHaveBeenCalledTimes(2);
+    monitor.stop();
+    await vi.waitFor(() => expect(writer).toHaveBeenCalledTimes(3));
+    const saved = JSON.parse(await readFile(join(f.cacheDir, 'codex-scan-cache.json'), 'utf8'));
+    expect(saved.files[f.path].observations.length).toBeGreaterThan(3);
+  });
 });
