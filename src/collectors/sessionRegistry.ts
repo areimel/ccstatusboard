@@ -1,4 +1,4 @@
-import { readdir as fsReaddir, readFile as fsReadFile } from 'node:fs/promises';
+import { readdir as fsReaddir, readFile as fsReadFile, stat as fsStat } from 'node:fs/promises';
 import { watch as fsWatch, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
 import type { RegistryEntry } from '../domain/types.js';
@@ -8,6 +8,8 @@ import { isAlive as defaultIsAlive } from './liveness.js';
 export interface RegistryDeps {
   readdir?: (dir: string) => Promise<string[]>;
   readFile?: (p: string) => Promise<string>;
+  /** Used only as a cheap change key (mtime+size); failures fall back to comparing file text. */
+  stat?: (p: string) => Promise<{ mtimeMs: number; size: number }>;
   isAlive?: (pid: number, procStart?: string) => boolean;
   watch?: typeof fsWatch;
 }
@@ -46,17 +48,29 @@ export function parseRegistryEntry(raw: unknown): RegistryEntry | null {
   return e;
 }
 
+interface CachedFile {
+  /** `mtimeMs:size`, when stat worked. */
+  key: string | undefined;
+  text: string;
+  entry: RegistryEntry | null;
+  /** The pid was not alive when last checked at this key. */
+  dead: boolean;
+}
+
 export class SessionRegistry {
   private readonly dir: string;
   private readonly pollMs: number;
   private readonly readdir: (dir: string) => Promise<string[]>;
   private readonly readFile: (p: string) => Promise<string>;
+  private readonly stat: NonNullable<RegistryDeps['stat']>;
   private readonly alive: (pid: number, procStart?: string) => boolean;
   private readonly watchFn: typeof fsWatch;
   private readonly onUpsert: (e: RegistryEntry) => void;
   private readonly onEnded: (sessionId: string, pid: number) => void;
   /** sessionId → entry for sessions live as of the last scan. */
   private live = new Map<string, RegistryEntry>();
+  /** file name → last read/parsed state, so unchanged files are not re-parsed or re-emitted. */
+  private cache = new Map<string, CachedFile>();
   private scanning: Promise<void> | null = null;
   private rescan = false;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -75,6 +89,7 @@ export class SessionRegistry {
     this.pollMs = opts.pollMs ?? 2000;
     this.readdir = d.readdir ?? ((dir) => fsReaddir(dir));
     this.readFile = d.readFile ?? ((p) => fsReadFile(p, 'utf8'));
+    this.stat = d.stat ?? ((p) => fsStat(p));
     this.alive = d.isAlive ?? ((pid, procStart) => defaultIsAlive(pid, procStart));
     this.watchFn = d.watch ?? fsWatch;
     this.onUpsert = opts.onUpsert;
@@ -108,35 +123,64 @@ export class SessionRegistry {
       names = [];
     }
     const seen = new Map<string, RegistryEntry>();
+    const present = new Set<string>();
     for (const name of names) {
       // Only `<pid>.json`. Never touch `<pid>.<hash>.key` secrets or anything else.
       if (!name.endsWith('.json')) continue;
-      let text: string;
+      present.add(name);
+      const path = join(this.dir, name);
+      let key: string | undefined;
       try {
-        text = await this.readFile(join(this.dir, name));
+        const st = await this.stat(path);
+        key = `${st.mtimeMs}:${st.size}`;
       } catch {
-        continue;
+        key = undefined;
       }
-      let raw: unknown;
-      try {
-        raw = JSON.parse(text);
-      } catch {
-        // Caught mid-write: carry the previous entry for this pid so the row doesn't flicker to ended.
-        const prev = this.previousEntryFor(name);
-        if (prev && this.alive(prev.pid, prev.procStart)) seen.set(prev.sessionId, prev);
-        continue;
+      let c = this.cache.get(name);
+      // Unchanged dead-pid file: skip the read, parse and liveness check entirely.
+      if (c?.dead && key !== undefined && c.key === key) continue;
+      if (!(c && key !== undefined && c.key === key)) {
+        let text: string;
+        try {
+          text = await this.readFile(path);
+        } catch {
+          continue;
+        }
+        if (c && c.text === text) {
+          c.key = key;
+        } else {
+          let raw: unknown;
+          try {
+            raw = JSON.parse(text);
+          } catch {
+            // Caught mid-write: carry the previous entry for this pid so the row doesn't flicker to ended.
+            this.cache.delete(name);
+            const prev = this.previousEntryFor(name);
+            if (prev && this.alive(prev.pid, prev.procStart)) seen.set(prev.sessionId, prev);
+            continue;
+          }
+          c = { key, text, entry: parseRegistryEntry(raw), dead: false };
+          this.cache.set(name, c);
+        }
       }
-      const e = parseRegistryEntry(raw);
+      const e = c.entry;
       if (!e) continue;
-      if (!this.alive(e.pid, e.procStart)) continue;
+      if (!this.alive(e.pid, e.procStart)) {
+        c.dead = true;
+        continue;
+      }
+      c.dead = false;
       if (this.stopped) return;
+      const before = this.live.get(e.sessionId);
       seen.set(e.sessionId, e);
+      if (before && (before === e || JSON.stringify(before) === JSON.stringify(e))) continue; // unchanged
       try {
         this.onUpsert(e);
       } catch {
         // A consumer error must never kill the scan.
       }
     }
+    for (const name of [...this.cache.keys()]) if (!present.has(name)) this.cache.delete(name);
     if (this.stopped) return;
     const prev = this.live;
     this.live = seen;

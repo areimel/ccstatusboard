@@ -48,14 +48,19 @@ export class TranscriptTailer {
   private timer: NodeJS.Timeout | undefined;
   private running: Promise<void> | undefined;
   private rerun = false;
+  private readonly debounceMs: number;
+  private debounceTimer: NodeJS.Timeout | undefined;
 
   constructor(opts: {
     onLines: (file: string, lines: string[]) => void;
     pollMs?: number;
+    /** Trailing debounce for fs.watch-triggered polls (default 250ms). */
+    debounceMs?: number;
     deps?: TailerDeps;
   }) {
     this.onLines = opts.onLines;
     this.pollMs = opts.pollMs ?? 1000;
+    this.debounceMs = opts.debounceMs ?? 250;
     this.stat = opts.deps?.stat ?? fsStat;
     this.readRange = opts.deps?.readRange ?? readRangeFromDisk;
     this.watch = opts.deps?.watch ?? watchOnDisk;
@@ -79,6 +84,24 @@ export class TranscriptTailer {
 
   has(file: string): boolean {
     return this.files.has(file);
+  }
+
+  /** Bytes consumed so far for a tracked file. */
+  offsetOf(file: string): number | undefined {
+    return this.files.get(file)?.offset;
+  }
+
+  /** True when a tracked file has no unread bytes (and still exists). */
+  async isCaughtUp(file: string): Promise<boolean> {
+    const state = this.files.get(file);
+    if (!state) return false;
+    try {
+      const { size } = await this.stat(file);
+      // A buffered partial line would be lost if the file were released and resumed at offset.
+      return size === state.offset && state.splitter.pending === '' && this.files.get(file) === state;
+    } catch {
+      return false;
+    }
   }
 
   /** Read any new bytes from every tailed file. Concurrent calls coalesce into one extra pass. */
@@ -108,16 +131,28 @@ export class TranscriptTailer {
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = undefined;
     for (const state of this.files.values()) {
       state.watcher?.close();
       state.watcher = undefined;
     }
   }
 
+  /** Coalesce bursts of watch events into one trailing poll. */
+  private schedulePoll(): void {
+    if (this.debounceTimer || !this.timer) return;
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = undefined;
+      void this.pollOnce();
+    }, this.debounceMs);
+    this.debounceTimer.unref?.();
+  }
+
   private attachWatcher(file: string, state: FileState): void {
     if (state.watcher) return;
     try {
-      state.watcher = this.watch(file, () => void this.pollOnce());
+      state.watcher = this.watch(file, () => this.schedulePoll());
     } catch {
       // File may not exist yet or fs.watch unsupported: interval polling covers it.
     }

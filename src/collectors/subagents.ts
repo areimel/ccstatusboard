@@ -5,6 +5,8 @@ export interface AgentActivity {
   activeCount: number;
   names: string[];
   files: string[];
+  /** mtime of each file in `files` that could be stat'ed. */
+  mtimes: Record<string, number>;
   /** Active agents with per-agent detail. */
   agents: { id: string; name: string; lastActivity: number }[];
 }
@@ -30,7 +32,7 @@ export async function scanSubagents(
   try {
     names = await readdir(dir);
   } catch {
-    return { activeCount: 0, names: [], files: [], agents: [] };
+    return { activeCount: 0, names: [], files: [], mtimes: {}, agents: [] };
   }
 
   const files = names
@@ -40,6 +42,7 @@ export async function scanSubagents(
 
   const activeNames: string[] = [];
   const agents: AgentActivity['agents'] = [];
+  const mtimes: Record<string, number> = {};
   for (const file of files) {
     let mtimeMs: number;
     try {
@@ -47,6 +50,7 @@ export async function scanSubagents(
     } catch {
       continue;
     }
+    mtimes[file] = mtimeMs;
     if (mtimeMs < now - activeWindowMs) continue;
     const name = await agentName(file, readFile);
     activeNames.push(name);
@@ -58,7 +62,7 @@ export async function scanSubagents(
       lastActivity: mtimeMs,
     });
   }
-  return { activeCount: activeNames.length, names: activeNames, files, agents };
+  return { activeCount: activeNames.length, names: activeNames, files, mtimes, agents };
 }
 
 async function agentName(file: string, readFile: (p: string) => Promise<string>): Promise<string> {

@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { memo, type JSX } from 'react';
 import { Box, Text } from 'ink';
 import { Overlay } from './Overlay.js';
 import { useTheme } from './theme.js';
@@ -26,7 +26,7 @@ const NOTES = [
 ];
 
 /** `width` defaults to 64; App passes `Math.min(64, columns)` so the border fits narrow terminals. */
-export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
+export const HelpOverlay = memo(function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Element {
   const theme = useTheme();
   return (
     <Overlay title="Help" width={width}>
@@ -54,4 +54,4 @@ export function HelpOverlay({ width = 64 }: { width?: number } = {}): JSX.Elemen
       ))}
     </Overlay>
   );
-}
+});

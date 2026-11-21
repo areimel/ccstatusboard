@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { burnRatePerHour, hourlySparkline, totalsForWindow, unknownModelsIn } from '../domain/aggregate.js';
+import { type ProviderAggregates } from '../domain/aggregate.js';
 import { DedupSet } from '../domain/dedup.js';
 import { projectBurn } from '../domain/burn-rate-formula.js';
 import {
@@ -19,16 +19,16 @@ import {
   type SystemStats,
   type TimeWindow,
   type TranscriptEvent,
-  type UsageRecord,
 } from '../domain/types.js';
 import {
   blockWindowFromLimit,
-  deriveCurrentBlock,
   monthWindow,
+  RETENTION_MS,
   rollingWeekWindow,
   todayWindow,
   weekWindowFromLimit,
 } from '../domain/windows.js';
+import { ProviderRecords } from './providerRecords.js';
 import { LimitHistory } from './limitHistory.js';
 import { nonNeg, sanitizeLimits, sanitizeSystem, sanitizeText, sanitizeWindowTotals } from './sanitize.js';
 import {
@@ -51,16 +51,31 @@ export interface StoreOptions {
 
 const TESTED_MAJOR_MINOR = '2.1';
 const SYSTEM_HISTORY_POINTS = 60;
+const PRUNE_INTERVAL_MS = 3_600_000;
 
 function pushCapped(arr: number[], v: number): void {
   arr.push(v);
   if (arr.length > SYSTEM_HISTORY_POINTS) arr.splice(0, arr.length - SYSTEM_HISTORY_POINTS);
 }
 
+interface AggCache {
+  version: number;
+  lookup: PriceLookup | null;
+  minute: number;
+  blockStart: number;
+  weekStart: number;
+  todayStart: number;
+  monthStart: number;
+  agg: ProviderAggregates;
+}
+
 export class Store {
   private readonly sessions = new Map<string, SessionState>();
-  private dedup = new DedupSet();
-  private readonly records: UsageRecord[] = [];
+  private readonly dedup = new DedupSet();
+  /** Usage records partitioned per provider. */
+  private readonly records = new Map<Provider, ProviderRecords>();
+  private readonly aggCache = new Map<Provider, AggCache>();
+  private lastPruneAt: number;
   private readonly providerState = new Map<
     Provider,
     {
@@ -91,19 +106,23 @@ export class Store {
   constructor(opts: StoreOptions) {
     this.opts = { ...opts };
     this.claudeDirFound = opts.claudeDirFound;
+    this.lastPruneAt = opts.now();
     this.setProviderStateDefaults('claude', opts.claudeDir, opts.claudeDirFound);
     this.snapshot = this.compute();
   }
 
   applyEvents(sessionId: string, events: TranscriptEvent[], provider: Provider = 'claude'): void {
     const s = this.session(sessionId, provider);
+    const horizon = this.opts.now() - RETENTION_MS;
     for (let e of events) {
       let isNew = false;
       if (e.kind === 'usage') {
+        // Records past the retention horizon are never ingested (they would only be pruned again).
+        if (e.record.timestamp < horizon) continue;
         isNew = this.dedup.add(`${provider}:${e.record.key}`);
         if (isNew) {
           e = { ...e, record: { ...e.record, provider } };
-          this.records.push(e.record);
+          this.recordsOf(provider).add(e.record);
         }
       }
       applySessionEvent(s, e, isNew);
@@ -223,6 +242,7 @@ export class Store {
   }
 
   flush(): void {
+    this.pruneIfDue();
     if (this.pending) {
       clearTimeout(this.pending);
       this.pending = null;
@@ -234,6 +254,29 @@ export class Store {
       } catch {
         // One misbehaving subscriber must not starve the others.
       }
+    }
+  }
+
+  private recordsOf(provider: Provider): ProviderRecords {
+    let p = this.records.get(provider);
+    if (!p) this.records.set(provider, (p = new ProviderRecords()));
+    return p;
+  }
+
+  /** At most once an hour: drops records past retention (and their dedup keys) and evicts stale sessions. */
+  private pruneIfDue(): void {
+    const now = this.opts.now();
+    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    this.lastPruneAt = now;
+    const horizon = now - RETENTION_MS;
+    for (const [provider, p] of this.records)
+      for (const r of p.prune(horizon)) this.dedup.delete(`${provider}:${r.key}`);
+    const sessionHorizon = now - Math.max(RETENTION_MS, this.opts.endedWindowHours * 3_600_000);
+    for (const [key, s] of this.sessions) {
+      if (!s.live && lastActivityOf(s) < sessionHorizon && (s.endedAt ?? 0) < sessionHorizon)
+        this.sessions.delete(key);
+      else if (s.owned.some((r) => r.timestamp < horizon))
+        s.owned = s.owned.filter((r) => r.timestamp >= horizon);
     }
   }
 
@@ -286,20 +329,49 @@ export class Store {
   replaceProviderSession(sessionId: string, events: TranscriptEvent[], provider: Provider = 'codex'): void {
     this.provider(provider);
     const key = `${provider}:${sessionId}`;
+    const old = this.sessions.get(key);
     this.sessions.delete(key);
-    for (let i = this.records.length - 1; i >= 0; i--) {
-      const record = this.records[i]!;
-      if ((record.provider ?? 'claude') === provider && record.sessionId === sessionId)
-        this.records.splice(i, 1);
+    if (old) {
+      for (const r of old.owned) this.dedup.delete(`${provider}:${r.key}`);
+      const gone = new Set(old.owned);
+      this.recordsOf(provider).remove(gone);
     }
-    this.dedup = new DedupSet();
-    for (const record of this.records) this.dedup.add(`${record.provider ?? 'claude'}:${record.key}`);
     this.applyEvents(sessionId, events, provider);
+  }
+
+  private derivedBlock(provider: Provider, now: number): TimeWindow | null {
+    const start = this.recordsOf(provider).derivedBlockStart(now);
+    return start === null ? null : { start, end: now };
+  }
+
+  /** One-pass aggregates, cached while records, pricing and window starts are unchanged within the same minute. */
+  private aggregates(
+    provider: Provider,
+    now: number,
+    lookup: ((model: string) => ReturnType<PriceLookup>) | null,
+    windows: { block: TimeWindow; today: TimeWindow; week: TimeWindow; month: TimeWindow },
+    blockFloating: boolean,
+    weekFloating: boolean,
+  ): ProviderAggregates {
+    const version = this.recordsOf(provider).version;
+    const key = {
+      version,
+      lookup: this.lookup,
+      minute: Math.floor(now / 60_000),
+      blockStart: blockFloating ? -1 : windows.block.start,
+      weekStart: weekFloating ? -1 : windows.week.start,
+      todayStart: windows.today.start,
+      monthStart: windows.month.start,
+    };
+    const c = this.aggCache.get(provider);
+    if (c && (Object.keys(key) as (keyof typeof key)[]).every((k) => c[k] === key[k])) return c.agg;
+    const agg = this.recordsOf(provider).aggregates(provider, windows, now, lookup);
+    this.aggCache.set(provider, { ...key, agg });
+    return agg;
   }
 
   private providerSnapshot(provider: Provider, now: number): ProviderSnapshot {
     const state = this.provider(provider);
-    const records = this.records.filter((record) => (record.provider ?? 'claude') === provider);
     const lookup = this.lookup ? (model: string) => this.lookup!(model, provider) : null;
     const limitDuration = (limit: LimitsState['block']) =>
       limit?.durationMs ?? (limit?.windowMinutes === undefined ? undefined : limit.windowMinutes * 60_000);
@@ -309,10 +381,7 @@ export class Store {
       provider !== 'codex' || (block !== undefined && (limitDuration(state.limits.block) ?? 0) > 0);
     const blockWindow: TimeWindow =
       block === undefined
-        ? (deriveCurrentBlock(
-            records.map((record) => record.timestamp).sort((a, b) => a - b),
-            now,
-          ) ?? { start: now, end: now })
+        ? (this.derivedBlock(provider, now) ?? { start: now, end: now })
         : blockWindowFromLimit(block, now, limitDuration(state.limits.block));
     const weekWindow =
       week === undefined
@@ -334,23 +403,34 @@ export class Store {
     const weekBurn = canProject(state.limits.weekly)
       ? projectBurn(state.limits.weekly, state.history.samples('week'), now, 'week')
       : undefined;
+    const agg = this.aggregates(
+      provider,
+      now,
+      lookup,
+      {
+        block: blockWindow,
+        today: todayWindow(now),
+        week: weekWindow,
+        month: monthWindow(now),
+      },
+      block === undefined && blockWindow.start === now,
+      week === undefined,
+    );
     return {
       dir: sanitizeText(state.dir),
       found: state.found,
       enabled: state.enabled,
       limits: state.limits,
       costs: {
-        block: validCodexBlock
-          ? sanitizeWindowTotals(totalsForWindow(records, blockWindow, lookup))
-          : { ...emptyWindowTotals(), costUSD: null },
-        today: sanitizeWindowTotals(totalsForWindow(records, todayWindow(now), lookup)),
-        week: sanitizeWindowTotals(totalsForWindow(records, weekWindow, lookup)),
-        month: sanitizeWindowTotals(totalsForWindow(records, monthWindow(now), lookup)),
-        burnRatePerHour: burnRatePerHour(records, now, lookup),
-        hourlySparkline: hourlySparkline(records, now, lookup),
+        block: validCodexBlock ? sanitizeWindowTotals(agg.block) : { ...emptyWindowTotals(), costUSD: null },
+        today: sanitizeWindowTotals(agg.today),
+        week: sanitizeWindowTotals(agg.week),
+        month: sanitizeWindowTotals(agg.month),
+        burnRatePerHour: agg.burnRatePerHour,
+        hourlySparkline: agg.hourlySparkline,
       },
       pricingStatus: this.pricingStatus,
-      unknownModels: unknownModelsIn(records, lookup).map(sanitizeText),
+      unknownModels: agg.unknownModels.map(sanitizeText),
       scan: state.scan,
       burn: { ...(blockBurn ? { block: blockBurn } : {}), ...(weekBurn ? { week: weekBurn } : {}) },
       accountingIncomplete: [...this.sessions.values()].some(

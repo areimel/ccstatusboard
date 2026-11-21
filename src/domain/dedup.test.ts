@@ -26,3 +26,13 @@ describe('DedupSet', () => {
     expect(s.has('x')).toBe(true);
   });
 });
+
+describe('DedupSet.delete', () => {
+  it('frees a key so it can be added again', () => {
+    const s = new DedupSet();
+    s.add('a');
+    expect(s.delete('a')).toBe(true);
+    expect(s.delete('a')).toBe(false);
+    expect(s.add('a')).toBe(true);
+  });
+});

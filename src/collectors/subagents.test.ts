@@ -32,6 +32,7 @@ describe('scanSubagents', () => {
       activeCount: 0,
       names: [],
       files: [],
+      mtimes: {},
       agents: [],
     });
   });

@@ -130,6 +130,11 @@ export type TableRow =
 /** Flatten already-sorted sessions into display rows (group headers only when sorting by project). */
 export function buildRows(sessions: SessionView[], sort: SortKey): TableRow[] {
   const rows: TableRow[] = [];
+  // One pass to count each project's sessions, so group headers cost O(1) instead of a rescan.
+  const counts = new Map<string, number>();
+  if (sort === 'project') {
+    for (const s of sessions) counts.set(projectOf(s), (counts.get(projectOf(s)) ?? 0) + 1);
+  }
   let prev: string | undefined;
   sessions.forEach((session, index) => {
     if (sort === 'project' && projectOf(session) !== prev) {
@@ -137,7 +142,7 @@ export function buildRows(sessions: SessionView[], sort: SortKey): TableRow[] {
       rows.push({
         kind: 'group',
         project: prev,
-        count: sessions.filter((s) => projectOf(s) === prev).length,
+        count: counts.get(prev) ?? 0,
       });
     }
     rows.push({ kind: 'session', session, index });
